@@ -302,7 +302,8 @@ class ExamFlowTests(TestCase):
                                       expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
         generated = []
         for number in (1, 2):
-            rows = [dict(q, stem=f"{q['stem']} Вариант {number}") for q in self.generated["questions"]]
+            rows = [dict(q, stem=q["stem"] if q["slot"] == 1 else f"{q['stem']} Вариант {number}")
+                    for q in self.generated["questions"]]
             generated.append([Question(exam=self.exam, **q) for q in rows])
         with patch("exams.management.commands.prepare_invitations.generate_round", side_effect=generated):
             call_command("prepare_invitations", once=True)
@@ -313,6 +314,24 @@ class ExamFlowTests(TestCase):
         self.assertEqual(first.questions.count(), 2)
         self.assertEqual(second.questions.count(), 2)
         self.assertFalse(set(first.questions.values_list("id", flat=True)) & set(second.questions.values_list("id", flat=True)))
+        self.assertEqual(first.questions.get(slot=1).stem, second.questions.get(slot=1).stem)
+
+    def test_identical_whole_variant_is_rejected(self):
+        self.exam.published = True
+        self.exam.save()
+        for number in (1, 2):
+            email = f"student{number}@example.invalid"
+            user = get_user_model().objects.create_user(email, email, "test-password")
+            student = Student.objects.create(user=user, name=f"Ученик {number}", grade=9)
+            Invitation.objects.create(exam=self.exam, student=student, code_hash=f"hash-{number}",
+                                      expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
+        with patch("exams.management.commands.prepare_invitations.generate_round",
+                   side_effect=lambda exam, variation_id: [Question(exam=exam, **q) for q in self.generated["questions"]]) as generate:
+            call_command("prepare_invitations", once=True)
+            call_command("prepare_invitations", once=True)
+        statuses = list(Invitation.objects.order_by("id").values_list("variant_status", flat=True))
+        self.assertEqual(statuses, [Invitation.VariantStatus.READY, Invitation.VariantStatus.ERROR])
+        self.assertEqual(generate.call_count, 4)
 
     def test_pending_code_cannot_start_and_catalog_hides_drafts(self):
         draft = Exam.objects.create(title="Черновик", subject="Математика", grade=9,
@@ -350,9 +369,14 @@ class ExamFlowTests(TestCase):
                 grade_open(question, "ответ")
 
     def test_generation_uses_igcse_for_nine_and_as_for_ten(self):
-        with patch("exams.ai.structured_response", return_value=self.generated) as response:
-            self.assertEqual(len(generate_round(self.exam)), 2)
+        mismatch = {"questions": [dict(self.generated["questions"][0], model_answer="wrong"),
+                                  dict(self.generated["questions"][1])]}
+        with patch("exams.ai.structured_response", return_value=mismatch) as response:
+            questions = generate_round(self.exam, variation_id="test-1")
+            self.assertEqual(len(questions), 2)
+            self.assertEqual(questions[0].model_answer, "1")
         self.assertIn("IGCSE", response.call_args.args[2])
+        self.assertIn("test-1", response.call_args.args[3])
         self.exam.grade = 10
         with patch("exams.ai.structured_response", return_value=self.generated) as response:
             self.assertEqual(len(generate_round(self.exam)), 2)

@@ -1,4 +1,5 @@
 import time
+from collections import defaultdict
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
@@ -37,16 +38,20 @@ class Command(BaseCommand):
                 time.sleep(2)
                 continue
             try:
-                for _ in range(3):
+                for attempt_number in range(3):
                     try:
-                        questions = generate_round(invitation.exam)
+                        questions = generate_round(invitation.exam, variation_id=f"{invitation.pk}-{attempt_number + 1}")
                         with transaction.atomic():
-                            # ponytail: one exam lock serializes uniqueness checks; shard if generation throughput grows.
+                            # ponytail: one exam lock serializes variant checks; shard if throughput grows.
                             Exam.objects.select_for_update().get(pk=invitation.exam_id)
-                            existing = {" ".join(s.casefold().split()) for s in
-                                        Question.objects.filter(exam_id=invitation.exam_id).values_list("stem", flat=True)}
-                            if any(" ".join(q.stem.casefold().split()) in existing for q in questions):
-                                raise ValidationError("ИИ повторил вопрос.")
+                            existing = defaultdict(list)
+                            for owner_id, stem in (Question.objects.filter(exam_id=invitation.exam_id, invitation__isnull=False)
+                                                   .order_by("invitation_id", "slot")
+                                                   .values_list("invitation_id", "stem")):
+                                existing[owner_id].append(" ".join(stem.casefold().split()))
+                            signature = tuple(" ".join(q.stem.casefold().split()) for q in questions)
+                            if signature in {tuple(stems) for stems in existing.values()}:
+                                raise ValidationError("ИИ повторил целый вариант.")
                             locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
                             if locked.variant_status != Invitation.VariantStatus.GENERATING:
                                 break
@@ -58,7 +63,7 @@ class Command(BaseCommand):
                             locked.save(update_fields=["variant_status", "generation_error"])
                         break
                     except ValidationError:
-                        if _ == 2:
+                        if attempt_number == 2:
                             raise
             except Exception as exc:
                 Invitation.objects.filter(pk=invitation.pk, variant_status=Invitation.VariantStatus.GENERATING).update(
