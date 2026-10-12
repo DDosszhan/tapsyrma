@@ -37,4 +37,6 @@ docker compose exec web python manage.py test exams --settings=tapsyrma.test_set
 
 В `.env` установите `DJANGO_DEBUG=0`, `SITE_ADDRESS=ваш-домен`, `DJANGO_ALLOWED_HOSTS=ваш-домен` и `DJANGO_CSRF_TRUSTED_ORIGINS=https://ваш-домен`. Направьте DNS на VPS и откройте порты 80/443; Caddy получит HTTPS-сертификат. Не публикуйте порт PostgreSQL. Настройте внешние резервные копии базы до работы с реальными результатами.
 
+На VPS таймер `ops/tapsyrma-backup.timer` ежедневно сохраняет PostgreSQL, приватные файлы и `.env` в `/var/backups/tapsyrma`, с хранением 14 дней. Каталог доступен только root; это локальная копия. Для защиты от потери VPS нужна отдельная копия вне сервера.
+
 `.env` и приватные ключи игнорируются Git и Docker. В репозиторий отправляйте только `.env.example` с фиктивными значениями. Перед `git push` проверяйте `git diff --cached --name-only` и `git ls-files`.

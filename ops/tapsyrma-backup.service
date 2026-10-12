@@ -1,0 +1,8 @@
+[Unit]
+Description=Tapsyrma database and private media backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /opt/tapsyrma/ops/backup.sh
