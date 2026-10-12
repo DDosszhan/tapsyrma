@@ -236,6 +236,9 @@ class ExamFlowTests(TestCase):
         self.assertEqual(self.client.post("/exam/submit/", answers).status_code, 302)
         attempt.refresh_from_db()
         self.assertEqual(attempt.status, Attempt.Status.PENDING)
+        pending_result = self.client.get("/exam/result/")
+        self.assertContains(pending_result, "Сначала вычесть 4")
+        self.assertContains(pending_result, "2x=4, x=2")
         with patch("exams.grading.grade_open", return_value={"score": 2, "criteria": [1, 1, 0], "explanation": "Два шага верны."}):
             grade_attempt(attempt)
         result = self.client.get("/exam/result/")

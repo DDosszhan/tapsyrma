@@ -130,11 +130,10 @@ def result(request, attempt_id=None):
         request.session["invitation_id"] = invitation.pk
         return redirect("exam_session")
     items = []
-    if attempt.status == Attempt.Status.DONE:
-        for q in _questions(attempt):
-            items.append({"question": q, "answer": attempt.answers.get(str(q.id), ""),
-                          "grade": attempt.grades[str(q.id)],
-                          "criteria": zip(q.rubric, attempt.grades[str(q.id)]["criteria"])})
+    for q in _questions(attempt):
+        grade = attempt.grades.get(str(q.id))
+        items.append({"question": q, "answer": attempt.answers.get(str(q.id), ""),
+                      "grade": grade, "criteria": zip(q.rubric, grade["criteria"]) if grade else []})
     return render(request, "exams/result.html", {"attempt": attempt, "items": items, "exam": invitation.exam})
 
 

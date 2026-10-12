@@ -3,14 +3,14 @@
 {% if attempt.status == "done" %}
 <p class="score">{{ attempt.score }} / {{ exam.total_points }} баллов</p>
 <p class="muted">Открытые ответы предварительно проверены ИИ по утвержденным критериям. Учитель видит работу и определяет оценку в EduPage.</p>
-{% for item in items %}<section class="question"><span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>
+{% elif attempt.status == "error" %}<p>Автоматическая проверка не удалась. Учитель видит работу и сможет повторить проверку.</p>
+{% else %}<p>Ответы сданы и сохранены. Идет проверка.</p><script>setTimeout(()=>location.reload(),5000)</script>{% endif %}
+{% for item in items %}<section class="question">{% if item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
 <h2>Вопрос {{ forloop.counter }}</h2><p>{{ item.question.stem|linebreaksbr }}</p>
 <p><strong>Ваш ответ:</strong> {% if item.question.kind == "mcq" %}{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}{% else %}{{ item.answer|default:"Ответ не дан"|linebreaksbr }}{% endif %}</p>
-<p><strong>Проверка:</strong> {{ item.grade.explanation }}</p>
-<h3>За что давались баллы</h3><ul>{% for criterion, earned in item.criteria %}<li>{{ criterion.criterion }} — {{ earned }} / {{ criterion.points }}</li>{% endfor %}</ul>
+{% if item.grade %}<p><strong>Проверка:</strong> {{ item.grade.explanation }}</p>{% endif %}
+<h3>За что давались баллы</h3><ul>{% if item.grade %}{% for criterion, earned in item.criteria %}<li>{{ criterion.criterion }} — {{ earned }} / {{ criterion.points }}</li>{% endfor %}{% else %}{% for criterion in item.question.rubric %}<li>{{ criterion.criterion }} — до {{ criterion.points }} баллов</li>{% endfor %}{% endif %}</ul>
 <details><summary>Объяснение подтемы: {{ item.question.subtopic }}</summary><p>{{ item.question.subtopic_explanation|linebreaksbr }}</p></details>
 <details><summary>Объяснение ответа</summary><p>{{ item.question.answer_explanation|linebreaksbr }}</p><p><strong>Образец:</strong> {{ item.question.model_answer|linebreaksbr }}</p></details>
 </section>{% endfor %}
-{% elif attempt.status == "error" %}<p>Автоматическая проверка не удалась. Учитель видит работу и сможет повторить проверку.</p>
-{% else %}<p>Ответы сданы и сохранены. Идет проверка.</p><script>setTimeout(()=>location.reload(),5000)</script>{% endif %}
 {% endblock %}
