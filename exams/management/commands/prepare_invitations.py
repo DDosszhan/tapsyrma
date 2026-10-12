@@ -21,7 +21,7 @@ class Command(BaseCommand):
         while True:
             with transaction.atomic():
                 stale = timezone.now() - timedelta(minutes=10)
-                invitation = (Invitation.objects.select_for_update(skip_locked=True)
+                invitation = (Invitation.objects.select_for_update(skip_locked=True, of=("self",))
                               .filter(exam__published=True, expires_at__gt=timezone.now(), attempt__isnull=True)
                               .filter(Q(variant_status=Invitation.VariantStatus.PENDING) |
                                       Q(variant_status=Invitation.VariantStatus.GENERATING, generation_started_at__lt=stale))
