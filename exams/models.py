@@ -20,6 +20,7 @@ class Exam(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, editable=False)
     created_at = models.DateTimeField("Создан", auto_now_add=True)
     updated_at = models.DateTimeField("Изменен", auto_now=True)
+    published = models.BooleanField("Опубликован", default=False)
 
     class Meta:
         verbose_name = "Экзамен"
@@ -29,6 +30,10 @@ class Exam(models.Model):
 
     def __str__(self):
         return f"{self.grade} класс — {self.title}"
+
+    @property
+    def assessment_style(self):
+        return "IGCSE" if self.grade == 9 else "AS Level"
 
     def clean(self):
         errors = {}
@@ -70,3 +75,82 @@ class ExamQuestionRule(models.Model):
             errors["points_each"] = "Баллы за вопрос должны быть больше нуля."
         if errors:
             raise ValidationError(errors)
+
+
+class Question(models.Model):
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="questions")
+    slot = models.PositiveSmallIntegerField("Место в экзамене")
+    kind = models.CharField("Тип", max_length=20, choices=ExamQuestionRule.Kind.choices)
+    points = models.PositiveSmallIntegerField("Баллы")
+    subtopic = models.CharField("Подтема", max_length=200)
+    stem = models.TextField("Вопрос")
+    options = models.JSONField("Варианты ответа", default=list, blank=True)
+    correct_option = models.PositiveSmallIntegerField("Номер верного ответа", null=True, blank=True)
+    rubric = models.JSONField("Критерии", default=list)
+    model_answer = models.TextField("Образец ответа")
+    subtopic_explanation = models.TextField("Объяснение подтемы")
+    answer_explanation = models.TextField("Объяснение ответа")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["slot", "id"]
+        verbose_name = "Сгенерированный вопрос"
+        verbose_name_plural = "Сгенерированные вопросы"
+
+    def __str__(self):
+        return f"{self.exam}: место {self.slot} — {self.subtopic}"
+
+
+class Student(models.Model):
+    name = models.CharField("Имя ученика", max_length=200)
+    grade = models.PositiveSmallIntegerField("Класс", choices=Exam.Grade.choices)
+    external_id = models.CharField("ID ученика", max_length=80, unique=True)
+
+    class Meta:
+        verbose_name = "Ученик"
+        verbose_name_plural = "Ученики"
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.external_id})"
+
+
+class Invitation(models.Model):
+    exam = models.ForeignKey(Exam, on_delete=models.PROTECT)
+    student = models.ForeignKey(Student, on_delete=models.PROTECT)
+    code_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField("Начать до")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Код на сдачу"
+        verbose_name_plural = "Коды на сдачу"
+
+    def __str__(self):
+        return f"{self.student} — {self.exam}"
+
+
+class Attempt(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "В процессе"
+        PENDING = "pending", "Ожидает проверки"
+        GRADING = "grading", "Проверяется"
+        DONE = "done", "Проверено"
+        ERROR = "error", "Нужна ручная проверка"
+
+    invitation = models.OneToOneField(Invitation, on_delete=models.PROTECT, related_name="attempt")
+    question_ids = models.JSONField(default=list)
+    answers = models.JSONField(default=dict)
+    grades = models.JSONField(default=dict)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
+    score = models.PositiveSmallIntegerField(null=True, blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    graded_at = models.DateTimeField(null=True, blank=True)
+    grading_started_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Сдача"
+        verbose_name_plural = "Сдачи"

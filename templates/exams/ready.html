@@ -1,0 +1,6 @@
+{% extends "exams/base.html" %}{% block content %}
+<h1>{{ invitation.exam.title }}</h1><p>{{ invitation.student.name }} · {{ invitation.exam.subject }} · {{ invitation.exam.grade }} класс · формат {{ invitation.exam.assessment_style }}</p>
+<p>{{ invitation.exam.question_count }} вопросов, {{ invitation.exam.total_points }} баллов. После начала можно вернуться по тому же коду; повторную сдачу разрешает учитель.</p>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form method="post">{% csrf_token %}<button type="submit">Начать экзамен</button></form>
+{% endblock %}

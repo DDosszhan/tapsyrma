@@ -30,7 +30,20 @@ services:
       sh -c "python manage.py migrate --noinput &&
       python manage.py collectstatic --noinput &&
       exec gunicorn tapsyrma.wsgi:application --bind 0.0.0.0:8000 --workers 3
-      --access-logfile - --error-logfile -"
+      --timeout 180 --access-logfile - --error-logfile -"
+
+  worker:
+    build: .
+    restart: unless-stopped
+    deploy:
+      replicas: 4
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python manage.py grade_attempts
 
   caddy:
     image: caddy:2-alpine

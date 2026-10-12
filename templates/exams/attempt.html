@@ -1,0 +1,16 @@
+{% extends "exams/base.html" %}{% load exam_tags %}{% block content %}
+<h1>{{ attempt.invitation.exam.title }}</h1><p class="muted">{{ attempt.invitation.student.name }} · {{ attempt.invitation.exam.total_points }} баллов</p>
+<form id="answers" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}
+{% for q in questions %}<section class="question"><span class="points">{{ q.points }} баллов</span>
+<h2>Вопрос {{ forloop.counter }}</h2><p>{{ q.stem|linebreaksbr }}</p>
+{% if q.kind == "mcq" %}{% for option in q.options %}
+<label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
+{% endfor %}{% else %}<label for="q_{{ q.id }}">Ваш ответ</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}
+</section>{% endfor %}
+<p id="save-status" class="muted" aria-live="polite">Ответы сохраняются автоматически.</p>
+<button type="submit" onclick="return confirm('Сдать экзамен? После этого ответы изменить нельзя.')">Сдать экзамен</button></form>
+<script>
+const form=document.getElementById('answers'),status=document.getElementById('save-status');let timer;
+form.addEventListener('input',()=>{clearTimeout(timer);status.textContent='Сохранение…';timer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});status.textContent=r.ok?'Ответы сохранены.':'Не удалось сохранить. Сдача отправит текущие ответы.'}catch{status.textContent='Нет связи. Сдача отправит текущие ответы.'}},700)});
+</script>
+{% endblock %}

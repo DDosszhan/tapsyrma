@@ -9,6 +9,7 @@ from django.db import connection
 from django.http import FileResponse, Http404, JsonResponse
 from django.urls import path
 from django.views.generic import TemplateView
+from exams import views as exam_views
 
 
 def healthz(request):
@@ -31,7 +32,12 @@ def private_media(request, path):
 
 
 urlpatterns = [
-    path("", login_required(TemplateView.as_view(template_name="home.html")), name="home"),
+    path("", exam_views.enter, name="enter"),
+    path("exam/", exam_views.session, name="exam_session"),
+    path("exam/save/", exam_views.save, name="exam_save"),
+    path("exam/submit/", exam_views.submit, name="exam_submit"),
+    path("exam/result/", exam_views.result, name="exam_result"),
+    path("dashboard/", login_required(TemplateView.as_view(template_name="home.html")), name="home"),
     path("login/", LoginView.as_view(template_name="login.html"), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("admin/private-media/<path:path>", admin.site.admin_view(private_media)),
