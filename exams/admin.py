@@ -7,16 +7,21 @@ import secrets
 from django import forms
 from django.contrib import admin
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
+from django.db.models import Q
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpResponseRedirect
+from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
 from .ai import blueprint, generate_round
 from .models import Attempt, Exam, ExamQuestionRule, Invitation, Question, Student
+from .student_import import read_student_emails
 from .syllabus import extract_syllabus_text, validate_syllabus_file
 
 
@@ -198,11 +203,99 @@ class QuestionAdmin(admin.ModelAdmin):
         return request.user.is_superuser and obj is not None and not obj.exam.published and not Attempt.objects.filter(invitation__exam=obj.exam).exists()
 
 
+class StudentAdminForm(forms.ModelForm):
+    email = forms.EmailField(label="Почта для входа", max_length=150,
+                             help_text="При первом входе ученик должен сменить начальный пароль.")
+
+    class Meta:
+        model = Student
+        fields = ["email", "name", "grade"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.fields["email"].help_text = (
+                f"Начальный пароль: {settings.STUDENT_INITIAL_PASSWORD}. При первом входе его нужно сменить."
+            )
+        if self.instance.pk and self.instance.user_id:
+            self.fields["email"].initial = self.instance.user.email
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        existing = get_user_model().objects.filter(Q(username__iexact=email) | Q(email__iexact=email))
+        if self.instance.user_id:
+            existing = existing.exclude(pk=self.instance.user_id)
+        if existing.exists():
+            raise ValidationError("Эта почта уже занята другой учетной записью.")
+        return email
+
+
+class StudentImportForm(forms.Form):
+    grade = forms.ChoiceField(label="Класс", choices=Exam.Grade.choices)
+    file = forms.FileField(label="Файл Excel (.xlsx)")
+
+
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ["name", "external_id", "grade"]
-    search_fields = ["name", "external_id"]
+    form = StudentAdminForm
+    change_list_template = "admin/exams/student/change_list.html"
+    list_display = ["name", "email_address", "grade"]
+    search_fields = ["name", "external_id", "user__email"]
     list_filter = ["grade"]
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("user")
+
+    @admin.display(description="Почта")
+    def email_address(self, obj):
+        return obj.user.email if obj.user_id else "Укажите почту в карточке"
+
+    def save_model(self, request, obj, form, change):
+        email = form.cleaned_data["email"]
+        if obj.user_id:
+            user = obj.user
+            if user.email != email or user.username != email:
+                user.email = user.username = email
+                user.save(update_fields=["email", "username"])
+        else:
+            obj.user = get_user_model().objects.create_user(username=email, email=email,
+                                                            password=settings.STUDENT_INITIAL_PASSWORD)
+        super().save_model(request, obj, form, change)
+
+    def get_urls(self):
+        return [path("import/", self.admin_site.admin_view(self.import_view), name="exams_student_import")] + super().get_urls()
+
+    def import_view(self, request):
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+        form = StudentImportForm(request.POST or None, request.FILES or None)
+        if request.method == "POST" and form.is_valid():
+            try:
+                rows = read_student_emails(form.cleaned_data["file"])
+                created = skipped = 0
+                with transaction.atomic():
+                    for email, name in rows:
+                        existing = get_user_model().objects.filter(Q(username__iexact=email) | Q(email__iexact=email)).first()
+                        if existing:
+                            if Student.objects.filter(user=existing).exists():
+                                skipped += 1
+                                continue
+                            raise ValidationError(f"Почта {email} уже занята другой учетной записью.")
+                        user = get_user_model().objects.create_user(username=email, email=email,
+                                                                    password=settings.STUDENT_INITIAL_PASSWORD)
+                        Student.objects.create(user=user, name=name, grade=int(form.cleaned_data["grade"]))
+                        created += 1
+            except ValidationError as exc:
+                form.add_error("file", exc)
+            else:
+                self.message_user(request, f"Создано учеников: {created}; уже были в системе: {skipped}.")
+                return HttpResponseRedirect(reverse("admin:exams_student_changelist"))
+        context = {**self.admin_site.each_context(request), "title": "Импорт учеников из Excel", "form": form,
+                   "opts": self.model._meta, "initial_password": settings.STUDENT_INITIAL_PASSWORD}
+        return render(request, "admin/exams/student/import.html", context)
 
 
 class InvitationForm(forms.ModelForm):
@@ -217,6 +310,8 @@ class InvitationForm(forms.ModelForm):
             self.add_error("exam", "Экзамен еще не опубликован.")
         if exam and student and exam.grade != student.grade:
             self.add_error("student", "Класс ученика не совпадает с экзаменом.")
+        if student and not student.user_id:
+            self.add_error("student", "Сначала укажите почту ученика в его карточке.")
         if data.get("expires_at") and data["expires_at"] <= timezone.now():
             self.add_error("expires_at", "Укажите время в будущем.")
         return data

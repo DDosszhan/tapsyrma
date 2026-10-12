@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -102,9 +103,12 @@ class Question(models.Model):
 
 
 class Student(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                related_name="student_profile", verbose_name="Учетная запись")
     name = models.CharField("Имя ученика", max_length=200)
     grade = models.PositiveSmallIntegerField("Класс", choices=Exam.Grade.choices)
-    external_id = models.CharField("ID ученика", max_length=80, unique=True)
+    external_id = models.CharField("ID ученика", max_length=80, unique=True, default=uuid.uuid4, editable=False)
+    password_change_required = models.BooleanField("Нужно сменить пароль", default=True)
 
     class Meta:
         verbose_name = "Ученик"

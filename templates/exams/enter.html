@@ -1,5 +1,5 @@
 {% extends "exams/base.html" %}{% block content %}
-<h1>Tapsyrma</h1><p>Введите персональный код, выданный учителем.</p>
+<h1>Tapsyrma</h1><p>Вы вошли как {{ request.user.email }}. Введите персональный код, выданный учителем.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 <form method="post">{% csrf_token %}<label for="code">Код</label><input id="code" name="code" type="text" maxlength="12" autocomplete="one-time-code" required autofocus><button type="submit">Продолжить</button></form>
 {% endblock %}

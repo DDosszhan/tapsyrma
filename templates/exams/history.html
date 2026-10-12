@@ -1,0 +1,10 @@
+{% extends "exams/base.html" %}{% block content %}
+<h1>Мои сдачи</h1>
+{% if attempts %}<ul>
+{% for attempt in attempts %}<li>
+  <a href="{% url 'exam_result_history' attempt.pk %}">{{ attempt.invitation.exam.title }}</a>
+  · {{ attempt.started_at|date:"d.m.Y H:i" }} · {{ attempt.get_status_display }}
+  {% if attempt.score is not None %} · {{ attempt.score }} / {{ attempt.invitation.exam.total_points }} баллов{% endif %}
+</li>{% endfor %}
+</ul>{% else %}<p>Сдач пока нет.</p>{% endif %}
+{% endblock %}

@@ -4,21 +4,26 @@ import itertools
 import secrets
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import Attempt, Invitation, Question
 
 
+@login_required
 def enter(request):
     if request.method == "POST":
         code = request.POST.get("code", "").strip().upper().replace("-", "")
         digest = hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest()
         invitation = Invitation.objects.filter(code_hash=digest).select_related("exam", "student").first()
-        if not invitation or (invitation.expires_at < timezone.now() and not hasattr(invitation, "attempt")):
+        if not invitation or invitation.student.user_id != request.user.pk or (
+            invitation.expires_at < timezone.now() and not hasattr(invitation, "attempt")
+        ):
             return render(request, "exams/enter.html", {"error": "Код недействителен или срок начала истек."})
         request.session["invitation_id"] = invitation.id
         return redirect("exam_session")
@@ -26,7 +31,8 @@ def enter(request):
 
 
 def _invitation(request):
-    invitation = Invitation.objects.filter(pk=request.session.get("invitation_id"), exam__published=True).select_related("exam", "student").first()
+    invitation = Invitation.objects.filter(pk=request.session.get("invitation_id"), exam__published=True,
+                                           student__user=request.user).select_related("exam", "student").first()
     if not invitation:
         raise Http404
     return invitation
@@ -54,6 +60,7 @@ def _new_variant(exam):
     raise ValueError("Варианты закончились. Сгенерируйте еще один раунд вопросов.")
 
 
+@login_required
 def session(request):
     invitation = _invitation(request)
     attempt = Attempt.objects.filter(invitation=invitation).first()
@@ -87,6 +94,7 @@ def _read_answers(request, questions):
     return answers
 
 
+@login_required
 @require_POST
 def save(request):
     invitation = _invitation(request)
@@ -102,6 +110,7 @@ def save(request):
     return JsonResponse({"saved": True})
 
 
+@login_required
 @require_POST
 def submit(request):
     invitation = _invitation(request)
@@ -120,12 +129,19 @@ def submit(request):
     return redirect("exam_result")
 
 
-def result(request):
-    invitation = _invitation(request)
-    attempt = Attempt.objects.filter(invitation=invitation).first()
+@login_required
+def result(request, attempt_id=None):
+    if attempt_id is None:
+        invitation = _invitation(request)
+        attempt = Attempt.objects.filter(invitation=invitation).first()
+    else:
+        attempt = get_object_or_404(Attempt.objects.select_related("invitation__exam"),
+                                    pk=attempt_id, invitation__student__user=request.user)
+        invitation = attempt.invitation
     if not attempt:
         return redirect("exam_session")
     if attempt.status == Attempt.Status.ACTIVE:
+        request.session["invitation_id"] = invitation.pk
         return redirect("exam_session")
     items = []
     if attempt.status == Attempt.Status.DONE:
@@ -134,3 +150,12 @@ def result(request):
                           "grade": attempt.grades[str(q.id)],
                           "criteria": zip(q.rubric, attempt.grades[str(q.id)]["criteria"])})
     return render(request, "exams/result.html", {"attempt": attempt, "items": items, "exam": invitation.exam})
+
+
+@login_required
+def history(request):
+    if not getattr(request.user, "student_profile", None):
+        raise PermissionDenied
+    attempts = Attempt.objects.filter(invitation__student__user=request.user).select_related(
+        "invitation__exam").order_by("-started_at")
+    return render(request, "exams/history.html", {"attempts": attempts})

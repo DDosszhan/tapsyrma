@@ -14,6 +14,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from docx import Document
+from openpyxl import Workbook
 
 from .ai import generate_round, grade_open, validate_questions
 from .grading import grade_attempt
@@ -112,6 +113,59 @@ class ExamAdminTests(TestCase):
         self.assertEqual(Exam.objects.count(), 1)
 
 
+class StudentAccountAdminTests(TestCase):
+    def setUp(self):
+        admin_user = get_user_model().objects.create_superuser("admin", "admin@example.invalid", "test-password")
+        self.client.force_login(admin_user)
+
+    @staticmethod
+    def workbook(rows):
+        book = Workbook()
+        sheet = book.active
+        for row in rows:
+            sheet.append(row)
+        stream = BytesIO()
+        book.save(stream)
+        return SimpleUploadedFile("students.xlsx", stream.getvalue(),
+                                  content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    def test_admin_creates_student_login_with_hashed_initial_password(self):
+        response = self.client.post("/admin/exams/student/add/", {
+            "email": "Pupil@Example.invalid", "name": "Ученик", "grade": "9", "_save": "Сохранить",
+        })
+        self.assertEqual(response.status_code, 302)
+        student = Student.objects.select_related("user").get()
+        self.assertEqual(student.user.username, "pupil@example.invalid")
+        self.assertTrue(student.user.check_password(settings.STUDENT_INITIAL_PASSWORD))
+        self.assertNotEqual(student.user.password, settings.STUDENT_INITIAL_PASSWORD)
+        self.assertTrue(student.password_change_required)
+
+    def test_excel_import_is_atomic_and_safe_to_repeat(self):
+        url = "/admin/exams/student/import/"
+        upload = self.workbook([["email", "name"], ["first@example.invalid", "Первый"],
+                                ["second@example.invalid", "Второй"]])
+        self.assertEqual(self.client.post(url, {"grade": "10", "file": upload}).status_code, 302)
+        self.assertEqual(Student.objects.count(), 2)
+        self.assertEqual(set(Student.objects.values_list("grade", flat=True)), {10})
+        self.assertEqual(self.client.post(url, {"grade": "10", "file": self.workbook([
+            ["email", "name"], ["first@example.invalid", "Первый"],
+            ["second@example.invalid", "Второй"],
+        ])}).status_code, 302)
+        self.assertEqual(Student.objects.count(), 2)
+
+        response = self.client.post(url, {"grade": "9", "file": self.workbook([
+            ["email"], ["third@example.invalid"], ["invalid-email"],
+        ])})
+        self.assertContains(response, "некорректная почта")
+        self.assertFalse(get_user_model().objects.filter(username="third@example.invalid").exists())
+
+        response = self.client.post(url, {"grade": "9", "file": self.workbook([
+            ["email"], ["fourth@example.invalid"], ["admin@example.invalid"],
+        ])})
+        self.assertContains(response, "уже занята")
+        self.assertFalse(get_user_model().objects.filter(username="fourth@example.invalid").exists())
+
+
 class ExamFlowTests(TestCase):
     def setUp(self):
         self.teacher = get_user_model().objects.create_superuser("teacher", "teacher@example.invalid", "password")
@@ -141,11 +195,25 @@ class ExamFlowTests(TestCase):
             Question.objects.create(exam=self.exam, **q)
         self.exam.published = True
         self.exam.save()
-        student = Student.objects.create(name="Ученик", grade=9, external_id="S-1")
+        email = "student@example.invalid"
+        student_user = get_user_model().objects.create_user(email, email, settings.STUDENT_INITIAL_PASSWORD)
+        student = Student.objects.create(user=student_user, name="Ученик", grade=9, external_id="S-1")
         code = "ABCD2345"
         invitation = Invitation.objects.create(exam=self.exam, student=student,
             code_hash=hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest(),
             expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
+        self.assertEqual(self.client.get("/").status_code, 302)
+        self.assertRedirects(self.client.post("/login/", {"username": email, "password": settings.STUDENT_INITIAL_PASSWORD}), "/password/change/")
+        self.assertRedirects(self.client.get("/"), "/password/change/")
+        self.assertRedirects(self.client.post("/password/change/", {
+            "old_password": settings.STUDENT_INITIAL_PASSWORD, "new_password1": "Strong-New-Password-2026!",
+            "new_password2": "Strong-New-Password-2026!",
+        }), "/")
+        student.refresh_from_db()
+        self.assertFalse(student.password_change_required)
+        self.client.logout()
+        self.assertRedirects(self.client.post("/login/", {"username": email.upper(),
+                                                          "password": "Strong-New-Password-2026!"}), "/")
         self.assertEqual(self.client.post("/", {"code": code}).status_code, 302)
         self.assertContains(self.client.get("/exam/"), "Ученик")
         self.assertEqual(self.client.post("/exam/").status_code, 302)
@@ -167,8 +235,19 @@ class ExamFlowTests(TestCase):
         self.assertContains(result, "3 / 4")
         self.assertContains(result, "Вычесть 4")
         self.assertContains(result, "Изолируйте x")
+        self.assertContains(self.client.get("/history/"), "Алгебра")
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "3 / 4")
         self.assertEqual(self.client.get("/exam/").status_code, 302)
         self.assertEqual(Attempt.objects.count(), 1)
+
+        another_email = "another@example.invalid"
+        another_user = get_user_model().objects.create_user(another_email, another_email, "Another-Password-2026!")
+        Student.objects.create(user=another_user, name="Другой", grade=9, password_change_required=False)
+        self.client.logout()
+        self.client.login(username=another_email, password="Another-Password-2026!")
+        self.assertContains(self.client.post("/", {"code": code}), "Код недействителен")
+        self.assertNotContains(self.client.get("/history/"), "Алгебра")
+        self.assertEqual(self.client.get(f"/exam/result/{attempt.pk}/").status_code, 404)
 
     def test_admin_generation_and_code_issue(self):
         self.client.force_login(self.teacher)
@@ -182,7 +261,9 @@ class ExamFlowTests(TestCase):
         self.assertEqual(self.client.post(f"/admin/exams/question/{draft.pk}/delete/", {"post": "yes"}).status_code, 302)
         self.assertEqual(self.exam.questions.count(), 1)
         Question.objects.create(exam=self.exam, **self.generated["questions"][0])
-        student = Student.objects.create(name="Ученик", grade=9, external_id="S-1")
+        student_user = get_user_model().objects.create_user("student@example.invalid", "student@example.invalid",
+                                                            settings.STUDENT_INITIAL_PASSWORD)
+        student = Student.objects.create(user=student_user, name="Ученик", grade=9, external_id="S-1")
         publish = self.client.post(f"/admin/exams/exam/{self.exam.pk}/change/", {
             "title": self.exam.title, "published": "on",
             "questions-TOTAL_FORMS": "2", "questions-INITIAL_FORMS": "2",

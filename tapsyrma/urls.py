@@ -2,7 +2,7 @@ from pathlib import PurePosixPath
 
 from django.contrib import admin
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LogoutView
 from django.core.exceptions import PermissionDenied
 from django.core.files.storage import default_storage
 from django.db import connection
@@ -10,6 +10,7 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.urls import path
 from django.views.generic import TemplateView
 from exams import views as exam_views
+from exams.accounts import StudentLoginView, StudentPasswordChangeView
 
 
 def healthz(request):
@@ -37,8 +38,11 @@ urlpatterns = [
     path("exam/save/", exam_views.save, name="exam_save"),
     path("exam/submit/", exam_views.submit, name="exam_submit"),
     path("exam/result/", exam_views.result, name="exam_result"),
+    path("exam/result/<int:attempt_id>/", exam_views.result, name="exam_result_history"),
+    path("history/", exam_views.history, name="history"),
     path("dashboard/", login_required(TemplateView.as_view(template_name="home.html")), name="home"),
-    path("login/", LoginView.as_view(template_name="login.html"), name="login"),
+    path("login/", StudentLoginView.as_view(), name="login"),
+    path("password/change/", StudentPasswordChangeView.as_view(), name="password_change"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("admin/private-media/<path:path>", admin.site.admin_view(private_media)),
     path("admin/", admin.site.urls),
