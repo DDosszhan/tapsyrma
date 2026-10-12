@@ -45,6 +45,19 @@ services:
         condition: service_healthy
     command: python manage.py grade_attempts
 
+  generator:
+    build: .
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python manage.py prepare_invitations
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped

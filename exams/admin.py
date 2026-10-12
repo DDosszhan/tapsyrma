@@ -1,12 +1,10 @@
 from decimal import Decimal
 import hashlib
 import hmac
-from math import prod
 import secrets
 
 from django import forms
 from django.contrib import admin
-from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -17,9 +15,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
-
-from .ai import blueprint, generate_round
+from .ai import blueprint
 from .models import Attempt, Exam, ExamQuestionRule, Invitation, Question, Student
 from .student_import import read_student_emails
 from .syllabus import extract_syllabus_text, validate_syllabus_file
@@ -43,16 +39,14 @@ class ExamAdminForm(forms.ModelForm):
             except ValidationError as exc:
                 self.add_error("syllabus_file", exc)
         if cleaned.get("published") and not self.instance.pk:
-            self.add_error("published", "Сначала сохраните экзамен и сгенерируйте вопросы.")
+            self.add_error("published", "Сначала сохраните экзамен и его структуру вопросов.")
         if cleaned.get("published") and self.instance.pk:
             try:
-                slots = blueprint(self.instance)
-                if any(not self.instance.questions.filter(slot=s["slot"]).exists() for s in slots):
-                    self.add_error("published", "Сначала сгенерируйте хотя бы один вариант каждого вопроса.")
+                blueprint(self.instance)
             except ValidationError as exc:
                 self.add_error("published", exc)
-        if self.instance.pk and self.instance.published and not cleaned.get("published") and Attempt.objects.filter(invitation__exam=self.instance).exists():
-            self.add_error("published", "Экзамен с начатыми сдачами нельзя снять с публикации.")
+        if self.instance.pk and self.instance.published and not cleaned.get("published") and Invitation.objects.filter(exam=self.instance).exists():
+            self.add_error("published", "Экзамен с выданными кодами нельзя снять с публикации.")
         return cleaned
 
 
@@ -88,29 +82,18 @@ class QuestionRuleInline(admin.TabularInline):
     verbose_name_plural = "Типы вопросов — удалите строку, чтобы исключить тип"
 
 
-class QuestionInline(admin.TabularInline):
-    model = Question
-    extra = 0
-    can_delete = False
-    fields = ["slot", "kind", "points", "subtopic", "stem", "options", "correct_option", "rubric", "model_answer", "subtopic_explanation", "answer_explanation"]
-    readonly_fields = fields
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
     form = ExamAdminForm
-    inlines = [QuestionRuleInline, QuestionInline]
-    list_display = ["title", "subject", "grade", "question_count", "total_points", "published", "generate_link", "created_at"]
+    inlines = [QuestionRuleInline]
+    list_display = ["title", "subject", "grade", "question_count", "total_points", "published", "created_at"]
     list_filter = ["grade", "subject"]
     search_fields = ["title", "subject", "syllabus_text"]
     readonly_fields = ["created_by", "created_at", "updated_at"]
     fieldsets = [
         ("Экзамен", {"fields": ["title", "subject", "grade"]}),
         ("Силабус", {"fields": ["syllabus_file", "syllabus_text"], "description": "Загрузите TXT, PDF или DOCX либо вставьте текст. После сохранения проверьте извлеченный текст."}),
-        ("Структура", {"fields": ["question_count", "total_points", "published"], "description": "Количество и баллы ниже должны дать указанные здесь итоги. Генерация доступна после сохранения."}),
+        ("Структура", {"fields": ["question_count", "total_points", "published"], "description": "Количество и баллы ниже должны дать указанные здесь итоги. После публикации варианты готовятся отдельно для каждого выданного кода."}),
         ("История", {"fields": ["created_by", "created_at", "updated_at"], "classes": ["collapse"]}),
     ]
 
@@ -136,54 +119,23 @@ class ExamAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         base = list(self.readonly_fields)
-        if obj and obj.questions.exists():
+        if obj and (obj.published or obj.questions.exists() or obj.invitation_set.exists()):
             base += ["subject", "grade", "syllabus_file", "syllabus_text", "question_count", "total_points"]
         return base
 
     def get_inline_instances(self, request, obj=None):
         instances = super().get_inline_instances(request, obj)
-        if not obj:
-            return [inline for inline in instances if not isinstance(inline, QuestionInline)]
-        if obj and obj.questions.exists():
-            return [inline for inline in instances if not isinstance(inline, QuestionRuleInline)]
+        if obj and (obj.published or obj.questions.exists() or obj.invitation_set.exists()):
+            return []
         return instances
-
-    def generate_link(self, obj):
-        if obj.published:
-            return "Опубликован"
-        return format_html('<a href="{}">Сгенерировать раунд</a>', reverse("admin:exam_generate", args=[obj.pk]))
-    generate_link.short_description = "Генерация"
-
-    def get_urls(self):
-        return [path("<int:exam_id>/generate/", self.admin_site.admin_view(self.generate_view), name="exam_generate")] + super().get_urls()
-
-    def generate_view(self, request, exam_id):
-        if not request.user.is_superuser:
-            from django.core.exceptions import PermissionDenied
-            raise PermissionDenied
-        exam = Exam.objects.get(pk=exam_id)
-        if request.method == "POST":
-            if exam.published or Attempt.objects.filter(invitation__exam=exam).exists():
-                self.message_user(request, "Опубликованный экзамен нельзя менять.", messages.ERROR)
-            else:
-                try:
-                    Question.objects.bulk_create(generate_round(exam))
-                    self.message_user(request, "Раунд вопросов сохранен. Проверьте вопросы и критерии перед публикацией.")
-                except ValidationError as exc:
-                    self.message_user(request, "; ".join(exc.messages), messages.ERROR)
-            return HttpResponseRedirect(reverse("admin:exams_exam_change", args=[exam.pk]))
-        from django.shortcuts import render
-        counts = [exam.questions.filter(slot=slot).count() for slot in range(1, exam.question_count + 1)]
-        return render(request, "admin/exams/generate.html", {"exam": exam, "title": "Генерация вопросов", "opts": self.model._meta,
-                                                               "capacity": prod(counts), "used": Attempt.objects.filter(invitation__exam=exam).count()})
 
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ["exam", "slot", "kind", "points", "subtopic", "stem"]
+    list_display = ["exam", "invitation", "slot", "kind", "points", "subtopic", "stem"]
     list_filter = ["exam", "kind", "slot"]
-    search_fields = ["stem", "subtopic"]
-    readonly_fields = ["exam", "slot", "kind", "points", "subtopic", "stem", "options", "correct_option",
+    search_fields = ["stem", "subtopic", "invitation__student__name", "invitation__student__user__email"]
+    readonly_fields = ["exam", "invitation", "slot", "kind", "points", "subtopic", "stem", "options", "correct_option",
                        "rubric", "model_answer", "subtopic_explanation", "answer_explanation", "created_at"]
     actions = None
 
@@ -200,7 +152,7 @@ class QuestionAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return request.user.is_superuser and obj is not None and not obj.exam.published and not Attempt.objects.filter(invitation__exam=obj.exam).exists()
+        return request.user.is_superuser and obj is not None and not obj.invitation_id and not obj.exam.published and not Attempt.objects.filter(invitation__exam=obj.exam).exists()
 
 
 class StudentAdminForm(forms.ModelForm):
@@ -320,10 +272,10 @@ class InvitationForm(forms.ModelForm):
 @admin.register(Invitation)
 class InvitationAdmin(admin.ModelAdmin):
     form = InvitationForm
-    list_display = ["student", "exam", "expires_at", "created_at", "attempt_status"]
-    readonly_fields = ["created_by", "created_at", "attempt_status"]
+    list_display = ["student", "exam", "expires_at", "variant_status", "created_at", "attempt_status"]
+    readonly_fields = ["created_by", "created_at", "variant_status", "generation_error", "attempt_status"]
     search_fields = ["student__name", "student__user__email", "student__external_id", "exam__title"]
-    actions = ["reissue_code"]
+    actions = ["reissue_code", "retry_generation"]
 
     def get_readonly_fields(self, request, obj=None):
         fields = list(self.readonly_fields)
@@ -357,6 +309,12 @@ class InvitationAdmin(admin.ModelAdmin):
             obj.code_hash = digest
             obj.save(update_fields=["code_hash"])
             self.message_user(request, f"Новый код для {obj.student}: {code}. Старый код больше не работает.")
+
+    @admin.action(description="Повторить генерацию ошибочных вариантов")
+    def retry_generation(self, request, queryset):
+        count = queryset.filter(variant_status=Invitation.VariantStatus.ERROR, attempt__isnull=True).update(
+            variant_status=Invitation.VariantStatus.PENDING, generation_error="", generation_started_at=None)
+        self.message_user(request, f"Отправлено на повторную генерацию: {count}.")
 
 
 @admin.register(Attempt)

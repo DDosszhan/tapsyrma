@@ -80,6 +80,7 @@ class ExamQuestionRule(models.Model):
 
 class Question(models.Model):
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="questions")
+    invitation = models.ForeignKey("Invitation", on_delete=models.PROTECT, related_name="questions", null=True, blank=True)
     slot = models.PositiveSmallIntegerField("Место в экзамене")
     kind = models.CharField("Тип", max_length=20, choices=ExamQuestionRule.Kind.choices)
     points = models.PositiveSmallIntegerField("Баллы")
@@ -97,6 +98,7 @@ class Question(models.Model):
         ordering = ["slot", "id"]
         verbose_name = "Сгенерированный вопрос"
         verbose_name_plural = "Сгенерированные вопросы"
+        constraints = [models.UniqueConstraint(fields=["invitation", "slot"], name="unique_invitation_question_slot")]
 
     def __str__(self):
         return f"{self.exam}: место {self.slot} — {self.subtopic}"
@@ -120,12 +122,21 @@ class Student(models.Model):
 
 
 class Invitation(models.Model):
+    class VariantStatus(models.TextChoices):
+        PENDING = "pending", "В очереди"
+        GENERATING = "generating", "Генерируется"
+        READY = "ready", "Готов"
+        ERROR = "error", "Ошибка генерации"
+
     exam = models.ForeignKey(Exam, on_delete=models.PROTECT)
     student = models.ForeignKey(Student, on_delete=models.PROTECT)
     code_hash = models.CharField(max_length=64, unique=True)
     expires_at = models.DateTimeField("Начать до")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
+    variant_status = models.CharField("Вариант", max_length=12, choices=VariantStatus.choices, default=VariantStatus.PENDING)
+    generation_started_at = models.DateTimeField(null=True, blank=True)
+    generation_error = models.TextField(blank=True)
 
     class Meta:
         verbose_name = "Код на сдачу"

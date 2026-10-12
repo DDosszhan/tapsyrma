@@ -1,10 +1,8 @@
 import hashlib
 import hmac
-import itertools
-import secrets
-
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
@@ -12,22 +10,24 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Attempt, Invitation, Question
+from .models import Attempt, Exam, Invitation, Question
 
 
-@login_required
 def enter(request):
+    exams = Exam.objects.filter(published=True).order_by("grade", "subject", "title")
     if request.method == "POST":
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.path)
         code = request.POST.get("code", "").strip().upper().replace("-", "")
         digest = hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest()
         invitation = Invitation.objects.filter(code_hash=digest).select_related("exam", "student").first()
         if not invitation or invitation.student.user_id != request.user.pk or (
             invitation.expires_at < timezone.now() and not hasattr(invitation, "attempt")
         ):
-            return render(request, "exams/enter.html", {"error": "Код недействителен или срок начала истек."})
+            return render(request, "exams/enter.html", {"error": "Код недействителен или срок начала истек.", "exams": exams})
         request.session["invitation_id"] = invitation.id
         return redirect("exam_session")
-    return render(request, "exams/enter.html")
+    return render(request, "exams/enter.html", {"exams": exams})
 
 
 def _invitation(request):
@@ -45,21 +45,6 @@ def _questions(attempt):
     return [by_id[pk] for pk in attempt.question_ids]
 
 
-def _new_variant(exam):
-    pools = [list(exam.questions.filter(slot=slot).values_list("id", flat=True)) for slot in range(1, exam.question_count + 1)]
-    if any(not pool for pool in pools):
-        raise ValueError("Вопросы еще не готовы.")
-    used = {tuple(ids) for ids in Attempt.objects.filter(invitation__exam=exam).values_list("question_ids", flat=True)}
-    for _ in range(200):
-        pick = tuple(secrets.choice(pool) for pool in pools)
-        if pick not in used:
-            return list(pick)
-    for pick in itertools.product(*pools):
-        if pick not in used:
-            return list(pick)
-    raise ValueError("Варианты закончились. Сгенерируйте еще один раунд вопросов.")
-
-
 @login_required
 def session(request):
     invitation = _invitation(request)
@@ -69,16 +54,17 @@ def session(request):
             return redirect("exam_result")
         return render(request, "exams/attempt.html", {"attempt": attempt, "questions": _questions(attempt), "answers": attempt.answers})
     if request.method == "POST":
-        if invitation.expires_at < timezone.now():
-            return render(request, "exams/ready.html", {"invitation": invitation, "error": "Срок начала истек."})
-        try:
-            with transaction.atomic():
-                invitation.exam.__class__.objects.select_for_update().get(pk=invitation.exam_id)
-                attempt, _ = Attempt.objects.get_or_create(invitation=invitation, defaults={"question_ids": _new_variant(invitation.exam)})
-        except ValueError as exc:
-            return render(request, "exams/ready.html", {"invitation": invitation, "error": str(exc)})
+        with transaction.atomic():
+            locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
+            if locked.expires_at < timezone.now():
+                return render(request, "exams/ready.html", {"invitation": locked, "expired": True})
+            ids = list(locked.questions.order_by("slot").values_list("id", flat=True))
+            if locked.variant_status != Invitation.VariantStatus.READY or len(ids) != locked.exam.question_count:
+                return render(request, "exams/ready.html", {"invitation": locked, "error": "Вариант еще не готов."})
+            Attempt.objects.get_or_create(invitation=locked, defaults={"question_ids": ids})
         return redirect("exam_session")
-    return render(request, "exams/ready.html", {"invitation": invitation})
+    return render(request, "exams/ready.html", {"invitation": invitation,
+                                                 "expired": invitation.expires_at < timezone.now()})
 
 
 def _read_answers(request, questions):

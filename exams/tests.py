@@ -11,6 +11,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from docx import Document
@@ -191,8 +192,6 @@ class ExamFlowTests(TestCase):
         invalid["questions"][1]["rubric"] = [{"criterion": "Только ответ", "points": 1}]
         with self.assertRaisesMessage(Exception, "критерии"):
             validate_questions(self.exam, invalid)
-        for q in validate_questions(self.exam, self.generated):
-            Question.objects.create(exam=self.exam, **q)
         self.exam.published = True
         self.exam.save()
         email = "student@example.invalid"
@@ -202,7 +201,15 @@ class ExamFlowTests(TestCase):
         invitation = Invitation.objects.create(exam=self.exam, student=student,
             code_hash=hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest(),
             expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
-        self.assertEqual(self.client.get("/").status_code, 302)
+        self.assertContains(self.client.get("/"), "Алгебра")
+        self.assertNotContains(self.client.get("/"), "Решите 2x")
+        self.assertEqual(self.client.post("/", {"code": code}).status_code, 302)
+        self.assertEqual(self.client.get("/exam/").status_code, 302)
+        with patch("exams.management.commands.prepare_invitations.generate_round",
+                   return_value=[Question(exam=self.exam, **q) for q in validate_questions(self.exam, self.generated)]):
+            call_command("prepare_invitations", once=True)
+        invitation.refresh_from_db()
+        self.assertEqual(invitation.variant_status, Invitation.VariantStatus.READY)
         self.assertRedirects(self.client.post("/login/", {"username": email, "password": settings.STUDENT_INITIAL_PASSWORD}), "/password/change/")
         self.assertRedirects(self.client.get("/"), "/password/change/")
         self.assertRedirects(self.client.post("/password/change/", {
@@ -223,7 +230,7 @@ class ExamFlowTests(TestCase):
         self.assertContains(page, "Решите 2x")
         self.assertNotContains(page, "Сначала вычесть 4")
         self.assertNotContains(page, "Верный ответ")
-        q1, q2 = Question.objects.order_by("slot")
+        q1, q2 = invitation.questions.order_by("slot")
         answers = {f"q_{q1.pk}": "1", f"q_{q2.pk}": "2x=4, x=2"}
         self.assertEqual(self.client.post("/exam/save/", answers).status_code, 200)
         self.assertEqual(self.client.post("/exam/submit/", answers).status_code, 302)
@@ -237,6 +244,10 @@ class ExamFlowTests(TestCase):
         self.assertContains(result, "Изолируйте x")
         self.assertContains(self.client.get("/history/"), "Алгебра")
         self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "3 / 4")
+        self.client.logout()
+        self.client.login(username=email, password="Strong-New-Password-2026!")
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Изолируйте x")
+        self.assertEqual(self.client.post("/", {"code": code}).status_code, 302)
         self.assertEqual(self.client.get("/exam/").status_code, 302)
         self.assertEqual(Attempt.objects.count(), 1)
 
@@ -249,32 +260,24 @@ class ExamFlowTests(TestCase):
         self.assertNotContains(self.client.get("/history/"), "Алгебра")
         self.assertEqual(self.client.get(f"/exam/result/{attempt.pk}/").status_code, 404)
 
-    def test_admin_generation_and_code_issue(self):
+    def test_admin_publishes_without_bank_and_issues_code(self):
         self.client.force_login(self.teacher)
-        with patch("exams.admin.generate_round", return_value=[Question(exam=self.exam, **q) for q in self.generated["questions"]]):
-            response = self.client.post(f"/admin/exams/exam/{self.exam.pk}/generate/")
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(self.exam.questions.count(), 2)
-        response = self.client.get(f"/admin/exams/exam/{self.exam.pk}/change/")
-        self.assertContains(response, "Вычесть 4")
-        draft = self.exam.questions.order_by("slot").first()
-        self.assertEqual(self.client.post(f"/admin/exams/question/{draft.pk}/delete/", {"post": "yes"}).status_code, 302)
-        self.assertEqual(self.exam.questions.count(), 1)
-        Question.objects.create(exam=self.exam, **self.generated["questions"][0])
         student_user = get_user_model().objects.create_user("student@example.invalid", "student@example.invalid",
                                                             settings.STUDENT_INITIAL_PASSWORD)
         student = Student.objects.create(user=student_user, name="Ученик", grade=9, external_id="S-1")
         publish = self.client.post(f"/admin/exams/exam/{self.exam.pk}/change/", {
-            "title": self.exam.title, "published": "on",
-            "questions-TOTAL_FORMS": "2", "questions-INITIAL_FORMS": "2",
-            "questions-MIN_NUM_FORMS": "0", "questions-MAX_NUM_FORMS": "1000",
-            **{f"questions-{i}-id": q.pk for i, q in enumerate(self.exam.questions.all())},
+            "title": self.exam.title, "subject": self.exam.subject, "grade": "9",
+            "syllabus_text": self.exam.syllabus_text, "question_count": "2", "total_points": "4.00",
+            "published": "on", "question_rules-TOTAL_FORMS": "2", "question_rules-INITIAL_FORMS": "2",
+            "question_rules-MIN_NUM_FORMS": "1", "question_rules-MAX_NUM_FORMS": "2",
+            **{f"question_rules-{i}-{key}": value
+               for i, rule in enumerate(self.exam.question_rules.order_by("id"))
+               for key, value in {"id": rule.pk, "kind": rule.kind, "count": rule.count,
+                                  "points_each": str(rule.points_each)}.items()},
         })
-        self.assertEqual(publish.status_code, 302)
+        self.assertEqual(publish.status_code, 302, publish.context["adminform"].form.errors if publish.context else "")
         self.exam.refresh_from_db()
         self.assertTrue(self.exam.published)
-        published_question = self.exam.questions.first()
-        self.assertIn(self.client.get(f"/admin/exams/question/{published_question.pk}/delete/").status_code, [403, 404])
         response = self.client.post("/admin/exams/invitation/add/", {
             "exam": self.exam.pk, "student": student.pk,
             "expires_at_0": (timezone.now() + timedelta(days=1)).date().isoformat(),
@@ -283,6 +286,50 @@ class ExamFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Invitation.objects.count(), 1)
         self.assertTrue(Invitation.objects.get().code_hash)
+        self.assertEqual(Invitation.objects.get().variant_status, Invitation.VariantStatus.PENDING)
+
+    def test_each_code_gets_its_own_questions(self):
+        self.exam.published = True
+        self.exam.save()
+        for number in (1, 2):
+            email = f"student{number}@example.invalid"
+            user = get_user_model().objects.create_user(email, email, "test-password")
+            student = Student.objects.create(user=user, name=f"Ученик {number}", grade=9)
+            Invitation.objects.create(exam=self.exam, student=student, code_hash=f"hash-{number}",
+                                      expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
+        generated = []
+        for number in (1, 2):
+            rows = [dict(q, stem=f"{q['stem']} Вариант {number}") for q in self.generated["questions"]]
+            generated.append([Question(exam=self.exam, **q) for q in rows])
+        with patch("exams.management.commands.prepare_invitations.generate_round", side_effect=generated):
+            call_command("prepare_invitations", once=True)
+            call_command("prepare_invitations", once=True)
+        first, second = Invitation.objects.order_by("id")
+        self.assertEqual(first.variant_status, Invitation.VariantStatus.READY)
+        self.assertEqual(second.variant_status, Invitation.VariantStatus.READY)
+        self.assertEqual(first.questions.count(), 2)
+        self.assertEqual(second.questions.count(), 2)
+        self.assertFalse(set(first.questions.values_list("id", flat=True)) & set(second.questions.values_list("id", flat=True)))
+
+    def test_pending_code_cannot_start_and_catalog_hides_drafts(self):
+        draft = Exam.objects.create(title="Черновик", subject="Математика", grade=9,
+                                    syllabus_text="Силабус", question_count=1, total_points=1, created_by=self.teacher)
+        self.exam.published = True
+        self.exam.save()
+        catalog = self.client.get("/")
+        self.assertContains(catalog, "Алгебра")
+        self.assertNotContains(catalog, draft.title)
+        user = get_user_model().objects.create_user("student@example.invalid", "student@example.invalid", "password")
+        student = Student.objects.create(user=user, name="Ученик", grade=9, password_change_required=False)
+        invitation = Invitation.objects.create(exam=self.exam, student=student, code_hash="unused-hash",
+                                                expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
+        self.client.force_login(user)
+        session = self.client.session
+        session["invitation_id"] = invitation.pk
+        session.save()
+        self.assertContains(self.client.get("/exam/"), "вариант готовится")
+        self.assertContains(self.client.post("/exam/"), "Вариант еще не готов")
+        self.assertFalse(Attempt.objects.exists())
 
     def test_structured_api_and_rejects_grades_above_rubric(self):
         question = Question.objects.create(exam=self.exam, **self.generated["questions"][1])

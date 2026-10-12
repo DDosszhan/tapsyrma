@@ -2,5 +2,8 @@
 <h1>{{ invitation.exam.title }}</h1><p>{{ invitation.student.name }} · {{ invitation.exam.subject }} · {{ invitation.exam.grade }} класс · формат {{ invitation.exam.assessment_style }}</p>
 <p>{{ invitation.exam.question_count }} вопросов, {{ invitation.exam.total_points }} баллов. После начала можно вернуться по тому же коду; повторную сдачу разрешает учитель.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
-<form method="post">{% csrf_token %}<button type="submit">Начать экзамен</button></form>
+{% if expired %}<p class="error">Срок начала истек.</p>
+{% elif invitation.variant_status == "ready" %}<form method="post">{% csrf_token %}<button type="submit">Начать экзамен</button></form>
+{% elif invitation.variant_status == "error" %}<p>Вариант не удалось подготовить. Сообщите учителю, чтобы он повторил генерацию.</p>
+{% else %}<p>Ваш вариант готовится. Обновите страницу чуть позже.</p><meta http-equiv="refresh" content="10">{% endif %}
 {% endblock %}
