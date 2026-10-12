@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.sqlite3
+media/
+staticfiles/
+backups/
+*.pem
+*.key
+*.p12
+*.pfx
+.DS_Store

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tapsyrma</title>
+<main>
+  <h1>Tapsyrma</h1>
+  <p>Здравствуйте, {{ request.user.username }}. Основа платформы готова.</p>
+  {% if request.user.is_staff %}<p><a href="{% url 'admin:index' %}">Администрирование</a></p>{% endif %}
+  <form method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button type="submit">Выйти</button>
+  </form>
+</main>
