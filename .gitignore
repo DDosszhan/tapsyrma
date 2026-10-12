@@ -10,6 +10,7 @@ __pycache__/
 media/
 staticfiles/
 backups/
+outputs/
 *.pem
 *.key
 *.p12
