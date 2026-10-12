@@ -322,7 +322,7 @@ class InvitationAdmin(admin.ModelAdmin):
     form = InvitationForm
     list_display = ["student", "exam", "expires_at", "created_at", "attempt_status"]
     readonly_fields = ["created_by", "created_at", "attempt_status"]
-    search_fields = ["student__name", "student__external_id", "exam__title"]
+    search_fields = ["student__name", "student__user__email", "student__external_id", "exam__title"]
     actions = ["reissue_code"]
 
     def get_readonly_fields(self, request, obj=None):
@@ -363,7 +363,8 @@ class InvitationAdmin(admin.ModelAdmin):
 class AttemptAdmin(admin.ModelAdmin):
     list_display = ["invitation", "status", "score", "started_at", "submitted_at", "graded_at"]
     list_filter = ["status", "invitation__exam"]
-    search_fields = ["invitation__student__name", "invitation__student__external_id", "invitation__exam__title"]
+    search_fields = ["invitation__student__name", "invitation__student__user__email",
+                     "invitation__student__external_id", "invitation__exam__title"]
     actions = ["retry_grading"]
     readonly_fields = ["invitation", "question_ids", "answers", "grades", "status", "score", "started_at", "submitted_at", "graded_at", "grading_started_at", "error_message"]
 

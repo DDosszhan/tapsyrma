@@ -116,7 +116,7 @@ class Student(models.Model):
         ordering = ["name"]
 
     def __str__(self):
-        return f"{self.name} ({self.external_id})"
+        return f"{self.name} ({self.user.email if self.user_id else self.external_id})"
 
 
 class Invitation(models.Model):
