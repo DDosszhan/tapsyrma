@@ -25,6 +25,7 @@ services:
         condition: service_healthy
     volumes:
       - static_data:/app/staticfiles
+      - media_data:/app/media
     command: >-
       sh -c "python manage.py migrate --noinput &&
       python manage.py collectstatic --noinput &&
@@ -50,5 +51,6 @@ services:
 volumes:
   postgres_data:
   static_data:
+  media_data:
   caddy_data:
   caddy_config:

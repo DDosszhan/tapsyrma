@@ -7,7 +7,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --create-home --uid 10001 app \
-    && mkdir -p /app/staticfiles \
+    && mkdir -p /app/staticfiles /app/media \
     && chown -R app:app /app
 COPY --chown=app:app . .
 USER app

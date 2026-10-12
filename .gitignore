@@ -5,6 +5,7 @@ __pycache__/
 *.py[cod]
 .venv/
 .pytest_cache/
+.test-media-*/
 *.sqlite3
 media/
 staticfiles/
