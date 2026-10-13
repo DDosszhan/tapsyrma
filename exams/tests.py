@@ -19,7 +19,7 @@ from openpyxl import Workbook
 
 from .ai import generate_round, grade_open, validate_questions
 from .grading import grade_attempt
-from .models import Attempt, Exam, ExamQuestionRule, Invitation, Question, Student
+from .models import Attempt, Exam, ExamQuestionRule, Invitation, Question, SharedCode, Student
 from .syllabus import extract_syllabus_text
 
 
@@ -352,6 +352,70 @@ class ExamFlowTests(TestCase):
         self.assertContains(self.client.get("/exam/"), "вариант готовится")
         self.assertContains(self.client.post("/exam/"), "Вариант еще не готов")
         self.assertFalse(Attempt.objects.exists())
+
+    def test_shared_code_allows_one_exam_choice_per_student(self):
+        self.exam.published = True
+        self.exam.save()
+        other = Exam.objects.create(title="Геометрия", subject="Математика", grade=9, published=True,
+                                    syllabus_text="Треугольники", question_count=1, total_points=1, created_by=self.teacher)
+        Exam.objects.create(title="AS физика", subject="Физика", grade=10, published=True,
+                            syllabus_text="Движение", question_count=1, total_points=1, created_by=self.teacher)
+        code = "SHARED23"
+        shared = SharedCode.objects.create(
+            code_hash=hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest(),
+            expires_at=timezone.now() + timedelta(hours=2), created_by=self.teacher)
+        users = []
+        for number in (1, 2):
+            email = f"student{number}@example.invalid"
+            user = get_user_model().objects.create_user(email, email, "test-password")
+            Student.objects.create(user=user, name=f"Ученик {number}", grade=9, password_change_required=False)
+            users.append(user)
+
+        self.client.force_login(users[0])
+        self.assertRedirects(self.client.post("/", {"code": code}), "/choose/")
+        choices = self.client.get("/choose/")
+        self.assertContains(choices, "Алгебра")
+        self.assertContains(choices, "Геометрия")
+        self.assertNotContains(choices, "AS физика")
+        self.assertEqual(self.client.post("/choose/", {"exam_id": "bad"}).status_code, 400)
+        self.assertContains(self.client.post("/choose/", {"exam_id": str(Exam.objects.get(title="AS физика").pk)}),
+                            "Экзамен или код больше недоступен")
+        self.assertRedirects(self.client.post("/choose/", {"exam_id": self.exam.pk}), "/exam/")
+        first = Invitation.objects.get(shared_code=shared, student__user=users[0])
+        self.assertEqual(first.exam, self.exam)
+        self.assertEqual(first.variant_status, Invitation.VariantStatus.PENDING)
+        self.assertRedirects(self.client.post("/choose/", {"exam_id": other.pk}), "/exam/")
+        self.assertEqual(Invitation.objects.filter(shared_code=shared, student__user=users[0]).count(), 1)
+        with patch("exams.management.commands.prepare_invitations.generate_round",
+                   return_value=[Question(exam=self.exam, **q) for q in self.generated["questions"]]):
+            call_command("prepare_invitations", once=True)
+        self.assertRedirects(self.client.post("/exam/"), "/exam/")
+        self.assertEqual(Attempt.objects.get(invitation=first).question_ids, list(first.questions.values_list("id", flat=True)))
+
+        self.client.force_login(users[1])
+        shared.expires_at = timezone.now() + timedelta(minutes=5)
+        shared.save(update_fields=["expires_at"])
+        self.assertRedirects(self.client.post("/", {"code": code}), "/choose/")
+        self.assertRedirects(self.client.post("/choose/", {"exam_id": other.pk}), "/exam/")
+        self.assertEqual(Invitation.objects.filter(shared_code=shared).count(), 2)
+        self.assertGreater(Invitation.objects.get(shared_code=shared, student__user=users[1]).expires_at,
+                           timezone.now() + timedelta(minutes=59))
+        shared.is_active = False
+        shared.save(update_fields=["is_active"])
+        self.assertRedirects(self.client.post("/", {"code": code}), "/exam/")
+
+    def test_admin_creates_common_code_without_storing_plaintext(self):
+        self.client.force_login(self.teacher)
+        code = "SHARED23"
+        digest = hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest()
+        with patch("exams.admin.new_code", return_value=(code, digest)):
+            response = self.client.post("/admin/exams/sharedcode/add/", {
+                "expires_at_0": (timezone.now() + timedelta(days=2)).date().isoformat(),
+                "expires_at_1": "12:00:00", "is_active": "on",
+            })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(SharedCode.objects.get().code_hash, digest)
+        self.assertContains(self.client.get("/admin/exams/sharedcode/"), code)
 
     def test_structured_api_and_rejects_grades_above_rubric(self):
         question = Question.objects.create(exam=self.exam, **self.generated["questions"][1])

@@ -1,5 +1,7 @@
 import hashlib
 import hmac
+import secrets
+from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
@@ -10,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Attempt, Exam, Invitation, Question
+from .models import Attempt, Exam, Invitation, Question, SharedCode
 
 
 def enter(request):
@@ -21,13 +23,56 @@ def enter(request):
         code = request.POST.get("code", "").strip().upper().replace("-", "")
         digest = hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest()
         invitation = Invitation.objects.filter(code_hash=digest).select_related("exam", "student").first()
-        if not invitation or invitation.student.user_id != request.user.pk or (
-            invitation.expires_at < timezone.now() and not hasattr(invitation, "attempt")
+        if invitation and invitation.student.user_id == request.user.pk and (
+            invitation.expires_at >= timezone.now() or hasattr(invitation, "attempt")
         ):
-            return render(request, "exams/enter.html", {"error": "Код недействителен или срок начала истек.", "exams": exams})
+            request.session["invitation_id"] = invitation.id
+            return redirect("exam_session")
+        shared = SharedCode.objects.filter(code_hash=digest).first()
+        student = getattr(request.user, "student_profile", None)
+        if shared and student:
+            chosen = Invitation.objects.filter(shared_code=shared, student=student).first()
+            if chosen:
+                request.session["invitation_id"] = chosen.id
+                return redirect("exam_session")
+            if shared.is_active and shared.expires_at >= timezone.now():
+                request.session["shared_code_id"] = shared.id
+                return redirect("choose_exam")
+        return render(request, "exams/enter.html", {"error": "Код недействителен или срок начала истек.", "exams": exams})
+    return render(request, "exams/enter.html", {"exams": exams})
+
+
+@login_required
+def choose_exam(request):
+    student = getattr(request.user, "student_profile", None)
+    if not student:
+        raise PermissionDenied
+    shared = get_object_or_404(SharedCode, pk=request.session.get("shared_code_id"))
+    chosen = Invitation.objects.filter(shared_code=shared, student=student).first()
+    if chosen:
+        request.session["invitation_id"] = chosen.id
+        return redirect("exam_session")
+    exams = Exam.objects.filter(published=True, grade=student.grade).order_by("subject", "title")
+    if not shared.is_active or shared.expires_at < timezone.now():
+        return render(request, "exams/choose.html", {"error": "Срок действия кода истек.", "exams": []})
+    if request.method == "POST":
+        exam_id = request.POST.get("exam_id", "")
+        if not exam_id.isdecimal() or len(exam_id) > 20:
+            return HttpResponseBadRequest("Неверный экзамен.")
+        with transaction.atomic():
+            locked = SharedCode.objects.select_for_update().get(pk=shared.pk)
+            exam = Exam.objects.select_for_update().filter(pk=int(exam_id), published=True,
+                                                           grade=student.grade).first()
+            if not locked.is_active or locked.expires_at < timezone.now() or not exam:
+                return render(request, "exams/choose.html", {"error": "Экзамен или код больше недоступен.", "exams": exams})
+            invitation, _ = Invitation.objects.get_or_create(
+                shared_code=locked, student=student,
+                defaults={"exam": exam, "code_hash": secrets.token_hex(32),
+                          "expires_at": max(locked.expires_at, timezone.now() + timedelta(hours=1)),
+                          "created_by": locked.created_by})
         request.session["invitation_id"] = invitation.id
         return redirect("exam_session")
-    return render(request, "exams/enter.html", {"exams": exams})
+    return render(request, "exams/choose.html", {"exams": exams})
 
 
 def _invitation(request):

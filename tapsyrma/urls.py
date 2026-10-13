@@ -34,6 +34,7 @@ def private_media(request, path):
 
 urlpatterns = [
     path("", exam_views.enter, name="enter"),
+    path("choose/", exam_views.choose_exam, name="choose_exam"),
     path("exam/", exam_views.session, name="exam_session"),
     path("exam/save/", exam_views.save, name="exam_save"),
     path("exam/submit/", exam_views.submit, name="exam_submit"),

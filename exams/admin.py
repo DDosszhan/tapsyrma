@@ -16,9 +16,18 @@ from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
 from .ai import blueprint
-from .models import Attempt, Exam, ExamQuestionRule, Invitation, Question, Student
+from .models import Attempt, Exam, ExamQuestionRule, Invitation, Question, SharedCode, Student
 from .student_import import read_student_emails
 from .syllabus import extract_syllabus_text, validate_syllabus_file
+
+
+def new_code():
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    while True:
+        code = "".join(secrets.choice(alphabet) for _ in range(8))
+        digest = hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest()
+        if not Invitation.objects.filter(code_hash=digest).exists() and not SharedCode.objects.filter(code_hash=digest).exists():
+            return code, digest
 
 
 class ExamAdminForm(forms.ModelForm):
@@ -272,8 +281,8 @@ class InvitationForm(forms.ModelForm):
 @admin.register(Invitation)
 class InvitationAdmin(admin.ModelAdmin):
     form = InvitationForm
-    list_display = ["student", "exam", "expires_at", "variant_status", "created_at", "attempt_status"]
-    readonly_fields = ["created_by", "created_at", "variant_status", "generation_error", "attempt_status"]
+    list_display = ["student", "exam", "shared_code", "expires_at", "variant_status", "created_at", "attempt_status"]
+    readonly_fields = ["created_by", "created_at", "shared_code", "variant_status", "generation_error", "attempt_status"]
     search_fields = ["student__name", "student__user__email", "student__external_id", "exam__title"]
     actions = ["reissue_code", "retry_generation"]
 
@@ -289,23 +298,17 @@ class InvitationAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if not change:
-            code, obj.code_hash = self._new_code()
+            code, obj.code_hash = new_code()
             obj.created_by = request.user
             super().save_model(request, obj, form, change)
             self.message_user(request, f"Код для {obj.student}: {code}. Сохраните сейчас: повторно он не показывается.")
         else:
             super().save_model(request, obj, form, change)
 
-    @staticmethod
-    def _new_code():
-        alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        code = "".join(secrets.choice(alphabet) for _ in range(8))
-        return code, hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest()
-
     @admin.action(description="Перевыпустить коды для выбранных приглашений")
     def reissue_code(self, request, queryset):
-        for obj in queryset.select_related("student"):
-            code, digest = self._new_code()
+        for obj in queryset.filter(shared_code__isnull=True).select_related("student"):
+            code, digest = new_code()
             obj.code_hash = digest
             obj.save(update_fields=["code_hash"])
             self.message_user(request, f"Новый код для {obj.student}: {code}. Старый код больше не работает.")
@@ -315,6 +318,56 @@ class InvitationAdmin(admin.ModelAdmin):
         count = queryset.filter(variant_status=Invitation.VariantStatus.ERROR, attempt__isnull=True).update(
             variant_status=Invitation.VariantStatus.PENDING, generation_error="", generation_started_at=None)
         self.message_user(request, f"Отправлено на повторную генерацию: {count}.")
+
+
+class SharedCodeForm(forms.ModelForm):
+    class Meta:
+        model = SharedCode
+        fields = ["expires_at", "is_active"]
+
+    def clean_expires_at(self):
+        expires_at = self.cleaned_data["expires_at"]
+        if expires_at <= timezone.now() and (not self.instance.pk or "expires_at" in self.changed_data):
+            raise ValidationError("Укажите время в будущем.")
+        return expires_at
+
+
+@admin.register(SharedCode)
+class SharedCodeAdmin(admin.ModelAdmin):
+    form = SharedCodeForm
+    exclude = ["code_hash"]
+    list_display = ["id", "expires_at", "is_active", "redeemed_count", "created_at"]
+    readonly_fields = ["created_by", "created_at", "redeemed_count"]
+    actions = ["reissue_code"]
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(self.readonly_fields)
+        if obj and obj.invitations.exists():
+            fields.append("expires_at")
+        return fields
+
+    @admin.display(description="Выбрали экзамен")
+    def redeemed_count(self, obj):
+        return obj.invitations.count() if obj.pk else 0
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            code, obj.code_hash = new_code()
+            obj.created_by = request.user
+            super().save_model(request, obj, form, change)
+            self.message_user(request, f"Общий код: {code}. Сохраните сейчас: повторно он не показывается.")
+        else:
+            super().save_model(request, obj, form, change)
+
+    @admin.action(description="Перевыпустить выбранные общие коды")
+    def reissue_code(self, request, queryset):
+        for obj in queryset:
+            code, obj.code_hash = new_code()
+            obj.save(update_fields=["code_hash"])
+            self.message_user(request, f"Новый общий код #{obj.pk}: {code}. Старый больше не работает.")
 
 
 @admin.register(Attempt)

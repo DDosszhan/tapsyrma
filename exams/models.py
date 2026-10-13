@@ -121,6 +121,21 @@ class Student(models.Model):
         return f"{self.name} ({self.user.email if self.user_id else self.external_id})"
 
 
+class SharedCode(models.Model):
+    code_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField("Начать до")
+    is_active = models.BooleanField("Активен", default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Общий код"
+        verbose_name_plural = "Общие коды"
+
+    def __str__(self):
+        return f"Общий код #{self.pk}"
+
+
 class Invitation(models.Model):
     class VariantStatus(models.TextChoices):
         PENDING = "pending", "В очереди"
@@ -130,6 +145,7 @@ class Invitation(models.Model):
 
     exam = models.ForeignKey(Exam, on_delete=models.PROTECT)
     student = models.ForeignKey(Student, on_delete=models.PROTECT)
+    shared_code = models.ForeignKey(SharedCode, on_delete=models.PROTECT, related_name="invitations", null=True, blank=True)
     code_hash = models.CharField(max_length=64, unique=True)
     expires_at = models.DateTimeField("Начать до")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
@@ -141,6 +157,7 @@ class Invitation(models.Model):
     class Meta:
         verbose_name = "Код на сдачу"
         verbose_name_plural = "Коды на сдачу"
+        constraints = [models.UniqueConstraint(fields=["shared_code", "student"], name="unique_shared_code_student")]
 
     def __str__(self):
         return f"{self.student} — {self.exam}"
