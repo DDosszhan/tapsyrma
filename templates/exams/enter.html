@@ -1,8 +1,9 @@
 {% extends "exams/base.html" %}{% block content %}
 <h1>Доступные тесты</h1>
 {% if exams %}<ul>{% for exam in exams %}<li><strong>{{ exam.title }}</strong> — {{ exam.subject }}, {{ exam.grade }} класс, {{ exam.question_count }} вопросов, {{ exam.total_points }} баллов, {{ exam.duration_minutes }} минут</li>{% endfor %}</ul>{% else %}<p>Пока нет опубликованных тестов.</p>{% endif %}
-{% if request.user.is_authenticated %}<p>Введите код, выданный учителем. По общему коду вы сможете выбрать один экзамен.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+{% if request.user.is_authenticated %}{% if request.user.student_profile %}<p>Введите код, выданный учителем. По общему коду вы сможете выбрать один экзамен.</p>
 <form method="post">{% csrf_token %}<label for="code">Код</label><input id="code" name="code" type="text" maxlength="12" autocomplete="one-time-code" required autofocus><button type="submit">Продолжить</button></form>
+{% else %}<p class="error">Вы вошли без профиля ученика. Для проверки общего кода войдите под учетной записью ученика своего класса.</p>{% if request.user.is_staff %}<p><a href="{% url 'admin:index' %}">Перейти в админку</a></p>{% endif %}{% endif %}
 {% else %}<p><a href="{% url 'login' %}">Войти</a>, чтобы использовать выданный код.</p>{% endif %}
 {% endblock %}

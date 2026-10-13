@@ -23,7 +23,7 @@ class StudentLoginView(LoginView):
             if profile.password_change_required:
                 return reverse("password_change")
             return self.get_redirect_url() or reverse("enter")
-        return super().get_success_url()
+        return self.get_redirect_url() or reverse("admin:index" if self.request.user.is_staff else "enter")
 
 
 class StudentPasswordChangeView(PasswordChangeView):

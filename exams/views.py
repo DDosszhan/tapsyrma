@@ -20,6 +20,10 @@ def enter(request):
     if request.method == "POST":
         if not request.user.is_authenticated:
             return redirect_to_login(request.path)
+        student = getattr(request.user, "student_profile", None)
+        if not student:
+            return render(request, "exams/enter.html", {
+                "error": "Общий код доступен только ученикам. Войдите под учетной записью ученика.", "exams": exams})
         code = request.POST.get("code", "").strip().upper().replace("-", "")
         digest = hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest()
         invitation = Invitation.objects.filter(code_hash=digest).select_related("exam", "student").first()
@@ -29,8 +33,7 @@ def enter(request):
             request.session["invitation_id"] = invitation.id
             return redirect("exam_session")
         shared = SharedCode.objects.filter(code_hash=digest).first()
-        student = getattr(request.user, "student_profile", None)
-        if shared and student:
+        if shared:
             chosen = Invitation.objects.filter(shared_code=shared, student=student).first()
             if chosen:
                 request.session["invitation_id"] = chosen.id

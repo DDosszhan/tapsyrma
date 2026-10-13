@@ -252,6 +252,14 @@ class ExamFlowTests(TestCase):
              "subtopic_explanation": "Изолируйте x.", "answer_explanation": "Сначала вычесть 4, затем разделить на 2."},
         ]}
 
+    def test_staff_login_goes_to_admin_and_cannot_use_student_code(self):
+        get_user_model().objects.create_superuser(
+            "admin@example.invalid", "admin@example.invalid", "Admin-Password-2026!")
+        self.assertRedirects(self.client.post("/login/", {
+            "username": "admin@example.invalid", "password": "Admin-Password-2026!"}), "/admin/")
+        self.assertContains(self.client.get("/"), "Вы вошли без профиля ученика")
+        self.assertContains(self.client.post("/", {"code": "ANYCODE"}), "Общий код доступен только ученикам")
+
     def test_generation_validation_and_full_student_flow(self):
         invalid = {"questions": [dict(self.generated["questions"][0]), dict(self.generated["questions"][1])]}
         invalid["questions"][1]["rubric"] = [{"criterion": "Только ответ", "points": 1}]
