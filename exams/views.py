@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Attempt, Exam, Invitation, Question, SharedCode
+from .models import Attempt, Exam, GradeAppeal, Invitation, Question, SharedCode
 
 
 def enter(request):
@@ -196,12 +196,31 @@ def result(request, attempt_id=None):
     if attempt.status == Attempt.Status.ACTIVE:
         request.session["invitation_id"] = invitation.pk
         return redirect("exam_session")
+    appeals = {appeal.question_id: appeal for appeal in attempt.appeals.all()}
     items = []
     for q in _questions(attempt):
         grade = attempt.grades.get(str(q.id))
         items.append({"question": q, "answer": attempt.answers.get(str(q.id), ""),
-                      "grade": grade, "criteria": zip(q.rubric, grade["criteria"]) if grade else []})
+                      "grade": grade, "criteria": zip(q.rubric, grade["criteria"]) if grade else [],
+                      "appeal": appeals.get(q.id)})
     return render(request, "exams/result.html", {"attempt": attempt, "items": items, "exam": invitation.exam})
+
+
+@login_required
+@require_POST
+def appeal(request, attempt_id, question_id):
+    reason = request.POST.get("reason", "").strip()
+    if not 10 <= len(reason) <= 2000:
+        return HttpResponseBadRequest("Опишите ошибку проверки (от 10 до 2000 символов).")
+    with transaction.atomic():
+        attempt = get_object_or_404(Attempt.objects.select_for_update(), pk=attempt_id,
+                                    invitation__student__user=request.user, status=Attempt.Status.DONE)
+        question = get_object_or_404(Question, pk=question_id)
+        if question_id not in attempt.question_ids or str(question_id) not in attempt.grades:
+            raise Http404
+        GradeAppeal.objects.get_or_create(attempt=attempt, question=question,
+            defaults={"student_reason": reason, "original_grade": attempt.grades[str(question_id)]})
+    return redirect("exam_result_history", attempt_id=attempt_id)
 
 
 @login_required

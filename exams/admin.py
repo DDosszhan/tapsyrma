@@ -17,8 +17,9 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
+from django.utils.html import format_html_join
 from .ai import blueprint
-from .models import Attempt, Exam, ExamQuestionRule, Invitation, Question, SharedCode, Student
+from .models import Attempt, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, SharedCode, Student
 from .student_import import read_student_emails
 from .syllabus import extract_syllabus_text, validate_syllabus_file
 
@@ -471,6 +472,117 @@ class AttemptAdmin(admin.ModelAdmin):
     def retry_grading(self, request, queryset):
         count = queryset.filter(status=Attempt.Status.ERROR).update(status=Attempt.Status.PENDING, error_message="")
         self.message_user(request, f"Отправлено на повторную проверку: {count}.")
+
+
+class GradeAppealReviewForm(forms.ModelForm):
+    decision = forms.ChoiceField(label="Решение учителя", choices=[
+        (GradeAppeal.Status.ACCEPTED, "Изменить баллы"),
+        (GradeAppeal.Status.REJECTED, "Оставить баллы"),
+    ])
+    criterion_scores = forms.CharField(
+        label="Баллы по критериям", required=False,
+        help_text="При изменении укажите баллы в порядке критериев через запятую, например: 1, 0, 2.")
+
+    class Meta:
+        model = GradeAppeal
+        fields = ["teacher_note"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["criterion_scores"].initial = ", ".join(
+                str(value) for value in self.instance.original_grade.get("criteria", []))
+
+    def clean(self):
+        data = super().clean()
+        if not (data.get("teacher_note") or "").strip():
+            self.add_error("teacher_note", "Объясните ученику принятое решение.")
+        if data.get("decision") == GradeAppeal.Status.ACCEPTED:
+            try:
+                scores = [int(value.strip()) for value in data.get("criterion_scores", "").split(",")]
+            except ValueError:
+                scores = []
+            rubric = self.instance.question.rubric
+            if len(scores) != len(rubric) or any(
+                score < 0 or score > criterion["points"] for score, criterion in zip(scores, rubric)
+            ):
+                self.add_error("criterion_scores", "Укажите по одному целому баллу в пределах каждого критерия.")
+            else:
+                data["parsed_scores"] = scores
+        return data
+
+
+@admin.register(GradeAppeal)
+class GradeAppealAdmin(admin.ModelAdmin):
+    form = GradeAppealReviewForm
+    list_display = ["id", "attempt", "question", "status", "created_at", "reviewed_at"]
+    list_filter = ["status", "attempt__invitation__exam"]
+    search_fields = ["attempt__invitation__student__name", "attempt__invitation__student__user__email",
+                     "attempt__invitation__exam__title", "question__stem"]
+    readonly_fields = ["attempt", "question_text", "student_answer", "student_reason", "original_grade",
+                       "rubric_details", "status", "reviewed_by", "created_at", "reviewed_at"]
+
+    def get_fields(self, request, obj=None):
+        fields = ["attempt", "question_text", "student_answer", "student_reason", "original_grade",
+                  "rubric_details", "status"]
+        if obj and obj.status == GradeAppeal.Status.PENDING:
+            fields += ["decision", "criterion_scores", "teacher_note"]
+        elif obj:
+            fields += ["corrected_grade", "teacher_note"]
+        return fields + ["reviewed_by", "created_at", "reviewed_at"]
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(self.readonly_fields)
+        if obj and obj.status != GradeAppeal.Status.PENDING:
+            fields += ["corrected_grade", "teacher_note"]
+        return fields
+
+    @admin.display(description="Текст вопроса")
+    def question_text(self, obj):
+        return obj.question.stem
+
+    @admin.display(description="Ответ ученика")
+    def student_answer(self, obj):
+        value = obj.attempt.answers.get(str(obj.question_id), "")
+        if obj.question.kind == "mcq" and value.isdecimal() and int(value) < len(obj.question.options):
+            return obj.question.options[int(value)]
+        return value or "Ответ не дан"
+
+    @admin.display(description="Критерии")
+    def rubric_details(self, obj):
+        return format_html_join("", "<div>{} — до {} баллов</div>",
+                                ((row["criterion"], row["points"]) for row in obj.question.rubric))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return super().has_change_permission(request, obj) and (obj is None or obj.status == GradeAppeal.Status.PENDING)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        with transaction.atomic():
+            attempt = Attempt.objects.select_for_update().get(pk=obj.attempt_id)
+            appeal = GradeAppeal.objects.select_for_update().get(pk=obj.pk)
+            if appeal.status != GradeAppeal.Status.PENDING or attempt.status != Attempt.Status.DONE:
+                raise PermissionDenied("Это оспаривание уже рассмотрено или сдача не проверена.")
+            obj.status = form.cleaned_data["decision"]
+            obj.reviewed_by = request.user
+            obj.reviewed_at = timezone.now()
+            if obj.status == GradeAppeal.Status.ACCEPTED:
+                scores = form.cleaned_data["parsed_scores"]
+                previous = attempt.grades[str(obj.question_id)]["score"]
+                corrected = {"score": sum(scores), "criteria": scores,
+                             "explanation": form.cleaned_data["teacher_note"].strip()}
+                grades = dict(attempt.grades)
+                grades[str(obj.question_id)] = corrected
+                attempt.grades = grades
+                attempt.score += corrected["score"] - previous
+                attempt.save(update_fields=["grades", "score"])
+                obj.corrected_grade = corrected
+            super().save_model(request, obj, form, change)
 
 
 admin.site.site_header = "Tapsyrma — управление"

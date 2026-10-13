@@ -40,6 +40,7 @@ urlpatterns = [
     path("exam/submit/", exam_views.submit, name="exam_submit"),
     path("exam/result/", exam_views.result, name="exam_result"),
     path("exam/result/<int:attempt_id>/", exam_views.result, name="exam_result_history"),
+    path("exam/result/<int:attempt_id>/appeal/<int:question_id>/", exam_views.appeal, name="exam_appeal"),
     path("history/", exam_views.history, name="history"),
     path("dashboard/", login_required(TemplateView.as_view(template_name="home.html")), name="home"),
     path("login/", StudentLoginView.as_view(), name="login"),

@@ -199,3 +199,31 @@ class Attempt(models.Model):
         verbose_name = "Сдача"
         verbose_name_plural = "Сдачи"
         indexes = [models.Index(fields=["status", "deadline_at"], name="attempt_deadline_idx")]
+
+
+class GradeAppeal(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Ожидает учителя"
+        ACCEPTED = "accepted", "Баллы изменены"
+        REJECTED = "rejected", "Баллы оставлены"
+
+    attempt = models.ForeignKey(Attempt, on_delete=models.PROTECT, related_name="appeals", verbose_name="Сдача")
+    question = models.ForeignKey(Question, on_delete=models.PROTECT, verbose_name="Вопрос")
+    student_reason = models.TextField("Почему нужна проверка")
+    original_grade = models.JSONField("Исходная оценка")
+    status = models.CharField("Решение", max_length=12, choices=Status.choices, default=Status.PENDING)
+    corrected_grade = models.JSONField("Оценка учителя", null=True, blank=True)
+    teacher_note = models.TextField("Объяснение учителя", blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                    editable=False, verbose_name="Проверил")
+    created_at = models.DateTimeField("Подано", auto_now_add=True)
+    reviewed_at = models.DateTimeField("Рассмотрено", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Оспаривание балла"
+        verbose_name_plural = "Оспаривания баллов"
+        ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["attempt", "question"], name="unique_attempt_question_appeal")]
+
+    def __str__(self):
+        return f"Сдача #{self.attempt_id}, вопрос #{self.question_id}"

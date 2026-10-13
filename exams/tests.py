@@ -20,7 +20,7 @@ from openpyxl import Workbook
 from .ai import generate_round, grade_open, validate_questions
 from .grading import grade_attempt
 from .management.commands.grade_attempts import expire_attempts
-from .models import Attempt, Exam, ExamQuestionRule, Invitation, Question, SharedCode, Student
+from .models import Attempt, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, SharedCode, Student
 from .syllabus import extract_syllabus_text
 
 
@@ -549,6 +549,58 @@ class ExamFlowTests(TestCase):
         with patch("exams.ai.structured_response", return_value={"scores": [2, 1, 0], "explanation": ""}):
             with self.assertRaisesMessage(Exception, "вне утвержденных критериев"):
                 grade_open(question, "ответ")
+
+    def test_binary_conversion_accepts_leading_zeroes_without_ai(self):
+        for decimal, answer, model_answer in [(20, "00010100", "10100"), (100, "01100100", "1100100")]:
+            question = Question(exam=self.exam, kind="open", points=1,
+                stem=f"Convert the decimal number {decimal} to binary.", model_answer=model_answer,
+                rubric=[{"criterion": "Correct conversion", "points": 1}])
+            with patch("exams.ai.structured_response", side_effect=AssertionError("AI should not grade this")):
+                self.assertEqual(grade_open(question, answer)["score"], 1)
+                self.assertEqual(grade_open(question, "00000001")["score"], 0)
+
+    def test_student_appeal_and_teacher_correction_preserve_original_grade(self):
+        student_user = get_user_model().objects.create_user("student@example.invalid", "student@example.invalid", "password")
+        student = Student.objects.create(user=student_user, name="Ученик", grade=9, password_change_required=False)
+        invitation = Invitation.objects.create(exam=self.exam, student=student, code_hash="appeal-test",
+            expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
+        question = Question.objects.create(exam=self.exam, invitation=invitation, **self.generated["questions"][1])
+        original = {"score": 0, "criteria": [0, 0, 0], "explanation": "Неверно."}
+        attempt = Attempt.objects.create(invitation=invitation, question_ids=[question.pk],
+            answers={str(question.pk): "2x=4, x=2"}, grades={str(question.pk): original},
+            score=0, status=Attempt.Status.DONE)
+        url = f"/exam/result/{attempt.pk}/appeal/{question.pk}/"
+        self.client.force_login(student_user)
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Отправить учителю")
+        self.assertEqual(self.client.post(url, {"reason": "Мой ответ содержит оба верных шага."}).status_code, 302)
+        self.assertEqual(self.client.post(url, {"reason": "Повторное обращение."}).status_code, 302)
+        self.assertEqual(GradeAppeal.objects.count(), 1)
+        appeal = GradeAppeal.objects.get()
+        self.assertEqual(appeal.original_grade, original)
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Ожидает учителя")
+        other = get_user_model().objects.create_user("other@example.invalid", "other@example.invalid", "password")
+        Student.objects.create(user=other, name="Другой", grade=9, password_change_required=False)
+        self.client.force_login(other)
+        self.assertEqual(self.client.post(url, {"reason": "Попытка доступа к чужому ответу"}).status_code, 404)
+        self.client.force_login(self.teacher)
+        review_url = f"/admin/exams/gradeappeal/{appeal.pk}/change/"
+        invalid = {"decision": "accepted", "criterion_scores": "2, 1, 0", "teacher_note": "Исправлено."}
+        self.assertEqual(self.client.post(review_url, invalid).status_code, 200)
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.score, 0)
+        valid = {"decision": "accepted", "criterion_scores": "1, 1, 1",
+                 "teacher_note": "Все три критерия выполнены."}
+        self.assertEqual(self.client.post(review_url, valid).status_code, 302)
+        attempt.refresh_from_db()
+        appeal.refresh_from_db()
+        self.assertEqual(attempt.score, 3)
+        self.assertEqual(attempt.grades[str(question.pk)]["criteria"], [1, 1, 1])
+        self.assertEqual(appeal.original_grade, original)
+        self.assertEqual(appeal.corrected_grade["score"], 3)
+        self.assertEqual(appeal.reviewed_by, self.teacher)
+        self.assertEqual(self.client.post(review_url, valid).status_code, 403)
+        self.client.force_login(student_user)
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Все три критерия выполнены")
 
     def test_generation_uses_igcse_for_nine_and_as_for_ten(self):
         mismatch = {"questions": [dict(self.generated["questions"][0], model_answer="wrong"),
