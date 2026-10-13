@@ -2,9 +2,11 @@ from decimal import Decimal
 import hashlib
 import hmac
 import secrets
+import uuid
 
 from django import forms
 from django.contrib import admin
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -30,6 +32,19 @@ def new_code():
             return code, digest
 
 
+def automatic_rules(count, total_points):
+    if count < 1 or total_points != int(total_points) or total_points < count:
+        raise ValidationError("Для автоматической структуры нужны целые баллы: не меньше одного за каждый вопрос.")
+    total = int(total_points)
+    for mcq_count in sorted(range(count), key=lambda value: (abs(value * 4 - count), value)):
+        open_count = count - mcq_count
+        open_points, remainder = divmod(total - mcq_count, open_count)
+        if open_points >= 1 and remainder == 0:
+            return ([(ExamQuestionRule.Kind.MCQ, mcq_count, 1)] if mcq_count else []) + [
+                (ExamQuestionRule.Kind.OPEN, open_count, open_points)]
+    raise ValidationError("Не удалось распределить баллы по вопросам.")
+
+
 class ExamAdminForm(forms.ModelForm):
     class Meta:
         model = Exam
@@ -47,6 +62,11 @@ class ExamAdminForm(forms.ModelForm):
                     cleaned["syllabus_text"] = extract_syllabus_text(upload)
             except ValidationError as exc:
                 self.add_error("syllabus_file", exc)
+        if cleaned.get("auto_structure") and cleaned.get("question_count") is not None and cleaned.get("total_points") is not None:
+            try:
+                automatic_rules(cleaned["question_count"], cleaned["total_points"])
+            except ValidationError as exc:
+                self.add_error("total_points", exc)
         if cleaned.get("published") and not self.instance.pk:
             self.add_error("published", "Сначала сохраните экзамен и его структуру вопросов.")
         if cleaned.get("published") and self.instance.pk:
@@ -102,7 +122,7 @@ class ExamAdmin(admin.ModelAdmin):
     fieldsets = [
         ("Экзамен", {"fields": ["title", "subject", "grade"]}),
         ("Силабус", {"fields": ["syllabus_file", "syllabus_text"], "description": "Загрузите TXT, PDF или DOCX либо вставьте текст. После сохранения проверьте извлеченный текст."}),
-        ("Структура", {"fields": ["question_count", "total_points", "duration_minutes", "published"], "description": "Количество и баллы ниже должны дать указанные здесь итоги. После публикации варианты готовятся отдельно для каждого выданного кода."}),
+        ("Структура", {"fields": ["question_count", "total_points", "duration_minutes", "auto_structure", "published"], "description": "Автоматически: около 25% MCQ, остальные открытые; баллы подбираются по вашим итогам. Для ручной настройки снимите галочку и заполните типы вопросов ниже."}),
         ("История", {"fields": ["created_by", "created_at", "updated_at"], "classes": ["collapse"]}),
     ]
 
@@ -126,17 +146,31 @@ class ExamAdmin(admin.ModelAdmin):
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
 
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if form.instance.auto_structure:
+            form.instance.question_rules.all().delete()
+            ExamQuestionRule.objects.bulk_create([
+                ExamQuestionRule(exam=form.instance, kind=kind, count=count, points_each=points)
+                for kind, count, points in automatic_rules(form.instance.question_count, form.instance.total_points)
+            ])
+
     def get_readonly_fields(self, request, obj=None):
         base = list(self.readonly_fields)
         if obj and (obj.published or obj.questions.exists() or obj.invitation_set.exists()):
-            base += ["subject", "grade", "syllabus_file", "syllabus_text", "question_count", "total_points"]
+            base += ["subject", "grade", "syllabus_file", "syllabus_text", "question_count", "total_points", "auto_structure"]
         return base
 
     def get_inline_instances(self, request, obj=None):
         instances = super().get_inline_instances(request, obj)
-        if obj and (obj.published or obj.questions.exists() or obj.invitation_set.exists()):
+        if (request.method == "POST" and request.POST.get("auto_structure") == "on") or (
+            obj and (obj.published or obj.questions.exists() or obj.invitation_set.exists())
+        ):
             return []
         return instances
+
+    class Media:
+        js = ("exams/exam_admin.js",)
 
 
 @admin.register(Question)
@@ -203,12 +237,63 @@ class StudentAdmin(admin.ModelAdmin):
     list_display = ["name", "email_address", "grade"]
     search_fields = ["name", "external_id", "user__email"]
     list_filter = ["grade"]
+    actions = ["reset_passwords", "anonymize_accounts"]
 
     def has_delete_permission(self, request, obj=None):
         return False
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("user")
+        return super().get_queryset(request).filter(anonymized_at__isnull=True).select_related("user")
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if not request.user.is_superuser:
+            actions.pop("reset_passwords", None)
+            actions.pop("anonymize_accounts", None)
+        return actions
+
+    @admin.action(description="Сбросить пароль до начального и потребовать смену")
+    def reset_passwords(self, request, queryset):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+        count = 0
+        with transaction.atomic():
+            for student in queryset.filter(user__isnull=False).select_related("user"):
+                student.user.set_password(settings.STUDENT_INITIAL_PASSWORD)
+                student.user.save(update_fields=["password"])
+                student.password_change_required = True
+                student.save(update_fields=["password_change_required"])
+                count += 1
+        self.message_user(request, f"Пароль сброшен у {count} учеников. При входе они должны сменить его.")
+
+    @admin.action(description="Удалить вход и обезличить историю")
+    def anonymize_accounts(self, request, queryset):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+        if request.POST.get("confirm_anonymize") != "yes":
+            return render(request, "admin/exams/student/confirm_anonymize.html", {
+                **self.admin_site.each_context(request), "title": "Удаление аккаунтов учеников",
+                "opts": self.model._meta, "count": queryset.count(),
+                "selected_ids": request.POST.getlist(ACTION_CHECKBOX_NAME),
+                "select_across": request.POST.get("select_across", "0"),
+                "action_checkbox_name": ACTION_CHECKBOX_NAME,
+            })
+        count = 0
+        with transaction.atomic():
+            for student in queryset.select_related("user"):
+                user = student.user if student.user_id else None
+                if user and (user.is_staff or user.is_superuser):
+                    raise PermissionDenied("Нельзя удалить аккаунт сотрудника через список учеников.")
+                student.user = None
+                student.name = "Удалённый ученик"
+                student.external_id = str(uuid.uuid4())
+                student.anonymized_at = timezone.now()
+                student.password_change_required = False
+                student.save(update_fields=["user", "name", "external_id", "anonymized_at", "password_change_required"])
+                if user:
+                    user.delete()
+                count += 1
+        self.message_user(request, f"Удалено аккаунтов: {count}. История сдач сохранена без имени и почты.")
 
     @admin.display(description="Почта")
     def email_address(self, obj):

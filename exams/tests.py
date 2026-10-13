@@ -120,6 +120,31 @@ class ExamAdminTests(TestCase):
         self.assertEqual(self.client.post("/admin/exams/exam/add/", data).status_code, 200)
         self.assertEqual(Exam.objects.count(), 1)
 
+    def test_automatic_structure_and_manual_override(self):
+        data = self.form_data("20.00")
+        data.update({"question_count": "8", "auto_structure": "on"})
+        self.assertEqual(self.client.post("/admin/exams/exam/add/", data).status_code, 302)
+        exam = Exam.objects.get()
+        self.assertTrue(exam.auto_structure)
+        self.assertEqual(list(exam.question_rules.order_by("kind").values_list("kind", "count", "points_each")),
+                         [("mcq", 2, 1), ("open", 6, 3)])
+        publish = self.client.post(f"/admin/exams/exam/{exam.pk}/change/", {
+            "title": exam.title, "subject": exam.subject, "grade": "9", "syllabus_text": exam.syllabus_text,
+            "question_count": "8", "total_points": "20.00", "duration_minutes": "75",
+            "auto_structure": "on", "published": "on",
+        })
+        self.assertEqual(publish.status_code, 302)
+        exam.refresh_from_db()
+        self.assertTrue(exam.published)
+
+        manual = self.form_data("10.00")
+        manual["title"] = "Ручной вариант"
+        self.assertEqual(self.client.post("/admin/exams/exam/add/", manual).status_code, 302)
+        custom = Exam.objects.get(title="Ручной вариант")
+        self.assertFalse(custom.auto_structure)
+        self.assertEqual(list(custom.question_rules.order_by("kind").values_list("kind", "count", "points_each")),
+                         [("mcq", 4, 2), ("open", 1, 2)])
+
 
 class StudentAccountAdminTests(TestCase):
     def setUp(self):
@@ -147,6 +172,39 @@ class StudentAccountAdminTests(TestCase):
         self.assertTrue(student.user.check_password(settings.STUDENT_INITIAL_PASSWORD))
         self.assertNotEqual(student.user.password, settings.STUDENT_INITIAL_PASSWORD)
         self.assertTrue(student.password_change_required)
+
+    def test_reset_password_and_delete_login_without_losing_history(self):
+        user = get_user_model().objects.create_user("pupil@example.invalid", "pupil@example.invalid", "changed-password")
+        student = Student.objects.create(user=user, name="Ученик", grade=9, password_change_required=False)
+        admin_user = get_user_model().objects.get(username="admin")
+        exam = Exam.objects.create(title="Ретейк", subject="Математика", grade=9,
+                                   syllabus_text="Тема", question_count=1, total_points=1, created_by=admin_user)
+        invitation = Invitation.objects.create(exam=exam, student=student, code_hash="test-code-hash",
+                                               expires_at=timezone.now() + timedelta(days=1), created_by=exam.created_by)
+        attempt = Attempt.objects.create(invitation=invitation, status=Attempt.Status.DONE, score=1)
+        url = "/admin/exams/student/"
+        selection = {"action": "reset_passwords", "_selected_action": [str(student.pk)]}
+        self.assertEqual(self.client.post(url, selection).status_code, 302)
+        user.refresh_from_db()
+        student.refresh_from_db()
+        self.assertTrue(user.check_password(settings.STUDENT_INITIAL_PASSWORD))
+        self.assertTrue(student.password_change_required)
+
+        selection["action"] = "anonymize_accounts"
+        confirmation = self.client.post(url, selection)
+        self.assertContains(confirmation, "Удалить вход")
+        self.assertTrue(get_user_model().objects.filter(pk=user.pk).exists())
+        original_external_id = student.external_id
+        selection["confirm_anonymize"] = "yes"
+        self.assertEqual(self.client.post(url, selection).status_code, 302)
+        student.refresh_from_db()
+        self.assertFalse(get_user_model().objects.filter(pk=user.pk).exists())
+        self.assertIsNone(student.user_id)
+        self.assertEqual(student.name, "Удалённый ученик")
+        self.assertNotEqual(student.external_id, original_external_id)
+        self.assertIsNotNone(student.anonymized_at)
+        self.assertTrue(Attempt.objects.filter(pk=attempt.pk, invitation__student=student).exists())
+        self.assertNotContains(self.client.get(url), "pupil@example.invalid")
 
     def test_excel_import_is_atomic_and_safe_to_repeat(self):
         url = "/admin/exams/student/import/"

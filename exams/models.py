@@ -18,6 +18,7 @@ class Exam(models.Model):
     syllabus_file = models.FileField("Файл силабуса", upload_to="syllabi/%Y/%m/", blank=True)
     syllabus_text = models.TextField("Текст силабуса", blank=True, help_text="Проверьте извлеченный текст перед генерацией вопросов.")
     question_count = models.PositiveSmallIntegerField("Всего вопросов")
+    auto_structure = models.BooleanField("Распределить типы и баллы автоматически", default=True)
     duration_minutes = models.PositiveSmallIntegerField(
         "Длительность (минут)", default=60, validators=[MinValueValidator(1)],
         help_text="Отсчет начинается, когда ученик нажмет «Начать экзамен».")
@@ -118,6 +119,7 @@ class Student(models.Model):
     grade = models.PositiveSmallIntegerField("Класс", choices=Exam.Grade.choices)
     external_id = models.CharField("ID ученика", max_length=80, unique=True, default=uuid.uuid4, editable=False)
     password_change_required = models.BooleanField("Нужно сменить пароль", default=True)
+    anonymized_at = models.DateTimeField("Аккаунт удалён", null=True, blank=True)
 
     class Meta:
         verbose_name = "Ученик"
@@ -125,6 +127,8 @@ class Student(models.Model):
         ordering = ["name"]
 
     def __str__(self):
+        if self.anonymized_at:
+            return f"Удалённый ученик #{self.pk}"
         return f"{self.name} ({self.user.email if self.user_id else self.external_id})"
 
 
