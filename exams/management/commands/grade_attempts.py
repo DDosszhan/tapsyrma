@@ -9,12 +9,19 @@ from exams.grading import grade_attempt
 from exams.models import Attempt
 
 
+def expire_attempts():
+    now = timezone.now()
+    return Attempt.objects.filter(status=Attempt.Status.ACTIVE, deadline_at__lte=now).update(
+        status=Attempt.Status.PENDING, submitted_at=now)
+
+
 class Command(BaseCommand):
     help = "Проверяет отправленные попытки через фиксированные критерии."
 
     def handle(self, *args, **options):
         while True:
             with transaction.atomic():
+                expire_attempts()
                 stale = timezone.now() - timedelta(hours=1)
                 attempt = (Attempt.objects.select_for_update(skip_locked=True)
                            .filter(status=Attempt.Status.PENDING).order_by("submitted_at").first())

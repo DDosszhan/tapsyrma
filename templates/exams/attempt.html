@@ -1,5 +1,6 @@
 {% extends "exams/base.html" %}{% load exam_tags %}{% block content %}
 <h1>{{ attempt.invitation.exam.title }}</h1><p class="muted">{{ attempt.invitation.student.name }} · {{ attempt.invitation.exam.total_points }} баллов</p>
+{% if attempt.deadline_at %}<p class="score exam-timer" role="timer">Осталось: <span id="countdown" data-remaining="{{ remaining_seconds }}">{{ remaining_seconds }} с</span></p>{% endif %}
 <form id="answers" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}
 {% for q in questions %}<section class="question"><span class="points">{{ q.points }} баллов</span>
 <h2>Вопрос {{ forloop.counter }}</h2><p>{{ q.stem|linebreaksbr }}</p>
@@ -10,7 +11,18 @@
 <p id="save-status" class="muted" aria-live="polite">Ответы сохраняются автоматически.</p>
 <button type="submit" onclick="return confirm('Сдать экзамен? После этого ответы изменить нельзя.')">Сдать экзамен</button></form>
 <script>
-const form=document.getElementById('answers'),status=document.getElementById('save-status');let timer;
-form.addEventListener('input',()=>{clearTimeout(timer);status.textContent='Сохранение…';timer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});status.textContent=r.ok?'Ответы сохранены.':'Не удалось сохранить. Сдача отправит текущие ответы.'}catch{status.textContent='Нет связи. Сдача отправит текущие ответы.'}},700)});
+const form=document.getElementById('answers'),status=document.getElementById('save-status');let saveTimer;
+form.addEventListener('input',()=>{clearTimeout(saveTimer);status.textContent='Сохранение…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Ответы сохранены.':'Не удалось сохранить. Сдача отправит текущие ответы.'}catch{status.textContent='Нет связи. Сдача отправит текущие ответы.'}},700)});
+const countdown=document.getElementById('countdown');
+if(countdown){
+  const deadline=Date.now()+Number(countdown.dataset.remaining)*1000;
+  function tick(){
+    const left=Math.max(0,Math.ceil((deadline-Date.now())/1000));
+    const hours=Math.floor(left/3600),minutes=Math.floor(left%3600/60),seconds=left%60;
+    countdown.textContent=(hours?String(hours).padStart(2,'0')+':':'')+String(minutes).padStart(2,'0')+':'+String(seconds).padStart(2,'0');
+    if(left===0){status.textContent='Время вышло. Сохраненные ответы отправлены.';location.replace('{% url "exam_session" %}')}
+  }
+  tick();setInterval(tick,1000);
+}
 </script>
 {% endblock %}

@@ -19,6 +19,7 @@ from openpyxl import Workbook
 
 from .ai import generate_round, grade_open, validate_questions
 from .grading import grade_attempt
+from .management.commands.grade_attempts import expire_attempts
 from .models import Attempt, Exam, ExamQuestionRule, Invitation, Question, SharedCode, Student
 from .syllabus import extract_syllabus_text
 
@@ -62,6 +63,7 @@ class ExamAdminTests(TestCase):
             "syllabus_file": SimpleUploadedFile("part.txt", "Линейные уравнения".encode()),
             "syllabus_text": "",
             "question_count": "5",
+            "duration_minutes": "75",
             "total_points": total_points,
             "question_rules-TOTAL_FORMS": "2",
             "question_rules-INITIAL_FORMS": "0",
@@ -80,12 +82,17 @@ class ExamAdminTests(TestCase):
         invalid = self.client.post(url, self.form_data("9.00"))
         self.assertEqual(invalid.status_code, 200)
         self.assertFalse(Exam.objects.exists())
+        bad_duration = self.form_data("10.00")
+        bad_duration["duration_minutes"] = "0"
+        self.assertEqual(self.client.post(url, bad_duration).status_code, 200)
+        self.assertFalse(Exam.objects.exists())
 
         saved = self.client.post(url, self.form_data("10.00"))
         self.assertEqual(saved.status_code, 302)
         exam = Exam.objects.get()
         self.assertEqual(exam.syllabus_text, "Линейные уравнения")
         self.assertEqual(exam.question_rules.count(), 2)
+        self.assertEqual(exam.duration_minutes, 75)
         self.assertEqual(exam.created_by, self.admin_user)
 
         self.client.logout()
@@ -263,6 +270,58 @@ class ExamFlowTests(TestCase):
         self.assertNotContains(self.client.get("/history/"), "Алгебра")
         self.assertEqual(self.client.get(f"/exam/result/{attempt.pk}/").status_code, 404)
 
+    def test_duration_starts_with_attempt_and_expiry_keeps_saved_answers(self):
+        self.exam.published = True
+        self.exam.duration_minutes = 2
+        self.exam.save()
+        user = get_user_model().objects.create_user("student@example.invalid", "student@example.invalid", "password")
+        student = Student.objects.create(user=user, name="Ученик", grade=9, password_change_required=False)
+        invitation = Invitation.objects.create(
+            exam=self.exam, student=student, code_hash="timer-test", variant_status=Invitation.VariantStatus.READY,
+            expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
+        questions = [Question.objects.create(exam=self.exam, invitation=invitation, **q)
+                     for q in self.generated["questions"]]
+        self.client.force_login(user)
+        session = self.client.session
+        session["invitation_id"] = invitation.pk
+        session.save()
+
+        self.assertRedirects(self.client.post("/exam/"), "/exam/")
+        attempt = Attempt.objects.get(invitation=invitation)
+        self.assertAlmostEqual((attempt.deadline_at - attempt.started_at).total_seconds(), 120, delta=2)
+        self.assertContains(self.client.get("/exam/"), 'id="countdown"')
+        answer_key = f"q_{questions[0].pk}"
+        self.assertEqual(self.client.post("/exam/save/", {answer_key: "1"}).status_code, 200)
+        attempt.deadline_at = timezone.now() - timedelta(seconds=1)
+        attempt.save(update_fields=["deadline_at"])
+        self.assertEqual(self.client.post("/exam/save/", {answer_key: "2"}).status_code, 409)
+        self.assertRedirects(self.client.post("/exam/submit/", {answer_key: "2"}), "/exam/result/")
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.status, Attempt.Status.PENDING)
+        self.assertEqual(attempt.answers[str(questions[0].pk)], "1")
+        self.assertIsNotNone(attempt.submitted_at)
+
+        def extra_attempt(deadline):
+            other = Invitation.objects.create(
+                exam=self.exam, student=student, code_hash=f"timer-{Invitation.objects.count()}",
+                expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
+            return Attempt.objects.create(invitation=other, deadline_at=deadline)
+
+        expired = extra_attempt(timezone.now() - timedelta(seconds=1))
+        session = self.client.session
+        session["invitation_id"] = expired.invitation_id
+        session.save()
+        self.assertRedirects(self.client.get("/exam/"), "/exam/result/")
+        expired.refresh_from_db()
+        self.assertEqual(expired.status, Attempt.Status.PENDING)
+        background = extra_attempt(timezone.now() - timedelta(seconds=1))
+        legacy = extra_attempt(None)
+        self.assertEqual(expire_attempts(), 1)
+        background.refresh_from_db()
+        legacy.refresh_from_db()
+        self.assertEqual(background.status, Attempt.Status.PENDING)
+        self.assertEqual(legacy.status, Attempt.Status.ACTIVE)
+
     def test_admin_publishes_without_bank_and_issues_code(self):
         self.client.force_login(self.teacher)
         student_user = get_user_model().objects.create_user("student@example.invalid", "student@example.invalid",
@@ -271,6 +330,7 @@ class ExamFlowTests(TestCase):
         publish = self.client.post(f"/admin/exams/exam/{self.exam.pk}/change/", {
             "title": self.exam.title, "subject": self.exam.subject, "grade": "9",
             "syllabus_text": self.exam.syllabus_text, "question_count": "2", "total_points": "4.00",
+            "duration_minutes": "60",
             "published": "on", "question_rules-TOTAL_FORMS": "2", "question_rules-INITIAL_FORMS": "2",
             "question_rules-MIN_NUM_FORMS": "1", "question_rules-MAX_NUM_FORMS": "2",
             **{f"question_rules-{i}-{key}": value

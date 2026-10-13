@@ -95,14 +95,14 @@ class QuestionRuleInline(admin.TabularInline):
 class ExamAdmin(admin.ModelAdmin):
     form = ExamAdminForm
     inlines = [QuestionRuleInline]
-    list_display = ["title", "subject", "grade", "question_count", "total_points", "published", "created_at"]
+    list_display = ["title", "subject", "grade", "question_count", "duration_minutes", "total_points", "published", "created_at"]
     list_filter = ["grade", "subject"]
     search_fields = ["title", "subject", "syllabus_text"]
     readonly_fields = ["created_by", "created_at", "updated_at"]
     fieldsets = [
         ("Экзамен", {"fields": ["title", "subject", "grade"]}),
         ("Силабус", {"fields": ["syllabus_file", "syllabus_text"], "description": "Загрузите TXT, PDF или DOCX либо вставьте текст. После сохранения проверьте извлеченный текст."}),
-        ("Структура", {"fields": ["question_count", "total_points", "published"], "description": "Количество и баллы ниже должны дать указанные здесь итоги. После публикации варианты готовятся отдельно для каждого выданного кода."}),
+        ("Структура", {"fields": ["question_count", "total_points", "duration_minutes", "published"], "description": "Количество и баллы ниже должны дать указанные здесь итоги. После публикации варианты готовятся отдельно для каждого выданного кода."}),
         ("История", {"fields": ["created_by", "created_at", "updated_at"], "classes": ["collapse"]}),
     ]
 

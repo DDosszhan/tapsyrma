@@ -90,14 +90,29 @@ def _questions(attempt):
     return [by_id[pk] for pk in attempt.question_ids]
 
 
+def _close_expired(attempt):
+    if attempt.status == Attempt.Status.ACTIVE and attempt.deadline_at and timezone.now() >= attempt.deadline_at:
+        attempt.status = Attempt.Status.PENDING
+        attempt.submitted_at = timezone.now()
+        attempt.save(update_fields=["status", "submitted_at"])
+        return True
+    return False
+
+
 @login_required
 def session(request):
     invitation = _invitation(request)
     attempt = Attempt.objects.filter(invitation=invitation).first()
     if attempt:
+        if attempt.status == Attempt.Status.ACTIVE and attempt.deadline_at and timezone.now() >= attempt.deadline_at:
+            with transaction.atomic():
+                attempt = Attempt.objects.select_for_update().get(pk=attempt.pk)
+                _close_expired(attempt)
         if attempt.status != Attempt.Status.ACTIVE:
             return redirect("exam_result")
-        return render(request, "exams/attempt.html", {"attempt": attempt, "questions": _questions(attempt), "answers": attempt.answers})
+        remaining_seconds = max(0, int((attempt.deadline_at - timezone.now()).total_seconds())) if attempt.deadline_at else None
+        return render(request, "exams/attempt.html", {"attempt": attempt, "questions": _questions(attempt),
+                                                       "answers": attempt.answers, "remaining_seconds": remaining_seconds})
     if request.method == "POST":
         with transaction.atomic():
             locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
@@ -106,7 +121,9 @@ def session(request):
             ids = list(locked.questions.order_by("slot").values_list("id", flat=True))
             if locked.variant_status != Invitation.VariantStatus.READY or len(ids) != locked.exam.question_count:
                 return render(request, "exams/ready.html", {"invitation": locked, "error": "Вариант еще не готов."})
-            Attempt.objects.get_or_create(invitation=locked, defaults={"question_ids": ids})
+            Attempt.objects.get_or_create(
+                invitation=locked,
+                defaults={"question_ids": ids, "deadline_at": timezone.now() + timedelta(minutes=locked.exam.duration_minutes)})
         return redirect("exam_session")
     return render(request, "exams/ready.html", {"invitation": invitation,
                                                  "expired": invitation.expires_at < timezone.now()})
@@ -129,15 +146,18 @@ def _read_answers(request, questions):
 @require_POST
 def save(request):
     invitation = _invitation(request)
-    attempt = Attempt.objects.filter(invitation=invitation).first()
-    if not attempt or attempt.status != Attempt.Status.ACTIVE:
-        return HttpResponseBadRequest("Попытка закрыта.")
-    try:
-        answers = _read_answers(request, _questions(attempt))
-    except ValueError as exc:
-        return HttpResponseBadRequest(str(exc))
-    attempt.answers = answers
-    attempt.save(update_fields=["answers"])
+    with transaction.atomic():
+        attempt = Attempt.objects.select_for_update().filter(invitation=invitation).first()
+        if not attempt or attempt.status != Attempt.Status.ACTIVE:
+            return HttpResponseBadRequest("Попытка закрыта.")
+        if _close_expired(attempt):
+            return JsonResponse({"expired": True}, status=409)
+        try:
+            answers = _read_answers(request, _questions(attempt))
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc))
+        attempt.answers = answers
+        attempt.save(update_fields=["answers"])
     return JsonResponse({"saved": True})
 
 
@@ -148,6 +168,8 @@ def submit(request):
     with transaction.atomic():
         attempt = Attempt.objects.select_for_update().filter(invitation=invitation).first()
         if not attempt or attempt.status != Attempt.Status.ACTIVE:
+            return redirect("exam_result")
+        if _close_expired(attempt):
             return redirect("exam_result")
         try:
             answers = _read_answers(request, _questions(attempt))

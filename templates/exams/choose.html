@@ -3,7 +3,7 @@
 <p>По этому коду можно сдать один экзамен. После выбора поменять его нельзя.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if exams %}<ul>{% for exam in exams %}<li>
-<form method="post">{% csrf_token %}<strong>{{ exam.title }}</strong> — {{ exam.subject }}, {{ exam.question_count }} вопросов, {{ exam.total_points }} баллов
+<form method="post">{% csrf_token %}<strong>{{ exam.title }}</strong> — {{ exam.subject }}, {{ exam.question_count }} вопросов, {{ exam.total_points }} баллов, {{ exam.duration_minutes }} минут
 <button type="submit" name="exam_id" value="{{ exam.pk }}">Выбрать</button></form>
 </li>{% endfor %}</ul>{% elif not error %}<p>Для вашего класса пока нет опубликованных экзаменов.</p>{% endif %}
 {% endblock %}

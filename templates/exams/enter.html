@@ -1,6 +1,6 @@
 {% extends "exams/base.html" %}{% block content %}
 <h1>Доступные тесты</h1>
-{% if exams %}<ul>{% for exam in exams %}<li><strong>{{ exam.title }}</strong> — {{ exam.subject }}, {{ exam.grade }} класс, {{ exam.question_count }} вопросов, {{ exam.total_points }} баллов</li>{% endfor %}</ul>{% else %}<p>Пока нет опубликованных тестов.</p>{% endif %}
+{% if exams %}<ul>{% for exam in exams %}<li><strong>{{ exam.title }}</strong> — {{ exam.subject }}, {{ exam.grade }} класс, {{ exam.question_count }} вопросов, {{ exam.total_points }} баллов, {{ exam.duration_minutes }} минут</li>{% endfor %}</ul>{% else %}<p>Пока нет опубликованных тестов.</p>{% endif %}
 {% if request.user.is_authenticated %}<p>Введите код, выданный учителем. По общему коду вы сможете выбрать один экзамен.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 <form method="post">{% csrf_token %}<label for="code">Код</label><input id="code" name="code" type="text" maxlength="12" autocomplete="one-time-code" required autofocus><button type="submit">Продолжить</button></form>

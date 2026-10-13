@@ -3,6 +3,7 @@ import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
@@ -17,6 +18,9 @@ class Exam(models.Model):
     syllabus_file = models.FileField("Файл силабуса", upload_to="syllabi/%Y/%m/", blank=True)
     syllabus_text = models.TextField("Текст силабуса", blank=True, help_text="Проверьте извлеченный текст перед генерацией вопросов.")
     question_count = models.PositiveSmallIntegerField("Всего вопросов")
+    duration_minutes = models.PositiveSmallIntegerField(
+        "Длительность (минут)", default=60, validators=[MinValueValidator(1)],
+        help_text="Отсчет начинается, когда ученик нажмет «Начать экзамен».")
     total_points = models.DecimalField("Всего баллов", max_digits=6, decimal_places=2)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, editable=False)
     created_at = models.DateTimeField("Создан", auto_now_add=True)
@@ -27,7 +31,10 @@ class Exam(models.Model):
         verbose_name = "Экзамен"
         verbose_name_plural = "Экзамены"
         ordering = ["-created_at"]
-        constraints = [models.CheckConstraint(condition=models.Q(grade__in=[9, 10]), name="exam_grade_9_or_10")]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(grade__in=[9, 10]), name="exam_grade_9_or_10"),
+            models.CheckConstraint(condition=models.Q(duration_minutes__gte=1), name="exam_duration_positive"),
+        ]
 
     def __str__(self):
         return f"{self.grade} класс — {self.title}"
@@ -178,6 +185,7 @@ class Attempt(models.Model):
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
     score = models.PositiveSmallIntegerField(null=True, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
+    deadline_at = models.DateTimeField("Завершить до", null=True, blank=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     graded_at = models.DateTimeField(null=True, blank=True)
     grading_started_at = models.DateTimeField(null=True, blank=True)
@@ -186,3 +194,4 @@ class Attempt(models.Model):
     class Meta:
         verbose_name = "Сдача"
         verbose_name_plural = "Сдачи"
+        indexes = [models.Index(fields=["status", "deadline_at"], name="attempt_deadline_idx")]
