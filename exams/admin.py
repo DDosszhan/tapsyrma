@@ -170,7 +170,7 @@ class ExamAdmin(admin.ModelAdmin):
         return instances
 
     class Media:
-        js = ("exams/exam_admin.js",)
+        js = ("exams/exam_admin_v2.js",)
 
 
 @admin.register(Question)
