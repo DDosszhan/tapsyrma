@@ -37,27 +37,55 @@ class Command(BaseCommand):
                     return
                 time.sleep(2)
                 continue
+
+            claim = [invitation.generation_started_at]
+
+            def persist(question):
+                with transaction.atomic():
+                    # ponytail: one exam lock serializes whole-variant uniqueness checks.
+                    Exam.objects.select_for_update().get(pk=invitation.exam_id)
+                    locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
+                    if (locked.variant_status != Invitation.VariantStatus.GENERATING
+                            or locked.generation_started_at != claim[0]):
+                        raise ValidationError("Подготовку варианта уже выполняет другой процесс.")
+                    current = list(Question.objects.filter(invitation=locked).order_by("slot"))
+                    if any(row.slot == question.slot for row in current):
+                        raise ValidationError("Место уже подготовлено другим процессом.")
+                    if len(current) + 1 == locked.exam.question_count:
+                        signature = tuple(" ".join(q.stem.casefold().split())
+                                          for q in sorted([*current, question], key=lambda q: q.slot))
+                        others = defaultdict(list)
+                        for owner_id, stem in (Question.objects.filter(exam_id=invitation.exam_id,
+                                                                       invitation__isnull=False)
+                                               .exclude(invitation_id=invitation.pk)
+                                               .order_by("invitation_id", "slot")
+                                               .values_list("invitation_id", "stem")):
+                            others[owner_id].append(" ".join(stem.casefold().split()))
+                        if signature in {tuple(stems) for stems in others.values()}:
+                            raise ValidationError("ИИ повторил целый вариант.")
+                    question.invitation = locked
+                    question.save()
+                    claim[0] = timezone.now()
+                    locked.generation_started_at = claim[0]
+                    locked.save(update_fields=["generation_started_at"])
+
             try:
                 for attempt_number in range(3):
                     try:
-                        questions = generate_round(invitation.exam, variation_id=f"{invitation.pk}-{attempt_number + 1}")
+                        questions = generate_round(
+                            invitation.exam, variation_id=f"{invitation.pk}-{attempt_number + 1}",
+                            existing_questions=list(invitation.questions.order_by("slot")), on_valid=persist)
+                        for question in questions:
+                            if question.pk is None and not Question.objects.filter(
+                                    invitation=invitation, slot=question.slot).exists():
+                                persist(question)
                         with transaction.atomic():
-                            # ponytail: one exam lock serializes variant checks; shard if throughput grows.
-                            Exam.objects.select_for_update().get(pk=invitation.exam_id)
-                            existing = defaultdict(list)
-                            for owner_id, stem in (Question.objects.filter(exam_id=invitation.exam_id, invitation__isnull=False)
-                                                   .order_by("invitation_id", "slot")
-                                                   .values_list("invitation_id", "stem")):
-                                existing[owner_id].append(" ".join(stem.casefold().split()))
-                            signature = tuple(" ".join(q.stem.casefold().split()) for q in questions)
-                            if signature in {tuple(stems) for stems in existing.values()}:
-                                raise ValidationError("ИИ повторил целый вариант.")
                             locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
-                            if locked.variant_status != Invitation.VariantStatus.GENERATING:
+                            if (locked.variant_status != Invitation.VariantStatus.GENERATING
+                                    or locked.generation_started_at != claim[0]):
                                 break
-                            for q in questions:
-                                q.invitation = locked
-                            Question.objects.bulk_create(questions)
+                            if locked.questions.count() != locked.exam.question_count:
+                                raise ValidationError("Не все места варианта подготовлены.")
                             locked.variant_status = Invitation.VariantStatus.READY
                             locked.generation_error = ""
                             locked.save(update_fields=["variant_status", "generation_error"])

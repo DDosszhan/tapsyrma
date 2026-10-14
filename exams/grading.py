@@ -1,14 +1,15 @@
-from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
 
-from .ai import grade_open
-from .models import Attempt, Question
+from .ai import ManualReviewRequired, grade_open
+from .models import Attempt, GradeAppeal, Question
 
 
 def grade_attempt(attempt):
     questions = Question.objects.in_bulk(attempt.question_ids)
     grades = {}
     total = 0
+    manual_review = []
     for pk in attempt.question_ids:
         question = questions[pk]
         answer = attempt.answers.get(str(pk), "")
@@ -19,12 +20,24 @@ def grade_attempt(attempt):
         elif not answer:
             grade = {"score": 0, "criteria": [0] * len(question.rubric), "explanation": "Ответ не дан."}
         else:
-            grade = grade_open(question, answer)
+            try:
+                grade = grade_open(question, answer)
+            except ManualReviewRequired:
+                grade = {"score": 0, "criteria": [0] * len(question.rubric),
+                         "explanation": "Автоматическая оценка не подтверждена. Ответ передан учителю."}
+                manual_review.append((question, grade))
         grades[str(pk)] = grade
         total += grade["score"]
-    attempt.grades = grades
-    attempt.score = total
-    attempt.status = Attempt.Status.DONE
-    attempt.graded_at = timezone.now()
-    attempt.error_message = ""
-    attempt.save(update_fields=["grades", "score", "status", "graded_at", "error_message"])
+    with transaction.atomic():
+        attempt.grades = grades
+        attempt.score = total
+        attempt.status = Attempt.Status.DONE
+        attempt.graded_at = timezone.now()
+        attempt.error_message = ""
+        attempt.save(update_fields=["grades", "score", "status", "graded_at", "error_message"])
+        for question, grade in manual_review:
+            GradeAppeal.objects.get_or_create(
+                attempt=attempt, question=question,
+                defaults={"student_reason": "Автоматическая проверка передала ответ учителю.",
+                          "original_grade": grade},
+            )
