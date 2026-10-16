@@ -6,13 +6,14 @@ from tempfile import TemporaryDirectory
 from datetime import timedelta
 import hashlib
 import hmac
+import uuid
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from docx import Document
 from openpyxl import Workbook
@@ -20,7 +21,7 @@ from openpyxl import Workbook
 from .ai import ManualReviewRequired, generate_round, grade_open, validate_questions
 from .grading import grade_attempt
 from .management.commands.grade_attempts import expire_attempts
-from .models import Attempt, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, SharedCode, Student
+from .models import Attempt, AttemptVisibilityEvent, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, SharedCode, Student
 from .syllabus import extract_syllabus_text
 
 
@@ -387,6 +388,57 @@ class ExamFlowTests(TestCase):
         legacy.refresh_from_db()
         self.assertEqual(background.status, Attempt.Status.PENDING)
         self.assertEqual(legacy.status, Attempt.Status.ACTIVE)
+
+    def test_exam_page_records_visibility_once_and_shows_question_map(self):
+        self.exam.published = True
+        self.exam.save(update_fields=["published"])
+        user = get_user_model().objects.create_user("visible@example.invalid", "visible@example.invalid", "password")
+        student = Student.objects.create(user=user, name="Ученик", grade=9, password_change_required=False)
+        invitation = Invitation.objects.create(exam=self.exam, student=student, code_hash="visibility-test",
+            expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher)
+        question = Question.objects.create(exam=self.exam, invitation=invitation, **self.generated["questions"][0])
+        attempt = Attempt.objects.create(invitation=invitation, question_ids=[question.pk],
+            deadline_at=timezone.now() + timedelta(minutes=10))
+        self.client.force_login(user)
+        session = self.client.session
+        session["invitation_id"] = invitation.pk
+        session.save()
+        page = self.client.get("/exam/")
+        self.assertContains(page, "Карта вопросов")
+        self.assertContains(page, f'href="#question-{question.pk}"')
+        self.assertContains(page, "Страница экзамена была скрыта. Событие зафиксировано.")
+        url = "/exam/visibility/"
+        event_id = str(uuid.uuid4())
+        self.assertEqual(self.client.post(url, {"action": "hidden", "event_id": "bad"}).status_code, 400)
+        self.assertEqual(self.client.post(url, {"action": "hidden", "event_id": event_id}).json()["count"], 1)
+        self.assertEqual(self.client.post(url, {"action": "hidden", "event_id": event_id}).json()["count"], 1)
+        self.assertEqual(self.client.post(url, {"action": "returned", "event_id": event_id}).json()["count"], 1)
+        event = AttemptVisibilityEvent.objects.get(attempt=attempt)
+        self.assertIsNotNone(event.returned_at)
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(user)
+        csrf_session = csrf_client.session
+        csrf_session["invitation_id"] = invitation.pk
+        csrf_session.save()
+        csrf_client.get("/exam/")
+        self.assertEqual(csrf_client.post(url, {"action": "returned", "event_id": event_id}).status_code, 403)
+        self.assertEqual(csrf_client.post(url, {"action": "returned", "event_id": event_id,
+                                           "csrfmiddlewaretoken": csrf_client.cookies["csrftoken"].value}).json()["count"], 1)
+        other = get_user_model().objects.create_user("other-visible@example.invalid", "other-visible@example.invalid", "password")
+        Student.objects.create(user=other, name="Другой", grade=9, password_change_required=False)
+        self.client.force_login(other)
+        self.assertEqual(self.client.post(url, {"action": "hidden", "event_id": str(uuid.uuid4())}).status_code, 404)
+        self.client.force_login(user)
+        session = self.client.session
+        session["invitation_id"] = invitation.pk
+        session.save()
+        attempt.status = Attempt.Status.PENDING
+        attempt.save(update_fields=["status"])
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "становилась скрытой: 1")
+        self.assertEqual(self.client.post(url, {"action": "hidden", "event_id": str(uuid.uuid4())}).status_code, 409)
+        self.assertEqual(self.client.post(url, {"action": "returned", "event_id": event_id}).json()["count"], 1)
+        self.client.force_login(self.teacher)
+        self.assertContains(self.client.get(f"/admin/exams/attempt/{attempt.pk}/change/"), "Уходы со страницы")
 
     def test_admin_publishes_without_bank_and_issues_code(self):
         self.client.force_login(self.teacher)

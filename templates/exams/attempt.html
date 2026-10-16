@@ -1,18 +1,81 @@
-{% extends "exams/base.html" %}{% load exam_tags %}{% block content %}
-<h1>{{ attempt.invitation.exam.title }}</h1><p class="muted">{{ attempt.invitation.student.name }} · {{ attempt.invitation.exam.total_points }} баллов</p>
+{% extends "exams/base.html" %}{% load exam_tags %}
+{% block main_class %}exam-page{% endblock %}
+{% block extra_head %}<style>
+main.exam-page{max-width:1180px;padding:32px;background:#f9fbfd}
+.exam-heading{margin-bottom:22px}.exam-heading h1{margin:0 0 8px}.exam-heading p{margin:0}
+.exam-layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:24px;align-items:start}
+.exam-questions{min-width:0}.exam-questions .question{background:white;border-color:#d6dfe9;box-shadow:0 2px 10px #17203308;scroll-margin-top:90px;margin:0 0 16px;padding:24px}
+.exam-questions .question:target{border-color:#124ab3;box-shadow:0 0 0 3px #124ab322}
+.exam-questions .question h2{margin:0 0 16px;font-size:1.2em}.exam-questions .question p{margin:0 0 16px}
+.exam-questions textarea{border:1px solid #aeb9c8;border-radius:8px;resize:vertical}
+.exam-questions input[type=radio]{accent-color:#124ab3}.exam-questions label{padding:6px 0}
+.exam-actions{background:white;border:1px solid #d6dfe9;border-radius:10px;padding:20px;margin-top:20px}
+.exam-actions p{margin-top:0}
+.question-map{position:sticky;top:84px;background:white;border:1px solid #d6dfe9;border-radius:12px;padding:20px;box-shadow:0 2px 10px #17203308}
+.question-map h2{font-size:1.1em;margin:0 0 4px}.question-map p{font-size:.88em;margin:0 0 16px;color:#566275}
+.question-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.question-grid a{display:grid;place-items:center;min-height:40px;border-radius:8px;background:#e8edf3;color:#344255;text-decoration:none;font-weight:700;border:1px solid #cbd4df}
+.question-grid a.answered{background:#0d7356;color:white;border-color:#0d7356}
+.question-grid a:hover,.question-grid a:focus-visible{outline:3px solid #86aaff;outline-offset:2px}
+.map-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;font-size:.8em;color:#566275}
+.map-legend span{display:flex;align-items:center;gap:5px}.map-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;background:#e8edf3;border:1px solid #cbd4df}.map-legend .done{background:#0d7356;border-color:#0d7356}
+.visibility-warning{border:1px solid #bd7c16;background:#fff4d9;color:#5d3e0a;border-radius:10px;padding:14px 18px;margin:16px 0;font-weight:600}
+.visibility-warning[hidden]{display:none}
+@media(max-width:760px){main.exam-page{margin:0;padding:18px;border-radius:0}.exam-layout{display:flex;flex-direction:column}.question-map{position:static;order:-1;width:100%;box-sizing:border-box}.exam-questions{width:100%}.question-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.exam-questions .question{padding:18px}}
+</style>{% endblock %}
+{% block content %}
+<header class="exam-heading"><h1>{{ attempt.invitation.exam.title }}</h1><p class="muted">{{ attempt.invitation.student.name }} · {{ attempt.invitation.exam.total_points }} баллов</p></header>
 {% if attempt.deadline_at %}<p class="score exam-timer" role="timer">Осталось: <span id="countdown" data-remaining="{{ remaining_seconds }}">{{ remaining_seconds }} с</span></p>{% endif %}
-<form id="answers" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}
-{% for q in questions %}<section class="question"><span class="points">{{ q.points }} баллов</span>
+<p id="visibility-warning" class="visibility-warning" role="alert" hidden></p>
+<div class="exam-layout">
+<form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}
+{% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" tabindex="-1"><span class="points">{{ q.points }} баллов</span>
 <h2>Вопрос {{ forloop.counter }}</h2><p>{{ q.stem|linebreaksbr }}</p>
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
 {% endfor %}{% else %}<label for="q_{{ q.id }}">Ваш ответ</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}
 </section>{% endfor %}
-<p id="save-status" class="muted" aria-live="polite">Ответы сохраняются автоматически.</p>
-<button type="submit" onclick="return confirm('Сдать экзамен? После этого ответы изменить нельзя.')">Сдать экзамен</button></form>
+<div class="exam-actions"><p id="save-status" class="muted" aria-live="polite">Ответы сохраняются автоматически.</p>
+<button type="submit" onclick="return confirm('Сдать экзамен? После этого ответы изменить нельзя.')">Сдать экзамен</button></div></form>
+<aside class="question-map" aria-label="Карта вопросов"><h2>Карта вопросов</h2><p><strong id="answered-count">0</strong> из {{ questions|length }} с ответом</p>
+<div class="question-grid">{% for q in questions %}<a href="#question-{{ q.id }}" data-question="{{ q.id }}" aria-label="Вопрос {{ forloop.counter }}, нет ответа">{{ forloop.counter }}</a>{% endfor %}</div>
+<div class="map-legend"><span><i></i>Нет ответа</span><span><i class="done"></i>Есть ответ</span></div></aside>
+</div>
 <script>
-const form=document.getElementById('answers'),status=document.getElementById('save-status');let saveTimer;
-form.addEventListener('input',()=>{clearTimeout(saveTimer);status.textContent='Сохранение…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Ответы сохранены.':'Не удалось сохранить. Сдача отправит текущие ответы.'}catch{status.textContent='Нет связи. Сдача отправит текущие ответы.'}},700)});
+const form=document.getElementById('answers'),status=document.getElementById('save-status');let saveTimer,leavingExam=false,awayId=null,pendingReturn=null;
+const warning=document.getElementById('visibility-warning'),mapLinks=[...document.querySelectorAll('.question-grid a')];
+function updateMap(){
+  let answered=0;
+  for(const link of mapLinks){
+    const question=document.getElementById('question-'+link.dataset.question);
+    const filled=!!(question.querySelector('input[type=radio]:checked')||question.querySelector('textarea')?.value.trim());
+    link.classList.toggle('answered',filled);
+    link.setAttribute('aria-label',`Вопрос ${link.textContent}, ${filled?'есть ответ':'нет ответа'}`);
+    if(filled)answered++;
+  }
+  document.getElementById('answered-count').textContent=answered;
+}
+updateMap();
+form.addEventListener('input',()=>{updateMap();clearTimeout(saveTimer);status.textContent='Сохранение…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Ответы сохранены.':'Не удалось сохранить. Сдача отправит текущие ответы.'}catch{status.textContent='Нет связи. Сдача отправит текущие ответы.'}},700)});
+form.addEventListener('submit',()=>{leavingExam=true});
+function eventData(action,id){const data=new FormData();data.append('csrfmiddlewaretoken',form.elements.csrfmiddlewaretoken.value);data.append('action',action);data.append('event_id',id);return data}
+async function confirmReturn(id){
+  try{
+    const response=await fetch('{% url "exam_visibility" %}',{method:'POST',body:eventData('returned',id)});
+    if(!response.ok)throw Error('Не сохранено');
+    const data=await response.json();pendingReturn=null;
+    warning.textContent=`Страница экзамена была скрыта. Событие зафиксировано. Всего: ${data.count}.`;
+  }catch{pendingReturn=id;warning.textContent='Страница экзамена была скрыта. Пока не удалось подтвердить запись. Проверьте интернет.'}
+  warning.hidden=false;
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    if(leavingExam||awayId)return;
+    awayId=crypto.randomUUID();
+    navigator.sendBeacon('{% url "exam_visibility" %}',eventData('hidden',awayId));
+  }else if(awayId){const id=awayId;awayId=null;confirmReturn(id)}
+});
+window.addEventListener('online',()=>{if(pendingReturn)confirmReturn(pendingReturn)});
 const countdown=document.getElementById('countdown');
 if(countdown){
   const deadline=Date.now()+Number(countdown.dataset.remaining)*1000;
@@ -20,7 +83,7 @@ if(countdown){
     const left=Math.max(0,Math.ceil((deadline-Date.now())/1000));
     const hours=Math.floor(left/3600),minutes=Math.floor(left%3600/60),seconds=left%60;
     countdown.textContent=(hours?String(hours).padStart(2,'0')+':':'')+String(minutes).padStart(2,'0')+':'+String(seconds).padStart(2,'0');
-    if(left===0){status.textContent='Время вышло. Сохраненные ответы отправлены.';location.replace('{% url "exam_session" %}')}
+    if(left===0){leavingExam=true;status.textContent='Время вышло. Сохраненные ответы отправлены.';location.replace('{% url "exam_session" %}')}
   }
   tick();setInterval(tick,1000);
 }

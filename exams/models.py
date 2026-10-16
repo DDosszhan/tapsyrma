@@ -201,6 +201,19 @@ class Attempt(models.Model):
         indexes = [models.Index(fields=["status", "deadline_at"], name="attempt_deadline_idx")]
 
 
+class AttemptVisibilityEvent(models.Model):
+    attempt = models.ForeignKey(Attempt, on_delete=models.PROTECT, related_name="visibility_events")
+    event_id = models.UUIDField()
+    left_at = models.DateTimeField("Страница скрыта", auto_now_add=True)
+    returned_at = models.DateTimeField("Вернулся на страницу", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Уход со страницы экзамена"
+        verbose_name_plural = "Уходы со страницы экзамена"
+        ordering = ["left_at"]
+        constraints = [models.UniqueConstraint(fields=["attempt", "event_id"], name="unique_attempt_visibility_event")]
+
+
 class GradeAppeal(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Ожидает учителя"

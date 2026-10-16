@@ -37,6 +37,7 @@ urlpatterns = [
     path("choose/", exam_views.choose_exam, name="choose_exam"),
     path("exam/", exam_views.session, name="exam_session"),
     path("exam/save/", exam_views.save, name="exam_save"),
+    path("exam/visibility/", exam_views.visibility, name="exam_visibility"),
     path("exam/submit/", exam_views.submit, name="exam_submit"),
     path("exam/result/", exam_views.result, name="exam_result"),
     path("exam/result/<int:attempt_id>/", exam_views.result, name="exam_result_history"),

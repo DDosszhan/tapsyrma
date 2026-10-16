@@ -1,5 +1,6 @@
 {% extends "exams/base.html" %}{% block content %}
 <h1>Результат: {{ exam.title }}</h1>
+{% if visibility_count %}<p class="muted">Страница экзамена становилась скрытой: {{ visibility_count }} раз(а). Учитель видит время этих событий.</p>{% endif %}
 {% if attempt.status == "done" %}
 <p class="score">{% if pending_review_count %}Предварительно: {% endif %}{{ attempt.score }} / {{ exam.total_points }} баллов</p>
 {% if pending_review_count %}<p>Вопросов на проверке у учителя: {{ pending_review_count }}. Показанный балл может измениться.</p>{% endif %}

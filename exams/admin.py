@@ -19,7 +19,7 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html_join
 from .ai import blueprint
-from .models import Attempt, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, SharedCode, Student
+from .models import Attempt, AttemptVisibilityEvent, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, SharedCode, Student
 from .student_import import read_student_emails
 from .syllabus import extract_syllabus_text, validate_syllabus_file
 
@@ -456,10 +456,26 @@ class SharedCodeAdmin(admin.ModelAdmin):
             self.message_user(request, f"Новый общий код #{obj.pk}: {code}. Старый больше не работает.")
 
 
+class AttemptVisibilityEventInline(admin.TabularInline):
+    model = AttemptVisibilityEvent
+    extra = 0
+    can_delete = False
+    fields = ["left_at", "returned_at", "duration"]
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Длительность")
+    def duration(self, obj):
+        return f"{int((obj.returned_at - obj.left_at).total_seconds())} с" if obj.returned_at else "Нет сигнала возврата"
+
+
 @admin.register(Attempt)
 class AttemptAdmin(admin.ModelAdmin):
-    list_display = ["invitation", "status", "score", "started_at", "submitted_at", "graded_at"]
+    list_display = ["invitation", "status", "score", "visibility_count", "started_at", "submitted_at", "graded_at"]
     list_filter = ["status", "invitation__exam"]
+    inlines = [AttemptVisibilityEventInline]
     search_fields = ["invitation__student__name", "invitation__student__user__email",
                      "invitation__student__external_id", "invitation__exam__title"]
     actions = ["retry_grading"]
@@ -467,6 +483,10 @@ class AttemptAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+    @admin.display(description="Уходы со страницы")
+    def visibility_count(self, obj):
+        return obj.visibility_events.count()
 
     @admin.action(description="Повторить проверку ошибочных сдач")
     def retry_grading(self, request, queryset):

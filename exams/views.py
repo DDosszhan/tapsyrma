@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import secrets
+from uuid import UUID
 from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -13,7 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Attempt, Exam, GradeAppeal, Invitation, Question, SharedCode
+from .models import Attempt, AttemptVisibilityEvent, Exam, GradeAppeal, Invitation, Question, SharedCode
 from .grading import AUTO_REVIEW_REASON
 
 
@@ -168,6 +169,33 @@ def save(request):
 
 @login_required
 @require_POST
+def visibility(request):
+    action = request.POST.get("action")
+    if action not in ("hidden", "returned"):
+        return HttpResponseBadRequest("Недопустимое событие.")
+    try:
+        event_id = UUID(request.POST.get("event_id", ""))
+    except (ValueError, AttributeError):
+        return HttpResponseBadRequest("Недопустимый идентификатор события.")
+    with transaction.atomic():
+        attempt = get_object_or_404(Attempt.objects.select_for_update(),
+                                    invitation_id=request.session.get("invitation_id"),
+                                    invitation__student__user=request.user)
+        _close_expired(attempt)
+        event = AttemptVisibilityEvent.objects.filter(attempt=attempt, event_id=event_id).first()
+        if event is None:
+            if attempt.status != Attempt.Status.ACTIVE:
+                return JsonResponse({"error": "Попытка закрыта."}, status=409)
+            event = AttemptVisibilityEvent.objects.create(attempt=attempt, event_id=event_id)
+        if action == "returned" and event.returned_at is None:
+            event.returned_at = timezone.now()
+            event.save(update_fields=["returned_at"])
+        count = AttemptVisibilityEvent.objects.filter(attempt=attempt).count()
+    return JsonResponse({"count": count})
+
+
+@login_required
+@require_POST
 def submit(request):
     invitation = _invitation(request)
     with transaction.atomic():
@@ -222,6 +250,7 @@ def result(request, attempt_id=None):
                                       and not question_appeal.student_note})
     return render(request, "exams/result.html", {"attempt": attempt, "items": items,
                                                   "exam": invitation.exam,
+                                                  "visibility_count": attempt.visibility_events.count(),
                                                   "pending_review_count": pending_review_count})
 
 
