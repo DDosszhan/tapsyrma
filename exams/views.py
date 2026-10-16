@@ -212,7 +212,7 @@ def result(request, attempt_id=None):
                       "appeal": question_appeal,
                       "auto_pending": bool(question_appeal and question_appeal.status == GradeAppeal.Status.PENDING
                                            and ((grade or {}).get("review_pending")
-                                                or question_appeal.student_reason == AUTO_REVIEW_REASON))})
+                                                or question_appeal.student_reason.startswith(AUTO_REVIEW_REASON)))})
     return render(request, "exams/result.html", {"attempt": attempt, "items": items,
                                                   "exam": invitation.exam,
                                                   "pending_review_count": pending_review_count})
