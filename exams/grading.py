@@ -5,12 +5,15 @@ from .ai import ManualReviewRequired, grade_open
 from .models import Attempt, GradeAppeal, Question
 
 
+AUTO_REVIEW_REASON = "Автоматическая проверка передала ответ учителю."
+
+
 def grade_attempt(attempt):
     questions = Question.objects.in_bulk(attempt.question_ids)
-    grades = {}
-    total = 0
-    manual_review = []
+    grades = dict(attempt.grades)
     for pk in attempt.question_ids:
+        if str(pk) in grades:
+            continue
         question = questions[pk]
         answer = attempt.answers.get(str(pk), "")
         if question.kind == "mcq":
@@ -22,22 +25,30 @@ def grade_attempt(attempt):
         else:
             try:
                 grade = grade_open(question, answer)
-            except ManualReviewRequired:
+            except ManualReviewRequired as exc:
                 grade = {"score": 0, "criteria": [0] * len(question.rubric),
-                         "explanation": "Автоматическая оценка не подтверждена. Ответ передан учителю."}
-                manual_review.append((question, grade))
+                         "explanation": "Автоматическая оценка не подтверждена. Ответ передан учителю.",
+                         "review_pending": True}
+                review_reason = f"{AUTO_REVIEW_REASON} {exc.messages[0]}"[:500]
+        # Save each result so a later API failure does not repeat paid grading calls.
+        with transaction.atomic():
+            locked = Attempt.objects.select_for_update().get(pk=attempt.pk)
+            if str(pk) not in locked.grades:
+                locked.grades = {**locked.grades, str(pk): grade}
+                locked.score = sum(row["score"] for row in locked.grades.values())
+                locked.save(update_fields=["grades", "score"])
+                if grade.get("review_pending"):
+                    GradeAppeal.objects.get_or_create(
+                        attempt=locked, question=question,
+                        defaults={"student_reason": review_reason,
+                                  "original_grade": grade})
         grades[str(pk)] = grade
-        total += grade["score"]
     with transaction.atomic():
-        attempt.grades = grades
-        attempt.score = total
-        attempt.status = Attempt.Status.DONE
-        attempt.graded_at = timezone.now()
-        attempt.error_message = ""
-        attempt.save(update_fields=["grades", "score", "status", "graded_at", "error_message"])
-        for question, grade in manual_review:
-            GradeAppeal.objects.get_or_create(
-                attempt=attempt, question=question,
-                defaults={"student_reason": "Автоматическая проверка передала ответ учителю.",
-                          "original_grade": grade},
-            )
+        locked = Attempt.objects.select_for_update().get(pk=attempt.pk)
+        if len(locked.grades) != len(attempt.question_ids):
+            raise ValueError("Не все вопросы проверены.")
+        locked.status = Attempt.Status.DONE
+        locked.graded_at = timezone.now()
+        locked.error_message = ""
+        locked.save(update_fields=["status", "graded_at", "error_message"])
+    attempt.refresh_from_db()

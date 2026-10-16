@@ -1,17 +1,18 @@
 {% extends "exams/base.html" %}{% block content %}
 <h1>Результат: {{ exam.title }}</h1>
 {% if attempt.status == "done" %}
-<p class="score">{{ attempt.score }} / {{ exam.total_points }} баллов</p>
-<p class="muted">Открытые ответы предварительно проверены ИИ по утвержденным критериям. Учитель видит работу и определяет оценку в EduPage.</p>
+<p class="score">{% if pending_review_count %}Предварительно: {% endif %}{{ attempt.score }} / {{ exam.total_points }} баллов</p>
+{% if pending_review_count %}<p>Вопросов на проверке у учителя: {{ pending_review_count }}. Показанный балл может измениться.</p>{% endif %}
+<p class="muted">Открытые ответы проверены ИИ по сохраненным критериям. Учитель видит работу и определяет оценку в EduPage.</p>
 {% elif attempt.status == "error" %}<p>Автоматическая проверка не удалась. Учитель видит работу и сможет повторить проверку.</p>
 {% else %}<p>Ответы сданы и сохранены. Идет проверка.</p><script>setTimeout(()=>location.reload(),5000)</script>{% endif %}
-{% for item in items %}<section class="question">{% if item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
+{% for item in items %}<section class="question">{% if item.auto_pending %}<span class="points">Ожидает учителя</span>{% elif item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
 <h2>Вопрос {{ forloop.counter }}</h2><p>{{ item.question.stem|linebreaksbr }}</p>
 <p><strong>Ваш ответ:</strong> {% if item.question.kind == "mcq" %}{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}{% else %}{{ item.answer|default:"Ответ не дан"|linebreaksbr }}{% endif %}</p>
 {% if item.grade %}<p><strong>Проверка:</strong> {{ item.grade.explanation }}</p>{% endif %}
 {% if item.appeal %}<p><strong>Оспаривание:</strong> {{ item.appeal.get_status_display }}.{% if item.appeal.reviewed_at %} {{ item.appeal.teacher_note }}{% endif %}</p>
 {% elif attempt.status == "done" %}<form method="post" action="{% url 'exam_appeal' attempt.pk item.question.pk %}">{% csrf_token %}<label>Ошибка в проверке? Опишите, что следует пересмотреть:<textarea name="reason" minlength="10" maxlength="2000" required></textarea></label><button type="submit">Отправить учителю</button></form>{% endif %}
-<h3>За что давались баллы</h3><ul>{% if item.grade %}{% for criterion, earned in item.criteria %}<li>{{ criterion.criterion }} — {{ earned }} / {{ criterion.points }}</li>{% endfor %}{% else %}{% for criterion in item.question.rubric %}<li>{{ criterion.criterion }} — до {{ criterion.points }} баллов</li>{% endfor %}{% endif %}</ul>
+<h3>За что давались баллы</h3><ul>{% if item.grade and not item.auto_pending %}{% for criterion, earned in item.criteria %}<li>{{ criterion.criterion }} — {{ earned }} / {{ criterion.points }}</li>{% endfor %}{% else %}{% for criterion in item.question.rubric %}<li>{{ criterion.criterion }} — до {{ criterion.points }} баллов</li>{% endfor %}{% endif %}</ul>
 <details><summary>Объяснение подтемы: {{ item.question.subtopic }}</summary><p>{{ item.question.subtopic_explanation|linebreaksbr }}</p></details>
 <details><summary>Объяснение ответа</summary><p>{{ item.question.answer_explanation|linebreaksbr }}</p><p><strong>Образец:</strong> {{ item.question.model_answer|linebreaksbr }}</p></details>
 </section>{% endfor %}

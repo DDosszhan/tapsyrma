@@ -7,12 +7,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Count, Q
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import Attempt, Exam, GradeAppeal, Invitation, Question, SharedCode
+from .grading import AUTO_REVIEW_REASON
 
 
 def enter(request):
@@ -200,13 +202,20 @@ def result(request, attempt_id=None):
         request.session["invitation_id"] = invitation.pk
         return redirect("exam_session")
     appeals = {appeal.question_id: appeal for appeal in attempt.appeals.all()}
+    pending_review_count = sum(appeal.status == GradeAppeal.Status.PENDING for appeal in appeals.values())
     items = []
     for q in _questions(attempt):
         grade = attempt.grades.get(str(q.id))
+        question_appeal = appeals.get(q.id)
         items.append({"question": q, "answer": attempt.answers.get(str(q.id), ""),
                       "grade": grade, "criteria": zip(q.rubric, grade["criteria"]) if grade else [],
-                      "appeal": appeals.get(q.id)})
-    return render(request, "exams/result.html", {"attempt": attempt, "items": items, "exam": invitation.exam})
+                      "appeal": question_appeal,
+                      "auto_pending": bool(question_appeal and question_appeal.status == GradeAppeal.Status.PENDING
+                                           and ((grade or {}).get("review_pending")
+                                                or question_appeal.student_reason == AUTO_REVIEW_REASON))})
+    return render(request, "exams/result.html", {"attempt": attempt, "items": items,
+                                                  "exam": invitation.exam,
+                                                  "pending_review_count": pending_review_count})
 
 
 @login_required
@@ -231,5 +240,6 @@ def history(request):
     if not getattr(request.user, "student_profile", None):
         raise PermissionDenied
     attempts = Attempt.objects.filter(invitation__student__user=request.user).select_related(
-        "invitation__exam").order_by("-started_at")
+        "invitation__exam").annotate(pending_review_count=Count(
+            "appeals", filter=Q(appeals__status=GradeAppeal.Status.PENDING))).order_by("-started_at")
     return render(request, "exams/history.html", {"attempts": attempts})
