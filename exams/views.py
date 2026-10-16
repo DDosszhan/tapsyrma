@@ -187,6 +187,12 @@ def submit(request):
     return redirect("exam_result")
 
 
+def _auto_review_pending(appeal, grade):
+    return bool(appeal and appeal.status == GradeAppeal.Status.PENDING
+                and ((grade or {}).get("review_pending")
+                     or appeal.student_reason.startswith(AUTO_REVIEW_REASON)))
+
+
 @login_required
 def result(request, attempt_id=None):
     if attempt_id is None:
@@ -207,12 +213,13 @@ def result(request, attempt_id=None):
     for q in _questions(attempt):
         grade = attempt.grades.get(str(q.id))
         question_appeal = appeals.get(q.id)
+        auto_pending = _auto_review_pending(question_appeal, grade)
         items.append({"question": q, "answer": attempt.answers.get(str(q.id), ""),
                       "grade": grade, "criteria": zip(q.rubric, grade["criteria"]) if grade else [],
                       "appeal": question_appeal,
-                      "auto_pending": bool(question_appeal and question_appeal.status == GradeAppeal.Status.PENDING
-                                           and ((grade or {}).get("review_pending")
-                                                or question_appeal.student_reason.startswith(AUTO_REVIEW_REASON)))})
+                      "auto_pending": auto_pending,
+                      "can_add_note": attempt.status == Attempt.Status.DONE and auto_pending
+                                      and not question_appeal.student_note})
     return render(request, "exams/result.html", {"attempt": attempt, "items": items,
                                                   "exam": invitation.exam,
                                                   "pending_review_count": pending_review_count})
@@ -230,8 +237,14 @@ def appeal(request, attempt_id, question_id):
         question = get_object_or_404(Question, pk=question_id)
         if question_id not in attempt.question_ids or str(question_id) not in attempt.grades:
             raise Http404
-        GradeAppeal.objects.get_or_create(attempt=attempt, question=question,
-            defaults={"student_reason": reason, "original_grade": attempt.grades[str(question_id)]})
+        existing = GradeAppeal.objects.select_for_update().filter(attempt=attempt, question=question).first()
+        if existing:
+            if _auto_review_pending(existing, attempt.grades[str(question_id)]) and not existing.student_note:
+                existing.student_note = reason
+                existing.save(update_fields=["student_note"])
+        else:
+            GradeAppeal.objects.create(attempt=attempt, question=question,
+                student_reason=reason, original_grade=attempt.grades[str(question_id)])
     return redirect("exam_result_history", attempt_id=attempt_id)
 
 

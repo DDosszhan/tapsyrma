@@ -210,6 +210,7 @@ class GradeAppeal(models.Model):
     attempt = models.ForeignKey(Attempt, on_delete=models.PROTECT, related_name="appeals", verbose_name="Сдача")
     question = models.ForeignKey(Question, on_delete=models.PROTECT, verbose_name="Вопрос")
     student_reason = models.TextField("Почему нужна проверка")
+    student_note = models.TextField("Пояснение ученика", blank=True)
     original_grade = models.JSONField("Исходная оценка")
     status = models.CharField("Решение", max_length=12, choices=Status.choices, default=Status.PENDING)
     corrected_grade = models.JSONField("Оценка учителя", null=True, blank=True)

@@ -621,6 +621,7 @@ class ExamFlowTests(TestCase):
         result = self.client.get(f"/exam/result/{attempt.pk}/")
         self.assertContains(result, "Предварительно")
         self.assertContains(result, "Ожидает учителя")
+        self.assertContains(result, "Добавить пояснение учителю")
         self.assertTrue(result.context["items"][0]["auto_pending"])
         self.assertContains(self.client.get("/history/"), "Предварительно")
         old_grade = dict(attempt.grades[str(question.pk)])
@@ -628,6 +629,19 @@ class ExamFlowTests(TestCase):
         attempt.grades = {str(question.pk): old_grade}
         attempt.save(update_fields=["grades"])
         self.assertTrue(self.client.get(f"/exam/result/{attempt.pk}/").context["items"][0]["auto_pending"])
+        url = f"/exam/result/{attempt.pk}/appeal/{question.pk}/"
+        note = "Проверьте, пожалуйста, мой ответ вручную."
+        self.assertEqual(self.client.post(url, {"reason": note}).status_code, 302)
+        appeal = GradeAppeal.objects.get(attempt=attempt, question=question)
+        self.assertEqual(appeal.student_note, note)
+        self.assertEqual(GradeAppeal.objects.count(), 1)
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), note)
+        self.assertNotContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Добавить пояснение учителю")
+        self.client.post(url, {"reason": "Повторное сообщение учителю."})
+        appeal.refresh_from_db()
+        self.assertEqual(appeal.student_note, note)
+        self.client.force_login(self.teacher)
+        self.assertContains(self.client.get(f"/admin/exams/gradeappeal/{appeal.pk}/change/"), note)
 
     def test_failed_grading_resumes_after_saved_question(self):
         user = get_user_model().objects.create_user("resume@example.invalid", "resume@example.invalid", "password")

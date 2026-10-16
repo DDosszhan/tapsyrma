@@ -519,11 +519,11 @@ class GradeAppealAdmin(admin.ModelAdmin):
     list_filter = ["status", "attempt__invitation__exam"]
     search_fields = ["attempt__invitation__student__name", "attempt__invitation__student__user__email",
                      "attempt__invitation__exam__title", "question__stem"]
-    readonly_fields = ["attempt", "question_text", "student_answer", "student_reason", "original_grade",
+    readonly_fields = ["attempt", "question_text", "student_answer", "student_reason", "student_note", "original_grade",
                        "rubric_details", "status", "reviewed_by", "created_at", "reviewed_at"]
 
     def get_fields(self, request, obj=None):
-        fields = ["attempt", "question_text", "student_answer", "student_reason", "original_grade",
+        fields = ["attempt", "question_text", "student_answer", "student_reason", "student_note", "original_grade",
                   "rubric_details", "status"]
         if obj and obj.status == GradeAppeal.Status.PENDING:
             fields += ["decision", "criterion_scores", "teacher_note"]
@@ -568,6 +568,7 @@ class GradeAppealAdmin(admin.ModelAdmin):
             appeal = GradeAppeal.objects.select_for_update().get(pk=obj.pk)
             if appeal.status != GradeAppeal.Status.PENDING or attempt.status != Attempt.Status.DONE:
                 raise PermissionDenied("Это оспаривание уже рассмотрено или сдача не проверена.")
+            obj.student_note = appeal.student_note
             obj.status = form.cleaned_data["decision"]
             obj.reviewed_by = request.user
             obj.reviewed_at = timezone.now()
