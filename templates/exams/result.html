@@ -1,4 +1,13 @@
-{% extends "exams/base.html" %}{% block content %}
+{% extends "exams/base.html" %}
+{% block main_class %}exam-page{% endblock %}
+{% block extra_head %}<style>
+.question-grid a.correct,.map-legend .correct{background:#0d7356;color:white;border-color:#0d7356}
+.question-grid a.wrong,.map-legend .wrong{background:#b42318;color:white;border-color:#b42318}
+.question-grid a.review,.map-legend .review{background:#f9c74f;color:#423000;border-color:#d69e12}
+.result-layout .question{margin-top:0}
+.result-layout .question-map{top:24px}
+</style>{% endblock %}
+{% block content %}
 <h1>Результат: {{ exam.title }}</h1>
 {% if visibility_count %}<p class="muted">Страница экзамена становилась скрытой: {{ visibility_count }} раз(а). Учитель видит время этих событий.</p>{% endif %}
 {% if attempt.status == "done" %}
@@ -7,7 +16,8 @@
 <p class="muted">Открытые ответы проверены ИИ по сохраненным критериям. Учитель видит работу и определяет оценку в EduPage.</p>
 {% elif attempt.status == "error" %}<p>Автоматическая проверка не удалась. Учитель видит работу и сможет повторить проверку.</p>
 {% else %}<p>Ответы сданы и сохранены. Идет проверка.</p><script>setTimeout(()=>location.reload(),5000)</script>{% endif %}
-{% for item in items %}<section class="question">{% if item.auto_pending %}<span class="points">Ожидает учителя</span>{% elif item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
+<div class="exam-layout result-layout"><div class="exam-questions">
+{% for item in items %}<section class="question" id="question-{{ item.question.pk }}">{% if item.auto_pending %}<span class="points">Ожидает учителя</span>{% elif item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
 <h2>Вопрос {{ forloop.counter }}</h2><p>{{ item.question.stem|linebreaksbr }}</p>
 <p><strong>Ваш ответ:</strong> {% if item.question.kind == "mcq" %}{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}{% else %}{{ item.answer|default:"Ответ не дан"|linebreaksbr }}{% endif %}</p>
 {% if item.grade %}<p><strong>Проверка:</strong> {{ item.grade.explanation }}</p>{% endif %}
@@ -19,4 +29,7 @@
 <details><summary>Объяснение подтемы: {{ item.question.subtopic }}</summary><p>{{ item.question.subtopic_explanation|linebreaksbr }}</p></details>
 <details><summary>Объяснение ответа</summary><p>{{ item.question.answer_explanation|linebreaksbr }}</p><p><strong>Образец:</strong> {{ item.question.model_answer|linebreaksbr }}</p></details>
 </section>{% endfor %}
+</div><aside class="question-map" aria-label="Карта результатов"><h2>Карта результатов</h2><p>Нажмите на номер, чтобы перейти к вопросу.</p>
+<div class="question-grid">{% for item in items %}<a href="#question-{{ item.question.pk }}" class="{{ item.map_status }}" aria-label="Вопрос {{ forloop.counter }}, {{ item.map_label }}">{{ forloop.counter }}</a>{% endfor %}</div>
+<div class="map-legend"><span><i class="correct"></i>Полный балл</span><span><i class="wrong"></i>Баллы потеряны</span><span><i class="review"></i>Ожидает учителя</span><span><i></i>Не оценён</span></div></aside></div>
 {% endblock %}

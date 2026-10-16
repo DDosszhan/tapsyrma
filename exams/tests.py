@@ -313,10 +313,13 @@ class ExamFlowTests(TestCase):
         pending_result = self.client.get("/exam/result/")
         self.assertContains(pending_result, "Сначала вычесть 4")
         self.assertContains(pending_result, "2x=4, x=2")
+        self.assertContains(pending_result, f'href="#question-{q1.pk}" class="pending"')
         with patch("exams.grading.grade_open", return_value={"score": 2, "criteria": [1, 1, 0], "explanation": "Два шага верны."}):
             grade_attempt(attempt)
         result = self.client.get("/exam/result/")
         self.assertContains(result, "3 / 4")
+        self.assertContains(result, f'href="#question-{q1.pk}" class="correct"')
+        self.assertContains(result, f'href="#question-{q2.pk}" class="wrong"')
         self.assertContains(result, "Вычесть 4")
         self.assertContains(result, "Изолируйте x")
         self.assertContains(self.client.get("/history/"), "Алгебра")
@@ -673,6 +676,7 @@ class ExamFlowTests(TestCase):
         result = self.client.get(f"/exam/result/{attempt.pk}/")
         self.assertContains(result, "Предварительно")
         self.assertContains(result, "Ожидает учителя")
+        self.assertContains(result, f'href="#question-{question.pk}" class="review"')
         self.assertContains(result, "Добавить пояснение учителю")
         self.assertTrue(result.context["items"][0]["auto_pending"])
         self.assertContains(self.client.get("/history/"), "Предварительно")
@@ -774,6 +778,8 @@ class ExamFlowTests(TestCase):
         appeal = GradeAppeal.objects.get()
         self.assertEqual(appeal.original_grade, original)
         self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Ожидает учителя")
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"),
+                            f'href="#question-{question.pk}" class="review"')
         other = get_user_model().objects.create_user("other@example.invalid", "other@example.invalid", "password")
         Student.objects.create(user=other, name="Другой", grade=9, password_change_required=False)
         self.client.force_login(other)
@@ -797,6 +803,8 @@ class ExamFlowTests(TestCase):
         self.assertEqual(self.client.post(review_url, valid).status_code, 403)
         self.client.force_login(student_user)
         self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Все три критерия выполнены")
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"),
+                            f'href="#question-{question.pk}" class="correct"')
 
     def test_generation_uses_igcse_for_nine_and_as_for_ten(self):
         mismatch = {"questions": [dict(self.generated["questions"][0], model_answer="wrong"),

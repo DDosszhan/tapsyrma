@@ -242,9 +242,18 @@ def result(request, attempt_id=None):
         grade = attempt.grades.get(str(q.id))
         question_appeal = appeals.get(q.id)
         auto_pending = _auto_review_pending(question_appeal, grade)
+        if question_appeal and question_appeal.status == GradeAppeal.Status.PENDING:
+            map_status, map_label = "review", "ожидает учителя"
+        elif grade is None:
+            map_status, map_label = "pending", "ещё не оценён"
+        elif grade["score"] == q.points:
+            map_status, map_label = "correct", "полный балл"
+        else:
+            map_status, map_label = "wrong", "баллы потеряны"
         items.append({"question": q, "answer": attempt.answers.get(str(q.id), ""),
                       "grade": grade, "criteria": zip(q.rubric, grade["criteria"]) if grade else [],
                       "appeal": question_appeal,
+                      "map_status": map_status, "map_label": map_label,
                       "auto_pending": auto_pending,
                       "can_add_note": attempt.status == Attempt.Status.DONE and auto_pending
                                       and not question_appeal.student_note})
