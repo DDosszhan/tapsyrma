@@ -5,9 +5,8 @@
 <div class="course-progress"><strong>{{ opened_count }} из {{ lessons|length }}</strong> уроков открыто · {{ remaining_count }} осталось · {{ completed_count }} с решёнными заданиями
 {% if lessons %}<progress value="{{ opened_count }}" max="{{ lessons|length }}" aria-label="Прогресс раздела"></progress>{% endif %}</div>
 {% if lessons %}<nav class="lesson-menu" aria-label="Уроки раздела">
-{% for lesson in lessons %}<a class="lesson-tab{% if lesson.is_opened %} is-opened{% endif %}{% if lesson.is_completed %} is-completed{% endif %}{% if current.pk == lesson.pk %} is-current{% endif %}" href="{% url 'lesson_detail' course.pk section.pk lesson.pk %}"{% if current.pk == lesson.pk %} aria-current="page"{% endif %}>
-  <small>Урок {{ lesson.position }} · {% if lesson.is_completed %}Задания решены{% elif lesson.is_opened %}Открыт{% else %}Не открыт{% endif %}</small><strong>{{ lesson.title }}</strong>
-</a>{% endfor %}</nav>{% endif %}
+{% for lesson in lessons %}<a class="lesson-tab{% if lesson.is_opened %} is-opened{% endif %}{% if lesson.is_completed %} is-completed{% endif %}{% if current.pk == lesson.pk %} is-current{% endif %}" href="{% url 'lesson_detail' course.pk section.pk lesson.pk %}" title="Урок {{ lesson.position }}: {{ lesson.title }} — {% if lesson.is_completed %}Задания решены{% elif lesson.is_opened %}Открыт{% else %}Не открыт{% endif %}" aria-label="Урок {{ lesson.position }}: {{ lesson.title }} — {% if lesson.is_completed %}Задания решены{% elif lesson.is_opened %}Открыт{% else %}Не открыт{% endif %}"{% if current.pk == lesson.pk %} aria-current="page"{% endif %}>{{ lesson.position }}</a>{% endfor %}</nav>
+<div class="lesson-legend" aria-label="Обозначения уроков"><span><i></i>Не открыт</span><span><i class="is-opened"></i>Открыт</span><span><i class="is-completed"></i>Задания решены</span></div>{% endif %}
 <article class="lesson-panel">
 {% if current %}<span class="course-kicker">Урок {{ current.position }}</span><h2>{{ current.title }}</h2>
   {% if current.content %}<div class="lesson-content">{{ current.content|linebreaks }}</div>{% else %}<p class="muted">Материал урока пока не добавлен.</p>{% endif %}

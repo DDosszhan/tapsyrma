@@ -20,13 +20,12 @@ main.course-page{max-width:1080px;background:transparent;box-shadow:none;padding
 .course-header p,.section-header p{color:#566275;margin-bottom:0}
 .course-progress{margin:18px 0 8px;padding:16px 20px}
 .section-grid{margin-top:18px}.section-number{display:inline-grid;place-items:center;width:36px;height:36px;background:#e4f2ed;border-radius:10px;color:#176b52;font-weight:800}
-.lesson-menu{display:flex;gap:10px;overflow-x:auto;border:0;padding:4px 2px 14px;margin:18px 0 12px}
-.lesson-tab{flex:0 0 180px;display:flex;flex-direction:column;gap:5px;background:#fff;border:1px solid #dce2ea;border-radius:12px;padding:12px 14px;color:#172033!important;text-decoration:none;min-height:70px}
-.lesson-tab small{color:#647084}.lesson-tab.is-opened{background:#e7f5ee;border-color:#8bc7a7}.lesson-tab.is-completed{background:#d5f0df;border-color:#429966}.lesson-tab.is-current{box-shadow:0 0 0 2px #176b52}
+.lesson-menu{display:grid;grid-template-columns:repeat(auto-fill,44px);gap:8px;margin:18px 0 10px;padding:4px 2px;border:0}
+.lesson-tab{position:relative;display:grid;place-items:center;width:44px;height:44px;background:#fff;border:1px solid #cbd4df;border-radius:8px;color:#344255!important;text-decoration:none;font-weight:700}
+.lesson-tab:hover{border-color:#176b52}.lesson-tab.is-opened{background:#e7f5ee;border-color:#8bc7a7;color:#176b52!important}.lesson-tab.is-completed{background:#cdebd9;border-color:#429966;color:#14583d!important}.lesson-tab.is-completed::after{content:"✓";position:absolute;top:2px;right:4px;font-size:.65rem}.lesson-tab.is-current{box-shadow:0 0 0 2px #176b52}
+.lesson-legend{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 18px;color:#566275;font-size:.82rem}.lesson-legend span{display:inline-flex;align-items:center;gap:5px}.lesson-legend i{width:12px;height:12px;border:1px solid #cbd4df;border-radius:3px;background:#fff}.lesson-legend .is-opened{background:#e7f5ee;border-color:#8bc7a7}.lesson-legend .is-completed{background:#cdebd9;border-color:#429966}
 .lesson-panel{min-height:220px}.lesson-panel h2{margin-top:0}.lesson-panel .lesson-content{max-width:760px}.lesson-panel .lesson-content p{margin:0 0 1em}
 .lesson-practice{border-top:1px solid #e1e8ed;margin-top:28px;padding-top:18px;color:#566275}
 .course-empty{background:#fff;border:1px dashed #b5c3d0;border-radius:16px;padding:30px;margin:24px 0;color:#566275}
-.course-page nav{flex-wrap:wrap}
-.course-page nav.lesson-menu{flex-wrap:nowrap}
 @media(max-width:700px){main.course-page{margin:0;padding:18px}.course-grid{grid-template-columns:1fr}.course-card,.course-header,.section-header,.lesson-panel{padding:20px}.course-stats{flex-wrap:wrap}}
 </style>{% endblock %}
