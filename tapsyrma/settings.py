@@ -62,7 +62,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "ru"
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Qyzylorda"
 USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
