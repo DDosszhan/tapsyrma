@@ -473,7 +473,8 @@ class AttemptVisibilityEventInline(admin.TabularInline):
 
 @admin.register(Attempt)
 class AttemptAdmin(admin.ModelAdmin):
-    list_display = ["invitation", "status", "score", "visibility_count", "started_at", "submitted_at", "graded_at"]
+    change_list_template = "admin/exams/attempt/change_list.html"
+    list_display = ["invitation", "status", "grading_progress", "score", "visibility_count", "started_at", "submitted_at", "graded_at"]
     list_filter = ["status", "invitation__exam"]
     inlines = [AttemptVisibilityEventInline]
     search_fields = ["invitation__student__name", "invitation__student__user__email",
@@ -488,10 +489,14 @@ class AttemptAdmin(admin.ModelAdmin):
     def visibility_count(self, obj):
         return obj.visibility_events.count()
 
-    @admin.action(description="Повторить проверку ошибочных сдач")
+    @admin.display(description="Проверено вопросов")
+    def grading_progress(self, obj):
+        return f"{len(obj.grades)}/{len(obj.question_ids)}"
+
+    @admin.action(description="Запустить автопроверку выбранных сдач с ошибкой")
     def retry_grading(self, request, queryset):
         count = queryset.filter(status=Attempt.Status.ERROR).update(status=Attempt.Status.PENDING, error_message="")
-        self.message_user(request, f"Отправлено на повторную проверку: {count}.")
+        self.message_user(request, f"Отправлено на повторную проверку: {count}. Уже проверенные вопросы сохраняются.")
 
 
 class GradeAppealReviewForm(forms.ModelForm):

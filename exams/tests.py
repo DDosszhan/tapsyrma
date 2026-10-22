@@ -207,6 +207,31 @@ class StudentAccountAdminTests(TestCase):
         self.assertTrue(Attempt.objects.filter(pk=attempt.pk, invitation__student=student).exists())
         self.assertNotContains(self.client.get(url), "pupil@example.invalid")
 
+    def test_retry_selected_failed_attempts_keeps_saved_grades(self):
+        admin_user = get_user_model().objects.get(username="admin")
+        exam = Exam.objects.create(title="Ретейк", subject="Математика", grade=9,
+                                   syllabus_text="Тема", question_count=1, total_points=1,
+                                   created_by=admin_user)
+        attempts = []
+        for index, status in enumerate((Attempt.Status.ERROR, Attempt.Status.DONE)):
+            student = Student.objects.create(name=f"Ученик {index}", grade=9)
+            invitation = Invitation.objects.create(exam=exam, student=student, code_hash=f"retry-{index}",
+                expires_at=timezone.now() + timedelta(days=1), created_by=admin_user)
+            attempts.append(Attempt.objects.create(invitation=invitation, status=status,
+                question_ids=[123], grades={"123": {"score": 1}}, score=1, error_message="Ошибка"))
+
+        url = "/admin/exams/attempt/"
+        self.assertContains(self.client.get(url), "Запустить автопроверку выбранных сдач с ошибкой")
+        response = self.client.post(url, {"action": "retry_grading",
+            "_selected_action": [str(attempt.pk) for attempt in attempts]})
+        self.assertEqual(response.status_code, 302)
+        for attempt in attempts:
+            attempt.refresh_from_db()
+            self.assertEqual(attempt.grades, {"123": {"score": 1}})
+        self.assertEqual(attempts[0].status, Attempt.Status.PENDING)
+        self.assertEqual(attempts[0].error_message, "")
+        self.assertEqual(attempts[1].status, Attempt.Status.DONE)
+
     def test_excel_import_is_atomic_and_safe_to_repeat(self):
         url = "/admin/exams/student/import/"
         upload = self.workbook([["email", "name"], ["first@example.invalid", "Первый"],
