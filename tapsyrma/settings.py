@@ -11,6 +11,7 @@ CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.environ.get("DJANGO_CSRF
 
 INSTALLED_APPS = [
     "exams.apps.ExamsConfig",
+    "courses.apps.CoursesConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",

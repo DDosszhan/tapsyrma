@@ -1,0 +1,16 @@
+{% extends "courses/base.html" %}{% block content %}
+<div class="course-breadcrumb"><a href="{% url 'course_list' %}">Мои курсы</a><span>›</span><span>{{ course.title }}</span></div>
+<header class="course-header"><span class="course-kicker">{{ course.subject }} · {{ course.grade }} класс</span><h1>{{ course.title }}</h1>
+{% if course.description %}<p>{{ course.description|linebreaksbr }}</p>{% endif %}</header>
+<h2>Разделы</h2>
+{% if sections %}<div class="course-grid section-grid">
+{% for section in sections %}<a class="course-card" href="{% url 'section_detail' course.pk section.pk %}">
+  <span class="section-number">{{ section.position }}</span><h2>{{ section.title }}</h2>
+  <p>{{ section.description|default:"Уроки раздела"|truncatechars:150 }}</p>
+  <div class="course-stats"><span><strong>{{ section.opened_count }}</strong> из {{ section.lesson_count }} уроков открыто</span><span>Осталось: {{ section.remaining_count }}</span></div>
+  {% if section.lesson_count %}<progress value="{{ section.opened_count }}" max="{{ section.lesson_count }}" aria-label="Открыто уроков: {{ section.opened_count }} из {{ section.lesson_count }}"></progress>{% endif %}
+  <div class="course-stats"><span>Задания решены: {{ section.completed_count }}</span></div>
+  <div class="course-arrow">Открыть раздел →</div>
+</a>{% endfor %}</div>
+{% else %}<div class="course-empty">Разделы появятся здесь после публикации материалов.</div>{% endif %}
+{% endblock %}

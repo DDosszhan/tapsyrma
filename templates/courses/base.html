@@ -1,0 +1,32 @@
+{% extends "exams/base.html" %}
+{% block main_class %}course-page{% endblock %}
+{% block extra_head %}<style>
+main.course-page{max-width:1080px;background:transparent;box-shadow:none;padding:12px 24px}
+.course-page a{color:#124ab3}.course-page h1{margin:10px 0}.course-page h2{line-height:1.25}
+.course-kicker{font-size:.82rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#31605a}
+.course-lead{max-width:720px;color:#566275;margin:8px 0 26px}
+.course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:24px 0 32px}
+.course-card{display:block;min-width:0;padding:24px;background:#fff;border:1px solid #dce2ea;border-radius:16px;text-decoration:none;color:#172033!important;box-shadow:0 5px 20px #1720330d;transition:transform .15s,border-color .15s,box-shadow .15s}
+.course-card:hover{transform:translateY(-3px);border-color:#70a698;box-shadow:0 10px 26px #17203318}
+.course-card:focus-visible,.lesson-tab:focus-visible{outline:3px solid #86aaff;outline-offset:3px}
+.course-card h2{margin:14px 0 8px;font-size:1.35rem}.course-card p{color:#566275;margin:0 0 18px}
+.course-meta{display:flex;gap:8px;flex-wrap:wrap}.course-chip{display:inline-block;background:#edf3f7;color:#344255;padding:5px 10px;border-radius:99px;font-size:.82rem;font-weight:700}
+.course-stats{display:flex;justify-content:space-between;gap:12px;color:#526174;font-size:.88rem;margin:16px 0 8px}
+.course-card progress,.course-progress progress{width:100%;height:9px;accent-color:#16815f}
+.course-card strong,.course-progress strong{color:#176b52}.course-arrow{color:#124ab3;font-weight:700;margin-top:14px}
+.course-breadcrumb{display:flex;flex-wrap:wrap;gap:8px;color:#647084;font-size:.9rem;margin-bottom:20px}
+.course-breadcrumb a{text-decoration:none}.course-breadcrumb a:hover{text-decoration:underline}
+.course-header,.section-header,.lesson-panel,.course-progress{background:#fff;border:1px solid #dce2ea;border-radius:16px;padding:24px}
+.course-header p,.section-header p{color:#566275;margin-bottom:0}
+.course-progress{margin:18px 0 8px;padding:16px 20px}
+.section-grid{margin-top:18px}.section-number{display:inline-grid;place-items:center;width:36px;height:36px;background:#e4f2ed;border-radius:10px;color:#176b52;font-weight:800}
+.lesson-menu{display:flex;gap:10px;overflow-x:auto;border:0;padding:4px 2px 14px;margin:18px 0 12px}
+.lesson-tab{flex:0 0 180px;display:flex;flex-direction:column;gap:5px;background:#fff;border:1px solid #dce2ea;border-radius:12px;padding:12px 14px;color:#172033!important;text-decoration:none;min-height:70px}
+.lesson-tab small{color:#647084}.lesson-tab.is-opened{background:#e7f5ee;border-color:#8bc7a7}.lesson-tab.is-completed{background:#d5f0df;border-color:#429966}.lesson-tab.is-current{box-shadow:0 0 0 2px #176b52}
+.lesson-panel{min-height:220px}.lesson-panel h2{margin-top:0}.lesson-panel .lesson-content{max-width:760px}.lesson-panel .lesson-content p{margin:0 0 1em}
+.lesson-practice{border-top:1px solid #e1e8ed;margin-top:28px;padding-top:18px;color:#566275}
+.course-empty{background:#fff;border:1px dashed #b5c3d0;border-radius:16px;padding:30px;margin:24px 0;color:#566275}
+.course-page nav{flex-wrap:wrap}
+.course-page nav.lesson-menu{flex-wrap:nowrap}
+@media(max-width:700px){main.course-page{margin:0;padding:18px}.course-grid{grid-template-columns:1fr}.course-card,.course-header,.section-header,.lesson-panel{padding:20px}.course-stats{flex-wrap:wrap}}
+</style>{% endblock %}

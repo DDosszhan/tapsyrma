@@ -1,0 +1,14 @@
+{% extends "courses/base.html" %}{% block content %}
+<span class="course-kicker">Обучение</span><h1>Мои курсы</h1>
+<p class="course-lead">Открывайте уроки по порядку и следите за своим прогрессом в каждом разделе.</p>
+{% if courses %}<div class="course-grid">
+{% for course in courses %}<a class="course-card" href="{% url 'course_detail' course.pk %}">
+  <div class="course-meta"><span class="course-chip">{{ course.subject }}</span><span class="course-chip">{{ course.grade }} класс</span></div>
+  <h2>{{ course.title }}</h2><p>{{ course.description|default:"Разделы и уроки курса"|truncatechars:150 }}</p>
+  <div class="course-stats"><span>{{ course.section_count }} разделов</span><span><strong>{{ course.opened_count }}</strong> из {{ course.lesson_count }} уроков открыто</span></div>
+  {% if course.lesson_count %}<progress value="{{ course.opened_count }}" max="{{ course.lesson_count }}" aria-label="Открыто уроков: {{ course.opened_count }} из {{ course.lesson_count }}"></progress>{% endif %}
+  <div class="course-stats"><span>Осталось открыть: {{ course.remaining_count }}</span><span>Задания решены: {{ course.completed_count }}</span></div>
+  <div class="course-arrow">Открыть курс →</div>
+</a>{% endfor %}</div>
+{% else %}<div class="course-empty">Пока нет опубликованных курсов для вашего класса.</div>{% endif %}
+{% endblock %}

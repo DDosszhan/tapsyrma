@@ -11,6 +11,7 @@ from django.urls import path
 from django.views.generic import TemplateView
 from exams import views as exam_views
 from exams.accounts import StudentLoginView, StudentPasswordChangeView
+from courses import views as course_views
 
 
 def healthz(request):
@@ -34,6 +35,11 @@ def private_media(request, path):
 
 urlpatterns = [
     path("", exam_views.enter, name="enter"),
+    path("courses/", course_views.course_list, name="course_list"),
+    path("courses/<int:course_id>/", course_views.course_detail, name="course_detail"),
+    path("courses/<int:course_id>/sections/<int:section_id>/", course_views.section_detail, name="section_detail"),
+    path("courses/<int:course_id>/sections/<int:section_id>/lessons/<int:lesson_id>/",
+         course_views.section_detail, name="lesson_detail"),
     path("choose/", exam_views.choose_exam, name="choose_exam"),
     path("exam/", exam_views.session, name="exam_session"),
     path("exam/save/", exam_views.save, name="exam_save"),
