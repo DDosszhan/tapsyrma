@@ -128,10 +128,11 @@ class CourseSkeletonTests(TestCase):
         self.assertEqual(post(mcq, "1").status_code, 302)
         wrong = LessonAnswer.objects.get(question=mcq)
         self.assertEqual(wrong.status, LessonAnswer.Status.INCORRECT)
+        self.assertEqual(wrong.explanation_status, LessonAnswer.ExplanationStatus.PENDING)
         self.assertIsNone(LessonProgress.objects.get(student=self.student, lesson=self.first).completed_at)
         explain_url = reverse("lesson_explain", args=[self.course.pk, self.section.pk, self.first.pk, mcq.pk, wrong.pk])
         self.assertContains(self.client.get(reverse("lesson_detail", args=[self.course.pk, self.section.pk, self.first.pk])),
-                            "Explain my mistake")
+                            "AI is preparing an explanation")
         self.assertEqual(self.client.post(explain_url).status_code, 302)
         wrong.refresh_from_db()
         self.assertEqual(wrong.explanation_status, LessonAnswer.ExplanationStatus.PENDING)
@@ -165,7 +166,40 @@ class CourseSkeletonTests(TestCase):
         ai.assert_called_once()
         answer.refresh_from_db()
         self.assertEqual(answer.status, LessonAnswer.Status.CORRECT)
+        self.assertEqual(answer.criteria_scores, [2])
         self.assertIsNotNone(LessonProgress.objects.get(student=self.student, lesson=self.first).completed_at)
+
+    def test_open_answer_shows_fixed_marks_and_specific_ai_feedback(self):
+        question = LessonQuestion.objects.create(
+            lesson=self.first, position=1, kind="open", points=2,
+            prompt="Convert 1010 to decimal.", model_answer="8 + 2 = 10.",
+            grading_criterion="1: Correct place values, 8 and 2\n1: Correct decimal answer, 10",
+        )
+        question.full_clean()
+        self.assertEqual(len(question.marking_rows()), 2)
+        answer = LessonAnswer.objects.create(
+            student=self.student, question=question, question_revision=question.revision,
+            answer="8 + 2 = 11",
+        )
+        with patch("courses.jobs.grade_open", return_value={
+            "score": 1, "criteria": [1, 0], "feedback": "8 + 2 equals 10, not 11.",
+            "suggestion": "Add the place values again before writing the final answer.",
+        }):
+            check_answer(answer)
+        answer.refresh_from_db()
+        self.assertEqual((answer.status, answer.score, answer.criteria_scores),
+                         (LessonAnswer.Status.INCORRECT, 1, [1, 0]))
+        self.assertEqual(answer.explanation_status, LessonAnswer.ExplanationStatus.READY)
+        self.client.force_login(self.user)
+        page = self.client.get(reverse("lesson_detail", args=[self.course.pk, self.section.pk, self.first.pk]))
+        self.assertContains(page, "1/1")
+        self.assertContains(page, "0/1")
+        self.assertContains(page, "8 + 2 equals 10, not 11.")
+        self.assertContains(page, "Add the place values again")
+
+        question.grading_criterion = "1: Only one mark"
+        with self.assertRaises(ValidationError):
+            question.full_clean()
 
     def test_editing_question_invalidates_previous_completion(self):
         question = LessonQuestion.objects.create(lesson=self.first, position=1, kind="short", prompt="2 + 2?",

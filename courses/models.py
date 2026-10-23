@@ -1,3 +1,5 @@
+import re
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -91,7 +93,10 @@ class LessonQuestion(models.Model):
                                                        null=True, blank=True)
     accepted_answers = models.TextField("Accepted short answers (one per line)", blank=True)
     model_answer = models.TextField("Model extended response", blank=True)
-    grading_criterion = models.TextField("Marking criterion", blank=True)
+    grading_criterion = models.TextField(
+        "Marking criterion", blank=True,
+        help_text="For itemized marks, write one line per criterion, for example: 1: Correct method",
+    )
     revision = models.PositiveIntegerField("Question revision", default=1, editable=False)
 
     class Meta:
@@ -128,8 +133,31 @@ class LessonQuestion(models.Model):
                 errors["model_answer"] = "Enter a model answer."
             if not self.grading_criterion.strip():
                 errors["grading_criterion"] = "Enter a marking criterion."
+            else:
+                try:
+                    self.marking_rows()
+                except ValidationError as exc:
+                    errors["grading_criterion"] = exc.messages[0]
         if errors:
             raise ValidationError(errors)
+
+    def marking_rows(self):
+        """Each `1: ...` line is a fixed criterion; older prose remains one criterion."""
+        if self.kind != self.Kind.OPEN:
+            description = "Select the correct option." if self.kind == self.Kind.MCQ else "Give a correct short answer."
+            return [{"criterion": description, "points": self.points}]
+        lines = [line.strip() for line in self.grading_criterion.splitlines() if line.strip()]
+        if not lines or not re.match(r"^\d+\s*:", lines[0]):
+            return [{"criterion": self.grading_criterion.strip(), "points": self.points}]
+        rows = []
+        for line in lines:
+            match = re.fullmatch(r"(\d+)\s*:\s*(\S.*)", line)
+            if not match or int(match.group(1)) < 1:
+                raise ValidationError("Use one criterion per line: '1: What earns the mark'.")
+            rows.append({"criterion": match.group(2), "points": int(match.group(1))})
+        if sum(row["points"] for row in rows) != self.points:
+            raise ValidationError("Criterion marks must add up to the question points.")
+        return rows
 
     def save(self, *args, **kwargs):
         tracked = ("lesson_id", "active", "kind", "prompt", "points", "option_a", "option_b",
@@ -173,6 +201,7 @@ class LessonAnswer(models.Model):
     answer = models.TextField("Student answer")
     status = models.CharField("Grading", max_length=12, choices=Status.choices, default=Status.PENDING)
     score = models.PositiveSmallIntegerField("Points", null=True, blank=True)
+    criteria_scores = models.JSONField("Marks by criterion", default=list, blank=True)
     review_reason = models.CharField("Review reason", max_length=500, blank=True)
     created_at = models.DateTimeField("Submitted", auto_now_add=True)
     grading_started_at = models.DateTimeField(null=True, blank=True)

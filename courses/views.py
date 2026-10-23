@@ -83,6 +83,12 @@ def section_detail(request, course_id, section_id, lesson_id=None):
         for question in questions:
             question.latest_answer = latest.get(question.pk)
             answer = question.latest_answer
+            scores = answer.criteria_scores if answer and answer.status in (
+                LessonAnswer.Status.CORRECT, LessonAnswer.Status.INCORRECT) else []
+            question.marking_rows_display = [
+                {**row, "earned": scores[index] if index < len(scores) else None}
+                for index, row in enumerate(question.marking_rows())
+            ]
             question.can_answer = not answer or answer.status not in (
                 LessonAnswer.Status.CORRECT, LessonAnswer.Status.PENDING, LessonAnswer.Status.GRADING,
                 LessonAnswer.Status.REVIEW, LessonAnswer.Status.ERROR)

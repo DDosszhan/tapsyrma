@@ -24,12 +24,16 @@
       {% elif answer.status == 'error' %}<strong>Grading failed. The teacher can retry it.</strong>
       {% else %}<strong>Your answer is being graded…</strong>{% endif %}
       <p>Your answer: {{ question.latest_answer_display }}</p>
+      {% if answer.status == 'review' and answer.review_reason %}<p>{{ answer.review_reason }}</p>{% endif %}
       {% if answer.status == 'incorrect' %}
-        {% if answer.explanation_status == 'ready' %}<div class="practice-explanation"><strong>AI explanation</strong>{{ answer.explanation|linebreaks }}</div>
+        {% if answer.explanation_status == 'ready' %}<div class="practice-explanation"><strong>Why marks were lost and what to try next</strong>{{ answer.explanation|linebreaks }}</div>
         {% elif answer.explanation_status == 'pending' or answer.explanation_status == 'generating' %}<p>AI is preparing an explanation…</p>
         {% else %}{% if answer.explanation_status == 'error' %}<p>The explanation could not be prepared. You can try again.</p>{% endif %}<form method="post" action="{% url 'lesson_explain' course.pk section.pk current.pk question.pk answer.pk %}">{% csrf_token %}<button type="submit" class="practice-explain-button">Explain my mistake</button></form>{% endif %}
       {% endif %}
     </div>{% endif %}
+    <div class="practice-marking"><strong>How marks are awarded</strong><ul>
+      {% for row in question.marking_rows_display %}<li><span>{{ row.criterion }}</span><strong>{% if row.earned != None %}{{ row.earned }}/{% else %}Up to {% endif %}{{ row.points }}</strong></li>{% endfor %}
+    </ul></div>
     {% if question.can_answer %}<form method="post" action="{% url 'lesson_answer' course.pk section.pk current.pk question.pk %}" class="practice-answer-form">{% csrf_token %}<input type="hidden" name="revision" value="{{ question.revision }}">
       {% if question.kind == 'mcq' %}{% for option in question.options %}<label class="practice-option"><input type="radio" name="answer" value="{{ forloop.counter }}" required> {{ option }}</label>{% endfor %}
       {% elif question.kind == 'short' %}<label for="answer-{{ question.pk }}">Short answer</label><input id="answer-{{ question.pk }}" type="text" name="answer" maxlength="500" required>
