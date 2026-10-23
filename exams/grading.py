@@ -5,7 +5,7 @@ from .ai import ManualReviewRequired, grade_open
 from .models import Attempt, GradeAppeal, Question
 
 
-AUTO_REVIEW_REASON = "Автоматическая проверка передала ответ учителю."
+AUTO_REVIEW_REASON = "Automatic grading sent this answer to the teacher."
 
 
 def grade_attempt(attempt):
@@ -19,15 +19,15 @@ def grade_attempt(attempt):
         if question.kind == "mcq":
             earned = question.points if answer == str(question.correct_option) else 0
             grade = {"score": earned, "criteria": [earned],
-                     "explanation": "Верный вариант." if earned else "Выбранный вариант неверен."}
+                     "explanation": "Correct option." if earned else "The selected option is incorrect."}
         elif not answer:
-            grade = {"score": 0, "criteria": [0] * len(question.rubric), "explanation": "Ответ не дан."}
+            grade = {"score": 0, "criteria": [0] * len(question.rubric), "explanation": "No answer was given."}
         else:
             try:
                 grade = grade_open(question, answer)
             except ManualReviewRequired as exc:
                 grade = {"score": 0, "criteria": [0] * len(question.rubric),
-                         "explanation": "Автоматическая оценка не подтверждена. Ответ передан учителю.",
+                         "explanation": "Automatic grading could not be confirmed. The answer was sent to the teacher.",
                          "review_pending": True}
                 review_reason = f"{AUTO_REVIEW_REASON} {exc.messages[0]}"[:500]
         # Save each result so a later API failure does not repeat paid grading calls.
@@ -46,7 +46,7 @@ def grade_attempt(attempt):
     with transaction.atomic():
         locked = Attempt.objects.select_for_update().get(pk=attempt.pk)
         if len(locked.grades) != len(attempt.question_ids):
-            raise ValueError("Не все вопросы проверены.")
+            raise ValueError("Not all questions have been graded.")
         locked.status = Attempt.Status.DONE
         locked.graded_at = timezone.now()
         locked.error_message = ""

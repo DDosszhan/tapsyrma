@@ -1,9 +1,9 @@
 {% extends "exams/base.html" %}{% block content %}
-<h1>Выберите экзамен</h1>
-<p>По этому коду можно сдать один экзамен. После выбора поменять его нельзя.</p>
+<h1>Choose an exam</h1>
+<p>This code allows one exam attempt. You cannot change your choice afterward.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if exams %}<ul>{% for exam in exams %}<li>
-<form method="post">{% csrf_token %}<strong>{{ exam.title }}</strong> — {{ exam.subject }}, {{ exam.question_count }} вопросов, {{ exam.total_points }} баллов, {{ exam.duration_minutes }} минут
-<button type="submit" name="exam_id" value="{{ exam.pk }}">Выбрать</button></form>
-</li>{% endfor %}</ul>{% elif not error %}<p>Для вашего класса пока нет опубликованных экзаменов.</p>{% endif %}
+<form method="post">{% csrf_token %}<strong>{{ exam.title }}</strong> — {{ exam.subject }}, {{ exam.question_count }} question{{ exam.question_count|pluralize }}, {{ exam.total_points }} points, {{ exam.duration_minutes }} minutes
+<button type="submit" name="exam_id" value="{{ exam.pk }}">Choose</button></form>
+</li>{% endfor %}</ul>{% elif not error %}<p>There are no published exams for your grade yet.</p>{% endif %}
 {% endblock %}

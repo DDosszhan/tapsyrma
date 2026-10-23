@@ -1,9 +1,9 @@
 {% extends "exams/base.html" %}{% block content %}
-<h1>{{ invitation.exam.title }}</h1><p>{{ invitation.student.name }} · {{ invitation.exam.subject }} · {{ invitation.exam.grade }} класс · формат {{ invitation.exam.assessment_style }}</p>
-<p>{{ invitation.exam.question_count }} вопросов, {{ invitation.exam.total_points }} баллов, {{ invitation.exam.duration_minutes }} минут. Время начнется после нажатия «Начать экзамен». После начала можно вернуться по тому же коду; повторную сдачу разрешает учитель.</p>
+<h1>{{ invitation.exam.title }}</h1><p>{{ invitation.student.name }} · {{ invitation.exam.subject }} · Grade {{ invitation.exam.grade }} · {{ invitation.exam.assessment_style }} format</p>
+<p>{{ invitation.exam.question_count }} question{{ invitation.exam.question_count|pluralize }}, {{ invitation.exam.total_points }} points, {{ invitation.exam.duration_minutes }} minutes. The timer starts when you select “Start exam”. You can return using the same code; your teacher authorizes another attempt.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
-{% if expired %}<p class="error">Срок начала истек.</p>
-{% elif invitation.variant_status == "ready" %}<form method="post">{% csrf_token %}<button type="submit">Начать экзамен</button></form>
-{% elif invitation.variant_status == "error" %}<p>Вариант не удалось подготовить. Сообщите учителю, чтобы он повторил генерацию.</p>
-{% else %}<p>Ваш вариант готовится. Обновите страницу чуть позже.</p><meta http-equiv="refresh" content="10">{% endif %}
+{% if expired %}<p class="error">The start deadline has passed.</p>
+{% elif invitation.variant_status == "ready" %}<form method="post">{% csrf_token %}<button type="submit">Start exam</button></form>
+{% elif invitation.variant_status == "error" %}<p>Your question set could not be prepared. Ask your teacher to retry generation.</p>
+{% else %}<p>Your question set is being prepared. Refresh this page shortly.</p><meta http-equiv="refresh" content="10">{% endif %}
 {% endblock %}

@@ -26,7 +26,7 @@ def enter(request):
         student = getattr(request.user, "student_profile", None)
         if not student:
             return render(request, "exams/enter.html", {
-                "error": "Общий код доступен только ученикам. Войдите под учетной записью ученика.", "exams": exams})
+                "error": "Shared codes are for students only. Sign in with a student account.", "exams": exams})
         code = request.POST.get("code", "").strip().upper().replace("-", "")
         digest = hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest()
         invitation = Invitation.objects.filter(code_hash=digest).select_related("exam", "student").first()
@@ -44,7 +44,7 @@ def enter(request):
             if shared.is_active and shared.expires_at >= timezone.now():
                 request.session["shared_code_id"] = shared.id
                 return redirect("choose_exam")
-        return render(request, "exams/enter.html", {"error": "Код недействителен или срок начала истек.", "exams": exams})
+        return render(request, "exams/enter.html", {"error": "The code is invalid or its start deadline has passed.", "exams": exams})
     return render(request, "exams/enter.html", {"exams": exams})
 
 
@@ -60,17 +60,17 @@ def choose_exam(request):
         return redirect("exam_session")
     exams = Exam.objects.filter(published=True, grade=student.grade).order_by("subject", "title")
     if not shared.is_active or shared.expires_at < timezone.now():
-        return render(request, "exams/choose.html", {"error": "Срок действия кода истек.", "exams": []})
+        return render(request, "exams/choose.html", {"error": "The code has expired.", "exams": []})
     if request.method == "POST":
         exam_id = request.POST.get("exam_id", "")
         if not exam_id.isdecimal() or len(exam_id) > 20:
-            return HttpResponseBadRequest("Неверный экзамен.")
+            return HttpResponseBadRequest("Invalid exam.")
         with transaction.atomic():
             locked = SharedCode.objects.select_for_update().get(pk=shared.pk)
             exam = Exam.objects.select_for_update().filter(pk=int(exam_id), published=True,
                                                            grade=student.grade).first()
             if not locked.is_active or locked.expires_at < timezone.now() or not exam:
-                return render(request, "exams/choose.html", {"error": "Экзамен или код больше недоступен.", "exams": exams})
+                return render(request, "exams/choose.html", {"error": "This exam or code is no longer available.", "exams": exams})
             invitation, _ = Invitation.objects.get_or_create(
                 shared_code=locked, student=student,
                 defaults={"exam": exam, "code_hash": secrets.token_hex(32),
@@ -126,7 +126,7 @@ def session(request):
                 return render(request, "exams/ready.html", {"invitation": locked, "expired": True})
             ids = list(locked.questions.order_by("slot").values_list("id", flat=True))
             if locked.variant_status != Invitation.VariantStatus.READY or len(ids) != locked.exam.question_count:
-                return render(request, "exams/ready.html", {"invitation": locked, "error": "Вариант еще не готов."})
+                return render(request, "exams/ready.html", {"invitation": locked, "error": "Your question set is not ready yet."})
             Attempt.objects.get_or_create(
                 invitation=locked,
                 defaults={"question_ids": ids, "deadline_at": timezone.now() + timedelta(minutes=locked.exam.duration_minutes)})
@@ -141,9 +141,9 @@ def _read_answers(request, questions):
         answer = request.POST.get(f"q_{q.id}", "").strip()
         if q.kind == "mcq":
             if answer not in ("", "0", "1", "2", "3"):
-                raise ValueError("Недопустимый вариант ответа.")
+                raise ValueError("Invalid answer option.")
         elif len(answer) > 5000:
-            raise ValueError("Ответ слишком длинный (до 5000 символов).")
+            raise ValueError("Answer is too long (maximum 5,000 characters).")
         answers[str(q.id)] = answer
     return answers
 
@@ -155,7 +155,7 @@ def save(request):
     with transaction.atomic():
         attempt = Attempt.objects.select_for_update().filter(invitation=invitation).first()
         if not attempt or attempt.status != Attempt.Status.ACTIVE:
-            return HttpResponseBadRequest("Попытка закрыта.")
+            return HttpResponseBadRequest("This attempt is closed.")
         if _close_expired(attempt):
             return JsonResponse({"expired": True}, status=409)
         try:
@@ -172,11 +172,11 @@ def save(request):
 def visibility(request):
     action = request.POST.get("action")
     if action not in ("hidden", "returned"):
-        return HttpResponseBadRequest("Недопустимое событие.")
+        return HttpResponseBadRequest("Invalid event.")
     try:
         event_id = UUID(request.POST.get("event_id", ""))
     except (ValueError, AttributeError):
-        return HttpResponseBadRequest("Недопустимый идентификатор события.")
+        return HttpResponseBadRequest("Invalid event ID.")
     with transaction.atomic():
         attempt = get_object_or_404(Attempt.objects.select_for_update(),
                                     invitation_id=request.session.get("invitation_id"),
@@ -185,7 +185,7 @@ def visibility(request):
         event = AttemptVisibilityEvent.objects.filter(attempt=attempt, event_id=event_id).first()
         if event is None:
             if attempt.status != Attempt.Status.ACTIVE:
-                return JsonResponse({"error": "Попытка закрыта."}, status=409)
+                return JsonResponse({"error": "This attempt is closed."}, status=409)
             event = AttemptVisibilityEvent.objects.create(attempt=attempt, event_id=event_id)
         if action == "returned" and event.returned_at is None:
             event.returned_at = timezone.now()
@@ -243,13 +243,13 @@ def result(request, attempt_id=None):
         question_appeal = appeals.get(q.id)
         auto_pending = _auto_review_pending(question_appeal, grade)
         if question_appeal and question_appeal.status == GradeAppeal.Status.PENDING:
-            map_status, map_label = "review", "ожидает учителя"
+            map_status, map_label = "review", "awaiting teacher"
         elif grade is None:
-            map_status, map_label = "pending", "ещё не оценён"
+            map_status, map_label = "pending", "not graded yet"
         elif grade["score"] == q.points:
-            map_status, map_label = "correct", "полный балл"
+            map_status, map_label = "correct", "full marks"
         else:
-            map_status, map_label = "wrong", "баллы потеряны"
+            map_status, map_label = "wrong", "points lost"
         items.append({"question": q, "answer": attempt.answers.get(str(q.id), ""),
                       "grade": grade, "criteria": zip(q.rubric, grade["criteria"]) if grade else [],
                       "appeal": question_appeal,
@@ -268,7 +268,7 @@ def result(request, attempt_id=None):
 def appeal(request, attempt_id, question_id):
     reason = request.POST.get("reason", "").strip()
     if not 10 <= len(reason) <= 2000:
-        return HttpResponseBadRequest("Опишите ошибку проверки (от 10 до 2000 символов).")
+        return HttpResponseBadRequest("Describe the grading error (10 to 2,000 characters).")
     with transaction.atomic():
         attempt = get_object_or_404(Attempt.objects.select_for_update(), pk=attempt_id,
                                     invitation__student__user=request.user, status=Attempt.Status.DONE)

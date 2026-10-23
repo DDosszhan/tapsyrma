@@ -35,7 +35,7 @@ def new_code():
 
 def automatic_rules(count, total_points):
     if count < 1 or total_points != int(total_points) or total_points < count:
-        raise ValidationError("Для автоматической структуры нужны целые баллы: не меньше одного за каждый вопрос.")
+        raise ValidationError("Automatic allocation requires whole-number points: at least one per question.")
     total = int(total_points)
     for mcq_count in sorted(range(count), key=lambda value: (abs(value * 4 - count), value)):
         open_count = count - mcq_count
@@ -43,7 +43,7 @@ def automatic_rules(count, total_points):
         if open_points >= 1 and remainder == 0:
             return ([(ExamQuestionRule.Kind.MCQ, mcq_count, 1)] if mcq_count else []) + [
                 (ExamQuestionRule.Kind.OPEN, open_count, open_points)]
-    raise ValidationError("Не удалось распределить баллы по вопросам.")
+    raise ValidationError("Could not allocate points across questions.")
 
 
 class ExamAdminForm(forms.ModelForm):
@@ -69,14 +69,14 @@ class ExamAdminForm(forms.ModelForm):
             except ValidationError as exc:
                 self.add_error("total_points", exc)
         if cleaned.get("published") and not self.instance.pk:
-            self.add_error("published", "Сначала сохраните экзамен и его структуру вопросов.")
+            self.add_error("published", "Save the exam and its question structure first.")
         if cleaned.get("published") and self.instance.pk:
             try:
                 blueprint(self.instance)
             except ValidationError as exc:
                 self.add_error("published", exc)
         if self.instance.pk and self.instance.published and not cleaned.get("published") and Invitation.objects.filter(exam=self.instance).exists():
-            self.add_error("published", "Экзамен с выданными кодами нельзя снять с публикации.")
+            self.add_error("published", "An exam with issued codes cannot be unpublished.")
         return cleaned
 
 
@@ -88,17 +88,17 @@ class QuestionRuleFormSet(BaseInlineFormSet):
 
         rows = [form.cleaned_data for form in self.forms if form.cleaned_data and not form.cleaned_data.get("DELETE")]
         if not rows:
-            raise ValidationError("Добавьте хотя бы один тип вопросов.")
+            raise ValidationError("Add at least one question type.")
         kinds = [row["kind"] for row in rows]
         if len(kinds) != len(set(kinds)):
-            raise ValidationError("Один тип вопросов нельзя добавить дважды.")
+            raise ValidationError("A question type cannot be added twice.")
 
         question_count = sum(row["count"] for row in rows)
         total_points = sum((row["points_each"] * row["count"] for row in rows), Decimal("0"))
         if self.instance.question_count is not None and question_count != self.instance.question_count:
-            raise ValidationError(f"Сумма вопросов по типам должна быть {self.instance.question_count}, сейчас {question_count}.")
+            raise ValidationError(f"The total number of questions across types must be {self.instance.question_count}; current total: {question_count}.")
         if self.instance.total_points is not None and total_points != self.instance.total_points:
-            raise ValidationError(f"Сумма баллов по типам должна быть {self.instance.total_points}, сейчас {total_points}.")
+            raise ValidationError(f"The total points across types must be {self.instance.total_points}; current total: {total_points}.")
 
 
 class QuestionRuleInline(admin.TabularInline):
@@ -108,8 +108,8 @@ class QuestionRuleInline(admin.TabularInline):
     min_num = 1
     validate_min = True
     max_num = len(ExamQuestionRule.Kind.choices)
-    verbose_name = "Тип вопросов"
-    verbose_name_plural = "Типы вопросов — удалите строку, чтобы исключить тип"
+    verbose_name = "Question type"
+    verbose_name_plural = "Question types — delete a row to exclude a type"
 
 
 @admin.register(Exam)
@@ -121,10 +121,10 @@ class ExamAdmin(admin.ModelAdmin):
     search_fields = ["title", "subject", "syllabus_text"]
     readonly_fields = ["created_by", "created_at", "updated_at"]
     fieldsets = [
-        ("Экзамен", {"fields": ["title", "subject", "grade"]}),
-        ("Силабус", {"fields": ["syllabus_file", "syllabus_text"], "description": "Загрузите TXT, PDF или DOCX либо вставьте текст. После сохранения проверьте извлеченный текст."}),
-        ("Структура", {"fields": ["question_count", "total_points", "duration_minutes", "auto_structure", "published"], "description": "Автоматически: около 25% MCQ, остальные открытые; баллы подбираются по вашим итогам. Для ручной настройки снимите галочку и заполните типы вопросов ниже."}),
-        ("История", {"fields": ["created_by", "created_at", "updated_at"], "classes": ["collapse"]}),
+        ("Exam", {"fields": ["title", "subject", "grade"]}),
+        ("Syllabus", {"fields": ["syllabus_file", "syllabus_text"], "description": "Upload a TXT, PDF or DOCX file, or paste the text. Check the extracted text after saving."}),
+        ("Structure", {"fields": ["question_count", "total_points", "duration_minutes", "auto_structure", "published"], "description": "Automatic: about 25% MCQ and the rest open response; points are allocated to match your totals. To customize, clear the checkbox and edit the question types below."}),
+        ("History", {"fields": ["created_by", "created_at", "updated_at"], "classes": ["collapse"]}),
     ]
 
     def has_module_permission(self, request):
@@ -200,8 +200,8 @@ class QuestionAdmin(admin.ModelAdmin):
 
 
 class StudentAdminForm(forms.ModelForm):
-    email = forms.EmailField(label="Почта для входа", max_length=150,
-                             help_text="При первом входе ученик должен сменить начальный пароль.")
+    email = forms.EmailField(label="Sign-in email", max_length=150,
+                             help_text="The student must change the initial password at first sign in.")
 
     class Meta:
         model = Student
@@ -211,7 +211,7 @@ class StudentAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if not self.instance.pk:
             self.fields["email"].help_text = (
-                f"Начальный пароль: {settings.STUDENT_INITIAL_PASSWORD}. При первом входе его нужно сменить."
+                f"Initial password: {settings.STUDENT_INITIAL_PASSWORD}. It must be changed at first sign in."
             )
         if self.instance.pk and self.instance.user_id:
             self.fields["email"].initial = self.instance.user.email
@@ -222,13 +222,13 @@ class StudentAdminForm(forms.ModelForm):
         if self.instance.user_id:
             existing = existing.exclude(pk=self.instance.user_id)
         if existing.exists():
-            raise ValidationError("Эта почта уже занята другой учетной записью.")
+            raise ValidationError("This email address is already used by another account.")
         return email
 
 
 class StudentImportForm(forms.Form):
-    grade = forms.ChoiceField(label="Класс", choices=Exam.Grade.choices)
-    file = forms.FileField(label="Файл Excel (.xlsx)")
+    grade = forms.ChoiceField(label="Grade", choices=Exam.Grade.choices)
+    file = forms.FileField(label="Excel file (.xlsx)")
 
 
 @admin.register(Student)
@@ -253,7 +253,7 @@ class StudentAdmin(admin.ModelAdmin):
             actions.pop("anonymize_accounts", None)
         return actions
 
-    @admin.action(description="Сбросить пароль до начального и потребовать смену")
+    @admin.action(description="Reset to the initial password and require a change")
     def reset_passwords(self, request, queryset):
         if not request.user.is_superuser:
             raise PermissionDenied
@@ -265,15 +265,15 @@ class StudentAdmin(admin.ModelAdmin):
                 student.password_change_required = True
                 student.save(update_fields=["password_change_required"])
                 count += 1
-        self.message_user(request, f"Пароль сброшен у {count} учеников. При входе они должны сменить его.")
+        self.message_user(request, f"Password reset for {count} students. They must change it at sign in.")
 
-    @admin.action(description="Удалить вход и обезличить историю")
+    @admin.action(description="Remove access and anonymize history")
     def anonymize_accounts(self, request, queryset):
         if not request.user.is_superuser:
             raise PermissionDenied
         if request.POST.get("confirm_anonymize") != "yes":
             return render(request, "admin/exams/student/confirm_anonymize.html", {
-                **self.admin_site.each_context(request), "title": "Удаление аккаунтов учеников",
+                **self.admin_site.each_context(request), "title": "Deleting student accounts",
                 "opts": self.model._meta, "count": queryset.count(),
                 "selected_ids": request.POST.getlist(ACTION_CHECKBOX_NAME),
                 "select_across": request.POST.get("select_across", "0"),
@@ -284,9 +284,9 @@ class StudentAdmin(admin.ModelAdmin):
             for student in queryset.select_related("user"):
                 user = student.user if student.user_id else None
                 if user and (user.is_staff or user.is_superuser):
-                    raise PermissionDenied("Нельзя удалить аккаунт сотрудника через список учеников.")
+                    raise PermissionDenied("A staff account cannot be deleted from the student list.")
                 student.user = None
-                student.name = "Удалённый ученик"
+                student.name = "Deleted student"
                 student.external_id = str(uuid.uuid4())
                 student.anonymized_at = timezone.now()
                 student.password_change_required = False
@@ -294,11 +294,11 @@ class StudentAdmin(admin.ModelAdmin):
                 if user:
                     user.delete()
                 count += 1
-        self.message_user(request, f"Удалено аккаунтов: {count}. История сдач сохранена без имени и почты.")
+        self.message_user(request, f"Accounts deleted: {count}. Attempt history was kept without names or email addresses.")
 
-    @admin.display(description="Почта")
+    @admin.display(description="Email")
     def email_address(self, obj):
-        return obj.user.email if obj.user_id else "Укажите почту в карточке"
+        return obj.user.email if obj.user_id else "Add an email address in the student profile"
 
     def save_model(self, request, obj, form, change):
         email = form.cleaned_data["email"]
@@ -330,7 +330,7 @@ class StudentAdmin(admin.ModelAdmin):
                             if Student.objects.filter(user=existing).exists():
                                 skipped += 1
                                 continue
-                            raise ValidationError(f"Почта {email} уже занята другой учетной записью.")
+                            raise ValidationError(f"Email {email} is already used by another account.")
                         user = get_user_model().objects.create_user(username=email, email=email,
                                                                     password=settings.STUDENT_INITIAL_PASSWORD)
                         Student.objects.create(user=user, name=name, grade=int(form.cleaned_data["grade"]))
@@ -338,9 +338,9 @@ class StudentAdmin(admin.ModelAdmin):
             except ValidationError as exc:
                 form.add_error("file", exc)
             else:
-                self.message_user(request, f"Создано учеников: {created}; уже были в системе: {skipped}.")
+                self.message_user(request, f"Students created: {created}; already existed: {skipped}.")
                 return HttpResponseRedirect(reverse("admin:exams_student_changelist"))
-        context = {**self.admin_site.each_context(request), "title": "Импорт учеников из Excel", "form": form,
+        context = {**self.admin_site.each_context(request), "title": "Import students from Excel", "form": form,
                    "opts": self.model._meta, "initial_password": settings.STUDENT_INITIAL_PASSWORD}
         return render(request, "admin/exams/student/import.html", context)
 
@@ -354,13 +354,13 @@ class InvitationForm(forms.ModelForm):
         data = super().clean()
         exam, student = data.get("exam"), data.get("student")
         if exam and not exam.published:
-            self.add_error("exam", "Экзамен еще не опубликован.")
+            self.add_error("exam", "The exam has not been published yet.")
         if exam and student and exam.grade != student.grade:
-            self.add_error("student", "Класс ученика не совпадает с экзаменом.")
+            self.add_error("student", "The student grade does not match the exam.")
         if student and not student.user_id:
-            self.add_error("student", "Сначала укажите почту ученика в его карточке.")
+            self.add_error("student", "Add an email address to the student profile first.")
         if data.get("expires_at") and data["expires_at"] <= timezone.now():
-            self.add_error("expires_at", "Укажите время в будущем.")
+            self.add_error("expires_at", "Choose a future date and time.")
         return data
 
 
@@ -379,31 +379,31 @@ class InvitationAdmin(admin.ModelAdmin):
         return fields
 
     def attempt_status(self, obj):
-        return obj.attempt.get_status_display() if obj.pk and hasattr(obj, "attempt") else "Не начат"
-    attempt_status.short_description = "Сдача"
+        return obj.attempt.get_status_display() if obj.pk and hasattr(obj, "attempt") else "Not started"
+    attempt_status.short_description = "Attempt"
 
     def save_model(self, request, obj, form, change):
         if not change:
             code, obj.code_hash = new_code()
             obj.created_by = request.user
             super().save_model(request, obj, form, change)
-            self.message_user(request, f"Код для {obj.student}: {code}. Сохраните сейчас: повторно он не показывается.")
+            self.message_user(request, f"Code for {obj.student}: {code}. Save it now; it will not be shown again.")
         else:
             super().save_model(request, obj, form, change)
 
-    @admin.action(description="Перевыпустить коды для выбранных приглашений")
+    @admin.action(description="Reissue codes for selected invitations")
     def reissue_code(self, request, queryset):
         for obj in queryset.filter(shared_code__isnull=True).select_related("student"):
             code, digest = new_code()
             obj.code_hash = digest
             obj.save(update_fields=["code_hash"])
-            self.message_user(request, f"Новый код для {obj.student}: {code}. Старый код больше не работает.")
+            self.message_user(request, f"New code for {obj.student}: {code}. The old code no longer works.")
 
-    @admin.action(description="Повторить генерацию ошибочных вариантов")
+    @admin.action(description="Retry failed question set generation")
     def retry_generation(self, request, queryset):
         count = queryset.filter(variant_status=Invitation.VariantStatus.ERROR, attempt__isnull=True).update(
             variant_status=Invitation.VariantStatus.PENDING, generation_error="", generation_started_at=None)
-        self.message_user(request, f"Отправлено на повторную генерацию: {count}.")
+        self.message_user(request, f"Queued for generation retry: {count}.")
 
 
 class SharedCodeForm(forms.ModelForm):
@@ -414,7 +414,7 @@ class SharedCodeForm(forms.ModelForm):
     def clean_expires_at(self):
         expires_at = self.cleaned_data["expires_at"]
         if expires_at <= timezone.now() and (not self.instance.pk or "expires_at" in self.changed_data):
-            raise ValidationError("Укажите время в будущем.")
+            raise ValidationError("Choose a future date and time.")
         return expires_at
 
 
@@ -432,7 +432,7 @@ class SharedCodeAdmin(admin.ModelAdmin):
             fields.append("expires_at")
         return fields
 
-    @admin.display(description="Выбрали экзамен")
+    @admin.display(description="Exam chosen")
     def redeemed_count(self, obj):
         return obj.invitations.count() if obj.pk else 0
 
@@ -444,16 +444,16 @@ class SharedCodeAdmin(admin.ModelAdmin):
             code, obj.code_hash = new_code()
             obj.created_by = request.user
             super().save_model(request, obj, form, change)
-            self.message_user(request, f"Общий код: {code}. Сохраните сейчас: повторно он не показывается.")
+            self.message_user(request, f"Shared code: {code}. Save it now; it will not be shown again.")
         else:
             super().save_model(request, obj, form, change)
 
-    @admin.action(description="Перевыпустить выбранные общие коды")
+    @admin.action(description="Reissue selected shared codes")
     def reissue_code(self, request, queryset):
         for obj in queryset:
             code, obj.code_hash = new_code()
             obj.save(update_fields=["code_hash"])
-            self.message_user(request, f"Новый общий код #{obj.pk}: {code}. Старый больше не работает.")
+            self.message_user(request, f"New shared code #{obj.pk}: {code}. The old one no longer works.")
 
 
 class AttemptVisibilityEventInline(admin.TabularInline):
@@ -466,9 +466,9 @@ class AttemptVisibilityEventInline(admin.TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
-    @admin.display(description="Длительность")
+    @admin.display(description="Duration")
     def duration(self, obj):
-        return f"{int((obj.returned_at - obj.left_at).total_seconds())} с" if obj.returned_at else "Нет сигнала возврата"
+        return f"{int((obj.returned_at - obj.left_at).total_seconds())} s" if obj.returned_at else "No return signal"
 
 
 @admin.register(Attempt)
@@ -485,28 +485,28 @@ class AttemptAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
-    @admin.display(description="Уходы со страницы")
+    @admin.display(description="Page exits")
     def visibility_count(self, obj):
         return obj.visibility_events.count()
 
-    @admin.display(description="Проверено вопросов")
+    @admin.display(description="Questions graded")
     def grading_progress(self, obj):
         return f"{len(obj.grades)}/{len(obj.question_ids)}"
 
-    @admin.action(description="Запустить автопроверку выбранных сдач с ошибкой")
+    @admin.action(description="Retry automatic grading for selected failed attempts")
     def retry_grading(self, request, queryset):
         count = queryset.filter(status=Attempt.Status.ERROR).update(status=Attempt.Status.PENDING, error_message="")
-        self.message_user(request, f"Отправлено на повторную проверку: {count}. Уже проверенные вопросы сохраняются.")
+        self.message_user(request, f"Queued for grading retry: {count}. Previously graded questions are kept.")
 
 
 class GradeAppealReviewForm(forms.ModelForm):
-    decision = forms.ChoiceField(label="Решение учителя", choices=[
-        (GradeAppeal.Status.ACCEPTED, "Изменить баллы"),
-        (GradeAppeal.Status.REJECTED, "Оставить баллы"),
+    decision = forms.ChoiceField(label="Teacher decision", choices=[
+        (GradeAppeal.Status.ACCEPTED, "Change score"),
+        (GradeAppeal.Status.REJECTED, "Keep score"),
     ])
     criterion_scores = forms.CharField(
-        label="Баллы по критериям", required=False,
-        help_text="При изменении укажите баллы в порядке критериев через запятую, например: 1, 0, 2.")
+        label="Points by criterion", required=False,
+        help_text="When changing the score, enter points for each criterion in order, separated by commas, for example: 1, 0, 2.")
 
     class Meta:
         model = GradeAppeal
@@ -521,7 +521,7 @@ class GradeAppealReviewForm(forms.ModelForm):
     def clean(self):
         data = super().clean()
         if not (data.get("teacher_note") or "").strip():
-            self.add_error("teacher_note", "Объясните ученику принятое решение.")
+            self.add_error("teacher_note", "Explain your decision to the student.")
         if data.get("decision") == GradeAppeal.Status.ACCEPTED:
             try:
                 scores = [int(value.strip()) for value in data.get("criterion_scores", "").split(",")]
@@ -531,7 +531,7 @@ class GradeAppealReviewForm(forms.ModelForm):
             if len(scores) != len(rubric) or any(
                 score < 0 or score > criterion["points"] for score, criterion in zip(scores, rubric)
             ):
-                self.add_error("criterion_scores", "Укажите по одному целому баллу в пределах каждого критерия.")
+                self.add_error("criterion_scores", "Enter one whole-number score within the limit for each criterion.")
             else:
                 data["parsed_scores"] = scores
         return data
@@ -562,20 +562,20 @@ class GradeAppealAdmin(admin.ModelAdmin):
             fields += ["corrected_grade", "teacher_note"]
         return fields
 
-    @admin.display(description="Текст вопроса")
+    @admin.display(description="Question text")
     def question_text(self, obj):
         return obj.question.stem
 
-    @admin.display(description="Ответ ученика")
+    @admin.display(description="Student answer")
     def student_answer(self, obj):
         value = obj.attempt.answers.get(str(obj.question_id), "")
         if obj.question.kind == "mcq" and value.isdecimal() and int(value) < len(obj.question.options):
             return obj.question.options[int(value)]
-        return value or "Ответ не дан"
+        return value or "No answer given"
 
-    @admin.display(description="Критерии")
+    @admin.display(description="Criteria")
     def rubric_details(self, obj):
-        return format_html_join("", "<div>{} — до {} баллов</div>",
+        return format_html_join("", "<div>{} — up to {} points</div>",
                                 ((row["criterion"], row["points"]) for row in obj.question.rubric))
 
     def has_add_permission(self, request):
@@ -592,7 +592,7 @@ class GradeAppealAdmin(admin.ModelAdmin):
             attempt = Attempt.objects.select_for_update().get(pk=obj.attempt_id)
             appeal = GradeAppeal.objects.select_for_update().get(pk=obj.pk)
             if appeal.status != GradeAppeal.Status.PENDING or attempt.status != Attempt.Status.DONE:
-                raise PermissionDenied("Это оспаривание уже рассмотрено или сдача не проверена.")
+                raise PermissionDenied("This appeal has already been reviewed or the attempt has not been graded.")
             obj.student_note = appeal.student_note
             obj.status = form.cleaned_data["decision"]
             obj.reviewed_by = request.user
@@ -611,4 +611,4 @@ class GradeAppealAdmin(admin.ModelAdmin):
             super().save_model(request, obj, form, change)
 
 
-admin.site.site_header = "Tapsyrma — управление"
+admin.site.site_header = "Tapsyrma administration"

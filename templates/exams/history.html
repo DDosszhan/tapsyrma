@@ -1,10 +1,10 @@
 {% extends "exams/base.html" %}{% block content %}
-<h1>Мои сдачи</h1>
+<h1>My attempts</h1>
 {% if attempts %}<ul>
 {% for attempt in attempts %}<li>
   <a href="{% url 'exam_result_history' attempt.pk %}">{{ attempt.invitation.exam.title }}</a>
   · {{ attempt.started_at|date:"d.m.Y H:i" }} · {{ attempt.get_status_display }}
-  {% if attempt.status == "done" and attempt.score is not None %} · {% if attempt.pending_review_count %}Предварительно: {% endif %}{{ attempt.score }} / {{ attempt.invitation.exam.total_points }} баллов{% endif %}
+  {% if attempt.status == "done" and attempt.score is not None %} · {% if attempt.pending_review_count %}Provisional score: {% endif %}{{ attempt.score }} / {{ attempt.invitation.exam.total_points }} points{% endif %}
 </li>{% endfor %}
-</ul>{% else %}<p>Сдач пока нет.</p>{% endif %}
+</ul>{% else %}<p>You have no exam attempts yet.</p>{% endif %}
 {% endblock %}

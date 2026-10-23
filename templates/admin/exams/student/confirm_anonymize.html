@@ -1,13 +1,13 @@
 {% extends "admin/base_site.html" %}
 {% block content %}
-<p>Удалить вход для {{ count }} учеников? Их почта и имя будут удалены, а вопросы, ответы и баллы останутся в истории без имени. Отменить это действие нельзя.</p>
+<p>Remove access for {{ count }} students? Their names and email addresses will be removed, while questions, answers and scores remain anonymously in the history. This cannot be undone.</p>
 <form method="post" action="{% url 'admin:exams_student_changelist' %}">
   {% csrf_token %}
   <input type="hidden" name="action" value="anonymize_accounts">
   <input type="hidden" name="confirm_anonymize" value="yes">
   <input type="hidden" name="select_across" value="{{ select_across }}">
   {% for id in selected_ids %}<input type="hidden" name="{{ action_checkbox_name }}" value="{{ id }}">{% endfor %}
-  <button type="submit" class="button default">Удалить аккаунты</button>
-  <a href="{% url 'admin:exams_student_changelist' %}">Отмена</a>
+  <button type="submit" class="button default">Delete accounts</button>
+  <a href="{% url 'admin:exams_student_changelist' %}">Cancel</a>
 </form>
 {% endblock %}

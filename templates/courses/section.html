@@ -1,47 +1,47 @@
 {% extends "courses/base.html" %}{% block content %}
-<div class="course-breadcrumb"><a href="{% url 'course_list' %}">Мои курсы</a><span>›</span><a href="{% url 'course_detail' course.pk %}">{{ course.title }}</a><span>›</span><span>{{ section.title }}</span></div>
+<div class="course-breadcrumb"><a href="{% url 'course_list' %}">My courses</a><span>›</span><a href="{% url 'course_detail' course.pk %}">{{ course.title }}</a><span>›</span><span>{{ section.title }}</span></div>
 {% for message in messages %}<p class="course-message">{{ message }}</p>{% endfor %}
-<header class="section-header"><span class="course-kicker">Раздел {{ section.position }}</span><h1>{{ section.title }}</h1>
+<header class="section-header"><span class="course-kicker">Section {{ section.position }}</span><h1>{{ section.title }}</h1>
 {% if section.description %}<p>{{ section.description|linebreaksbr }}</p>{% endif %}</header>
-<div class="course-progress"><strong>{{ opened_count }} из {{ lessons|length }}</strong> уроков открыто · {{ remaining_count }} осталось · {{ completed_count }} с решёнными заданиями
-{% if lessons %}<progress value="{{ opened_count }}" max="{{ lessons|length }}" aria-label="Прогресс раздела"></progress>{% endif %}</div>
-{% if lessons %}<nav class="lesson-menu" aria-label="Уроки раздела">
-{% for lesson in lessons %}<a class="lesson-tab{% if lesson.is_opened %} is-opened{% endif %}{% if lesson.is_completed %} is-completed{% endif %}{% if current.pk == lesson.pk %} is-current{% endif %}" href="{% url 'lesson_detail' course.pk section.pk lesson.pk %}" title="Урок {{ lesson.position }}: {{ lesson.title }} — {% if lesson.is_completed %}Задания решены{% elif lesson.is_opened %}Открыт{% else %}Не открыт{% endif %}" aria-label="Урок {{ lesson.position }}: {{ lesson.title }} — {% if lesson.is_completed %}Задания решены{% elif lesson.is_opened %}Открыт{% else %}Не открыт{% endif %}"{% if current.pk == lesson.pk %} aria-current="page"{% endif %}>{{ lesson.position }}</a>{% endfor %}</nav>
-<div class="lesson-legend" aria-label="Обозначения уроков"><span><i></i>Не открыт</span><span><i class="is-opened"></i>Открыт</span><span><i class="is-completed"></i>Задания решены</span></div>{% endif %}
+<div class="course-progress"><strong>{{ opened_count }} of {{ lessons|length }}</strong> lessons opened · {{ remaining_count }} remaining · {{ completed_count }} with completed practice
+{% if lessons %}<progress value="{{ opened_count }}" max="{{ lessons|length }}" aria-label="Section progress"></progress>{% endif %}</div>
+{% if lessons %}<nav class="lesson-menu" aria-label="Section lessons">
+{% for lesson in lessons %}<a class="lesson-tab{% if lesson.is_opened %} is-opened{% endif %}{% if lesson.is_completed %} is-completed{% endif %}{% if current.pk == lesson.pk %} is-current{% endif %}" href="{% url 'lesson_detail' course.pk section.pk lesson.pk %}" title="Lesson {{ lesson.position }}: {{ lesson.title }} — {% if lesson.is_completed %}Practice completed{% elif lesson.is_opened %}Opened{% else %}Not opened{% endif %}" aria-label="Lesson {{ lesson.position }}: {{ lesson.title }} — {% if lesson.is_completed %}Practice completed{% elif lesson.is_opened %}Opened{% else %}Not opened{% endif %}"{% if current.pk == lesson.pk %} aria-current="page"{% endif %}>{{ lesson.position }}</a>{% endfor %}</nav>
+<div class="lesson-legend" aria-label="Lesson status legend"><span><i></i>Not opened</span><span><i class="is-opened"></i>Opened</span><span><i class="is-completed"></i>Practice completed</span></div>{% endif %}
 <article class="lesson-panel">
-{% if current %}<span class="course-kicker">Урок {{ current.position }}</span><h2>{{ current.title }}</h2>
-  {% if current.content %}<div class="lesson-content">{{ current.content|linebreaks }}</div>{% else %}<p class="muted">Материал урока пока не добавлен.</p>{% endif %}
-  <div class="lesson-practice"><h3>Задания</h3>
+{% if current %}<span class="course-kicker">Lesson {{ current.position }}</span><h2>{{ current.title }}</h2>
+  {% if current.content %}<div class="lesson-content">{{ current.content|linebreaks }}</div>{% else %}<p class="muted">Lesson content has not been added yet.</p>{% endif %}
+  <div class="lesson-practice"><h3>Practice</h3>
   {% if questions %}{% for question in questions %}
   <section class="practice-question" id="question-{{ question.pk }}">
-    <div class="practice-heading"><strong>Задание {{ question.position }}</strong><span>Баллы: {{ question.points }}</span></div>
+    <div class="practice-heading"><strong>Question {{ question.position }}</strong><span>Points: {{ question.points }}</span></div>
     <div class="practice-prompt">{{ question.prompt|linebreaks }}</div>
     {% with answer=question.latest_answer %}
     {% if answer %}<div class="practice-result{% if answer.status == 'correct' %} is-correct{% elif answer.status == 'incorrect' %} is-incorrect{% endif %}">
-      {% if answer.status == 'correct' %}<strong>Верно · {{ answer.score }}/{{ question.points }}</strong>
-      {% elif answer.status == 'incorrect' %}<strong>Есть ошибка · {{ answer.score }}/{{ question.points }}</strong>
-      {% elif answer.status == 'review' %}<strong>Ответ передан учителю на проверку</strong>
-      {% elif answer.status == 'error' %}<strong>Проверка не удалась. Учитель может запустить её снова.</strong>
-      {% else %}<strong>Ответ проверяется…</strong>{% endif %}
-      <p>Ваш ответ: {{ question.latest_answer_display }}</p>
+      {% if answer.status == 'correct' %}<strong>Correct · {{ answer.score }}/{{ question.points }}</strong>
+      {% elif answer.status == 'incorrect' %}<strong>Needs improvement · {{ answer.score }}/{{ question.points }}</strong>
+      {% elif answer.status == 'review' %}<strong>Answer sent to the teacher for review</strong>
+      {% elif answer.status == 'error' %}<strong>Grading failed. The teacher can retry it.</strong>
+      {% else %}<strong>Your answer is being graded…</strong>{% endif %}
+      <p>Your answer: {{ question.latest_answer_display }}</p>
       {% if answer.status == 'incorrect' %}
-        {% if answer.explanation_status == 'ready' %}<div class="practice-explanation"><strong>Объяснение ИИ</strong>{{ answer.explanation|linebreaks }}</div>
-        {% elif answer.explanation_status == 'pending' or answer.explanation_status == 'generating' %}<p>ИИ готовит объяснение…</p>
-        {% else %}{% if answer.explanation_status == 'error' %}<p>Объяснение не удалось подготовить. Можно повторить запрос.</p>{% endif %}<form method="post" action="{% url 'lesson_explain' course.pk section.pk current.pk question.pk answer.pk %}">{% csrf_token %}<button type="submit" class="practice-explain-button">Объяснить ошибку</button></form>{% endif %}
+        {% if answer.explanation_status == 'ready' %}<div class="practice-explanation"><strong>AI explanation</strong>{{ answer.explanation|linebreaks }}</div>
+        {% elif answer.explanation_status == 'pending' or answer.explanation_status == 'generating' %}<p>AI is preparing an explanation…</p>
+        {% else %}{% if answer.explanation_status == 'error' %}<p>The explanation could not be prepared. You can try again.</p>{% endif %}<form method="post" action="{% url 'lesson_explain' course.pk section.pk current.pk question.pk answer.pk %}">{% csrf_token %}<button type="submit" class="practice-explain-button">Explain my mistake</button></form>{% endif %}
       {% endif %}
     </div>{% endif %}
     {% if question.can_answer %}<form method="post" action="{% url 'lesson_answer' course.pk section.pk current.pk question.pk %}" class="practice-answer-form">{% csrf_token %}<input type="hidden" name="revision" value="{{ question.revision }}">
       {% if question.kind == 'mcq' %}{% for option in question.options %}<label class="practice-option"><input type="radio" name="answer" value="{{ forloop.counter }}" required> {{ option }}</label>{% endfor %}
-      {% elif question.kind == 'short' %}<label for="answer-{{ question.pk }}">Короткий ответ</label><input id="answer-{{ question.pk }}" type="text" name="answer" maxlength="500" required>
-      {% else %}<label for="answer-{{ question.pk }}">Развёрнутый ответ</label><textarea id="answer-{{ question.pk }}" name="answer" maxlength="2000" required></textarea>{% endif %}
-      <button type="submit">Проверить ответ</button>
+      {% elif question.kind == 'short' %}<label for="answer-{{ question.pk }}">Short answer</label><input id="answer-{{ question.pk }}" type="text" name="answer" maxlength="500" required>
+      {% else %}<label for="answer-{{ question.pk }}">Extended response</label><textarea id="answer-{{ question.pk }}" name="answer" maxlength="2000" required></textarea>{% endif %}
+      <button type="submit">Submit answer</button>
     </form>{% endif %}
     {% endwith %}
   </section>
-  {% endfor %}{% else %}<p>Задания для этого урока пока не добавлены.</p>{% endif %}
+  {% endfor %}{% else %}<p>No practice questions have been added to this lesson yet.</p>{% endif %}
   </div>
-{% elif lessons %}<h2>Выберите урок сверху</h2><p class="muted">После открытия урок станет зелёным, а прогресс раздела обновится.</p>
-{% else %}<h2>Уроки пока не добавлены</h2><p class="muted">Когда появится первый урок, он будет доступен здесь.</p>{% endif %}
+{% elif lessons %}<h2>Choose a lesson above</h2><p class="muted">Opened lessons turn green and section progress updates.</p>
+{% else %}<h2>No lessons yet</h2><p class="muted">The first lesson will appear here when it is added.</p>{% endif %}
 </article>
 {% if has_pending %}<script>setTimeout(() => location.reload(), 4000)</script>{% endif %}
 {% endblock %}

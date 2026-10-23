@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tapsyrma</title>
 <style>
 body{font:17px/1.5 system-ui,sans-serif;color:#172033;background:#f4f6fa;margin:0}
@@ -21,5 +21,5 @@ main.exam-page{max-width:1180px;padding:32px;background:#f9fbfd}
 .map-legend span{display:flex;align-items:center;gap:5px}.map-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;background:#e8edf3;border:1px solid #cbd4df}
 @media(max-width:760px){main.exam-page{margin:0;padding:18px;border-radius:0}.exam-layout{display:flex;flex-direction:column}.question-map{position:static;order:-1;width:100%;box-sizing:border-box}.exam-questions{width:100%}.question-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.exam-questions .question{padding:18px}}
 </style>{% block extra_head %}{% endblock %}</head><body><main class="{% block main_class %}{% endblock %}">{% block content %}{% endblock %}
-{% if request.user.is_authenticated %}<nav>{% if request.user.student_profile %}<a href="{% url 'course_list' %}">Мои курсы</a>{% endif %}<a href="{% url 'enter' %}">Все тесты</a>{% if request.user.student_profile %}<a href="{% url 'history' %}">Мои сдачи</a>{% endif %}<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Выйти</button></form></nav>{% endif %}
+{% if request.user.is_authenticated %}<nav>{% if request.user.student_profile %}<a href="{% url 'course_list' %}">My courses</a>{% endif %}<a href="{% url 'enter' %}">All exams</a>{% if request.user.student_profile %}<a href="{% url 'history' %}">My attempts</a>{% endif %}<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Log out</button></form></nav>{% endif %}
 </main></body></html>

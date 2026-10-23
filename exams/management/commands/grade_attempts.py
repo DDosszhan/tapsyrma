@@ -16,7 +16,7 @@ def expire_attempts():
 
 
 class Command(BaseCommand):
-    help = "Проверяет отправленные попытки через фиксированные критерии."
+    help = "Grades submitted attempts against fixed criteria."
 
     def handle(self, *args, **options):
         while True:
@@ -42,4 +42,4 @@ class Command(BaseCommand):
                 # The answer and rubric remain intact for a teacher to retry or review.
                 Attempt.objects.filter(pk=attempt.pk, status=Attempt.Status.GRADING).update(
                     status=Attempt.Status.ERROR, error_message=str(exc)[:500])
-                self.stderr.write(f"Не удалось проверить сдачу {attempt.pk}: {type(exc).__name__}")
+                self.stderr.write(f"Could not grade attempt {attempt.pk}: {type(exc).__name__}")

@@ -1,8 +1,8 @@
 {% extends "exams/base.html" %}{% block content %}
-<h1>Вход в Tapsyrma</h1>
-<p class="muted">Введите школьную почту и пароль.</p>
-{% if form.errors %}<p class="error" role="alert">Неверная почта или пароль.</p>{% endif %}
+<h1>Sign in to Tapsyrma</h1>
+<p class="muted">Enter your school email and password.</p>
+{% if form.errors %}<p class="error" role="alert">Invalid email or password.</p>{% endif %}
 <form method="post">{% csrf_token %}{{ form.as_p }}
-<input type="hidden" name="next" value="{{ next }}"><button type="submit">Войти</button></form>
-<p><a href="{% url 'admin:index' %}">Вход для администратора</a></p>
+<input type="hidden" name="next" value="{{ next }}"><button type="submit">Sign in</button></form>
+<p><a href="{% url 'admin:index' %}">Administrator sign in</a></p>
 {% endblock %}

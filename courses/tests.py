@@ -39,7 +39,7 @@ class CourseSkeletonTests(TestCase):
         self.assertContains(listing, "Информатика")
         self.assertNotContains(listing, "Черновик")
         self.assertNotContains(listing, "Курс 10")
-        self.assertContains(listing, "Мои курсы")
+        self.assertContains(listing, "My courses")
         self.assertEqual(self.client.get(reverse("course_detail", args=[self.draft.pk])).status_code, 404)
         self.assertEqual(self.client.get(reverse("course_detail", args=[self.ten_course.pk])).status_code, 404)
         self.client.force_login(self.ten_user)
@@ -50,17 +50,17 @@ class CourseSkeletonTests(TestCase):
         self.client.force_login(self.user)
         section_url = reverse("section_detail", args=[self.course.pk, self.section.pk])
         lesson_url = reverse("lesson_detail", args=[self.course.pk, self.section.pk, self.first.pk])
-        self.assertContains(self.client.get(section_url), "0 из 2")
+        self.assertContains(self.client.get(section_url), "0 of 2")
         self.assertEqual(LessonProgress.objects.count(), 0)
         opened = self.client.get(lesson_url)
         self.assertContains(opened, "Что такое переменная")
         self.assertContains(opened, "is-opened")
-        self.assertContains(opened, "1 из 2")
+        self.assertContains(opened, "1 of 2")
         self.assertEqual(LessonProgress.objects.count(), 1)
         self.client.get(lesson_url)
         self.assertEqual(LessonProgress.objects.count(), 1)
-        self.assertContains(self.client.get(reverse("course_list")), "1</strong> из 2 уроков открыто", html=False)
-        self.assertContains(self.client.get(reverse("course_detail", args=[self.course.pk])), "1</strong> из 2 уроков открыто", html=False)
+        self.assertContains(self.client.get(reverse("course_list")), "1</strong> of 2 lessons opened", html=False)
+        self.assertContains(self.client.get(reverse("course_detail", args=[self.course.pk])), "1</strong> of 2 lessons opened", html=False)
         self.assertNotContains(self.client.get(lesson_url), 'class="lesson-tab is-opened is-completed')
 
         progress = LessonProgress.objects.get(student=self.student, lesson=self.first)
@@ -68,9 +68,9 @@ class CourseSkeletonTests(TestCase):
         progress.save(update_fields=["completed_at"])
         completed = self.client.get(lesson_url)
         self.assertContains(completed, 'class="lesson-tab is-opened is-completed')
-        self.assertContains(completed, "Задания решены")
+        self.assertContains(completed, "Practice completed")
         self.client.force_login(self.other_user)
-        self.assertContains(self.client.get(section_url), "0 из 2")
+        self.assertContains(self.client.get(section_url), "0 of 2")
         self.assertEqual(LessonProgress.objects.count(), 1)
 
     def test_lesson_must_belong_to_the_selected_section(self):
@@ -99,7 +99,7 @@ class CourseSkeletonTests(TestCase):
 
     def test_teacher_can_add_lesson_questions_and_invalid_keys_are_rejected(self):
         self.client.force_login(self.teacher)
-        self.assertContains(self.client.get(f"/admin/courses/lesson/{self.first.pk}/change/"), "Задание: заполните поля")
+        self.assertContains(self.client.get(f"/admin/courses/lesson/{self.first.pk}/change/"), "Question: fill in the fields")
         response = self.client.post(f"/admin/courses/lesson/{self.first.pk}/change/", {
             "section": self.section.pk, "position": 1, "title": "Переменные", "content": "Что такое переменная",
             "questions-TOTAL_FORMS": 1, "questions-INITIAL_FORMS": 0,
@@ -131,7 +131,7 @@ class CourseSkeletonTests(TestCase):
         self.assertIsNone(LessonProgress.objects.get(student=self.student, lesson=self.first).completed_at)
         explain_url = reverse("lesson_explain", args=[self.course.pk, self.section.pk, self.first.pk, mcq.pk, wrong.pk])
         self.assertContains(self.client.get(reverse("lesson_detail", args=[self.course.pk, self.section.pk, self.first.pk])),
-                            "Объяснить ошибку")
+                            "Explain my mistake")
         self.assertEqual(self.client.post(explain_url).status_code, 302)
         wrong.refresh_from_db()
         self.assertEqual(wrong.explanation_status, LessonAnswer.ExplanationStatus.PENDING)
@@ -179,7 +179,7 @@ class CourseSkeletonTests(TestCase):
         self.assertEqual(question.revision, 2)
         self.assertIsNone(LessonProgress.objects.get(student=self.student, lesson=self.first).completed_at)
         self.assertNotContains(self.client.get(reverse("lesson_detail", args=[self.course.pk, self.section.pk,
-                                                                             self.first.pk])), "Верно ·")
+                                                                             self.first.pk])), "Correct ·")
         self.client.post(url, {"answer": "four", "revision": 1})
         self.assertEqual(LessonAnswer.objects.filter(question=question).count(), 1)
         self.client.post(url, {"answer": "four", "revision": question.revision})

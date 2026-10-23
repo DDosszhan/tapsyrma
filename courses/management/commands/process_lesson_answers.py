@@ -40,7 +40,7 @@ def claim_job(prefer_explanation=False):
 
 
 class Command(BaseCommand):
-    help = "Проверяет ответы уроков и готовит запрошенные объяснения."
+    help = "Grades lesson answers and prepares requested explanations."
 
     def handle(self, *args, **options):
         prefer_explanation = False
@@ -63,4 +63,4 @@ class Command(BaseCommand):
                     LessonAnswer.objects.filter(pk=answer.pk,
                                                 explanation_status=LessonAnswer.ExplanationStatus.GENERATING).update(
                         explanation_status=LessonAnswer.ExplanationStatus.ERROR)
-                self.stderr.write(f"Не удалось обработать ответ урока {answer.pk}: {type(exc).__name__}")
+                self.stderr.write(f"Could not process lesson answer {answer.pk}: {type(exc).__name__}")

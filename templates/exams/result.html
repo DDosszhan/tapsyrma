@@ -8,28 +8,28 @@
 .result-layout .question-map{top:24px}
 </style>{% endblock %}
 {% block content %}
-<h1>Результат: {{ exam.title }}</h1>
-{% if visibility_count %}<p class="muted">Страница экзамена становилась скрытой: {{ visibility_count }} раз(а). Учитель видит время этих событий.</p>{% endif %}
+<h1>Result: {{ exam.title }}</h1>
+{% if visibility_count %}<p class="muted">The exam page was hidden {{ visibility_count }} time(s). Your teacher can see when this happened.</p>{% endif %}
 {% if attempt.status == "done" %}
-<p class="score">{% if pending_review_count %}Предварительно: {% endif %}{{ attempt.score }} / {{ exam.total_points }} баллов</p>
-{% if pending_review_count %}<p>Вопросов на проверке у учителя: {{ pending_review_count }}. Показанный балл может измениться.</p>{% endif %}
-<p class="muted">Открытые ответы проверены ИИ по сохраненным критериям. Учитель видит работу и определяет оценку в EduPage.</p>
-{% elif attempt.status == "error" %}<p>Автоматическая проверка не удалась. Учитель видит работу и сможет повторить проверку.</p>
-{% else %}<p>Ответы сданы и сохранены. Идет проверка.</p><script>setTimeout(()=>location.reload(),5000)</script>{% endif %}
+<p class="score">{% if pending_review_count %}Provisional score: {% endif %}{{ attempt.score }} / {{ exam.total_points }} points</p>
+{% if pending_review_count %}<p>Questions awaiting teacher review: {{ pending_review_count }}. The displayed score may change.</p>{% endif %}
+<p class="muted">Open responses were graded by AI against saved criteria. Your teacher can review your work and decide the EduPage grade.</p>
+{% elif attempt.status == "error" %}<p>Automatic grading failed. Your teacher can see your work and retry grading.</p>
+{% else %}<p>Your answers were submitted and saved. Grading is in progress.</p><script>setTimeout(()=>location.reload(),5000)</script>{% endif %}
 <div class="exam-layout result-layout"><div class="exam-questions">
-{% for item in items %}<section class="question" id="question-{{ item.question.pk }}">{% if item.auto_pending %}<span class="points">Ожидает учителя</span>{% elif item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
-<h2>Вопрос {{ forloop.counter }}</h2><p>{{ item.question.stem|linebreaksbr }}</p>
-<p><strong>Ваш ответ:</strong> {% if item.question.kind == "mcq" %}{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}{% else %}{{ item.answer|default:"Ответ не дан"|linebreaksbr }}{% endif %}</p>
-{% if item.grade %}<p><strong>Проверка:</strong> {{ item.grade.explanation }}</p>{% endif %}
-{% if item.appeal %}<p><strong>Оспаривание:</strong> {{ item.appeal.get_status_display }}.{% if item.appeal.reviewed_at %} {{ item.appeal.teacher_note }}{% endif %}</p>
-{% if item.appeal.student_note %}<p><strong>Ваше пояснение учителю:</strong> {{ item.appeal.student_note|linebreaksbr }}</p>{% endif %}
-{% if item.can_add_note %}<form method="post" action="{% url 'exam_appeal' attempt.pk item.question.pk %}">{% csrf_token %}<label>Ответ уже передан учителю. Добавьте своё пояснение, если нужно:<textarea name="reason" minlength="10" maxlength="2000" required></textarea></label><button type="submit">Добавить пояснение учителю</button></form>{% endif %}
-{% elif attempt.status == "done" %}<form method="post" action="{% url 'exam_appeal' attempt.pk item.question.pk %}">{% csrf_token %}<label>Ошибка в проверке? Опишите, что следует пересмотреть:<textarea name="reason" minlength="10" maxlength="2000" required></textarea></label><button type="submit">Отправить учителю</button></form>{% endif %}
-<h3>За что давались баллы</h3><ul>{% if item.grade and not item.auto_pending %}{% for criterion, earned in item.criteria %}<li>{{ criterion.criterion }} — {{ earned }} / {{ criterion.points }}</li>{% endfor %}{% else %}{% for criterion in item.question.rubric %}<li>{{ criterion.criterion }} — до {{ criterion.points }} баллов</li>{% endfor %}{% endif %}</ul>
-<details><summary>Объяснение подтемы: {{ item.question.subtopic }}</summary><p>{{ item.question.subtopic_explanation|linebreaksbr }}</p></details>
-<details><summary>Объяснение ответа</summary><p>{{ item.question.answer_explanation|linebreaksbr }}</p><p><strong>Образец:</strong> {{ item.question.model_answer|linebreaksbr }}</p></details>
+{% for item in items %}<section class="question" id="question-{{ item.question.pk }}">{% if item.auto_pending %}<span class="points">Awaiting teacher</span>{% elif item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
+<h2>Question {{ forloop.counter }}</h2><p>{{ item.question.stem|linebreaksbr }}</p>
+<p><strong>Your answer:</strong> {% if item.question.kind == "mcq" %}{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}{% else %}{{ item.answer|default:"No answer given"|linebreaksbr }}{% endif %}</p>
+{% if item.grade %}<p><strong>Grading:</strong> {{ item.grade.explanation }}</p>{% endif %}
+{% if item.appeal %}<p><strong>Appeal:</strong> {{ item.appeal.get_status_display }}.{% if item.appeal.reviewed_at %} {{ item.appeal.teacher_note }}{% endif %}</p>
+{% if item.appeal.student_note %}<p><strong>Your note to the teacher:</strong> {{ item.appeal.student_note|linebreaksbr }}</p>{% endif %}
+{% if item.can_add_note %}<form method="post" action="{% url 'exam_appeal' attempt.pk item.question.pk %}">{% csrf_token %}<label>This answer has been sent to your teacher. Add a note if needed:<textarea name="reason" minlength="10" maxlength="2000" required></textarea></label><button type="submit">Add a note for the teacher</button></form>{% endif %}
+{% elif attempt.status == "done" %}<form method="post" action="{% url 'exam_appeal' attempt.pk item.question.pk %}">{% csrf_token %}<label>Think there is a grading error? Explain what should be reviewed:<textarea name="reason" minlength="10" maxlength="2000" required></textarea></label><button type="submit">Send to teacher</button></form>{% endif %}
+<h3>Marking criteria</h3><ul>{% if item.grade and not item.auto_pending %}{% for criterion, earned in item.criteria %}<li>{{ criterion.criterion }} — {{ earned }} / {{ criterion.points }}</li>{% endfor %}{% else %}{% for criterion in item.question.rubric %}<li>{{ criterion.criterion }} — up to {{ criterion.points }} points</li>{% endfor %}{% endif %}</ul>
+<details><summary>Subtopic explanation: {{ item.question.subtopic }}</summary><p>{{ item.question.subtopic_explanation|linebreaksbr }}</p></details>
+<details><summary>Answer explanation</summary><p>{{ item.question.answer_explanation|linebreaksbr }}</p><p><strong>Model answer:</strong> {{ item.question.model_answer|linebreaksbr }}</p></details>
 </section>{% endfor %}
-</div><aside class="question-map" aria-label="Карта результатов"><h2>Карта результатов</h2><p>Нажмите на номер, чтобы перейти к вопросу.</p>
-<div class="question-grid">{% for item in items %}<a href="#question-{{ item.question.pk }}" class="{{ item.map_status }}" aria-label="Вопрос {{ forloop.counter }}, {{ item.map_label }}">{{ forloop.counter }}</a>{% endfor %}</div>
-<div class="map-legend"><span><i class="correct"></i>Полный балл</span><span><i class="wrong"></i>Баллы потеряны</span><span><i class="review"></i>Ожидает учителя</span><span><i></i>Не оценён</span></div></aside></div>
+</div><aside class="question-map" aria-label="Result map"><h2>Result map</h2><p>Select a number to jump to a question.</p>
+<div class="question-grid">{% for item in items %}<a href="#question-{{ item.question.pk }}" class="{{ item.map_status }}" aria-label="Question {{ forloop.counter }}, {{ item.map_label }}">{{ forloop.counter }}</a>{% endfor %}</div>
+<div class="map-legend"><span><i class="correct"></i>Full marks</span><span><i class="wrong"></i>Points lost</span><span><i class="review"></i>Awaiting teacher</span><span><i></i>Not graded</span></div></aside></div>
 {% endblock %}

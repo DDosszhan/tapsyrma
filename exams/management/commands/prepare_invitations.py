@@ -13,10 +13,10 @@ from exams.models import Exam, Invitation, Question
 
 
 class Command(BaseCommand):
-    help = "Готовит отдельный комплект вопросов для каждого выданного кода."
+    help = "Prepares a separate question set for each issued code."
 
     def add_arguments(self, parser):
-        parser.add_argument("--once", action="store_true", help="Подготовить не более одного варианта и выйти.")
+        parser.add_argument("--once", action="store_true", help="Prepare at most one question set and exit.")
 
     def handle(self, *args, **options):
         while True:
@@ -47,10 +47,10 @@ class Command(BaseCommand):
                     locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
                     if (locked.variant_status != Invitation.VariantStatus.GENERATING
                             or locked.generation_started_at != claim[0]):
-                        raise ValidationError("Подготовку варианта уже выполняет другой процесс.")
+                        raise ValidationError("Another process is already preparing this question set.")
                     current = list(Question.objects.filter(invitation=locked).order_by("slot"))
                     if any(row.slot == question.slot for row in current):
-                        raise ValidationError("Место уже подготовлено другим процессом.")
+                        raise ValidationError("Another process has already prepared this position.")
                     if len(current) + 1 == locked.exam.question_count:
                         signature = tuple(" ".join(q.stem.casefold().split())
                                           for q in sorted([*current, question], key=lambda q: q.slot))
@@ -62,7 +62,7 @@ class Command(BaseCommand):
                                                .values_list("invitation_id", "stem")):
                             others[owner_id].append(" ".join(stem.casefold().split()))
                         if signature in {tuple(stems) for stems in others.values()}:
-                            raise ValidationError("ИИ повторил целый вариант.")
+                            raise ValidationError("AI repeated an entire question set.")
                     question.invitation = locked
                     question.save()
                     claim[0] = timezone.now()
@@ -85,7 +85,7 @@ class Command(BaseCommand):
                                     or locked.generation_started_at != claim[0]):
                                 break
                             if locked.questions.count() != locked.exam.question_count:
-                                raise ValidationError("Не все места варианта подготовлены.")
+                                raise ValidationError("Not all question positions were prepared.")
                             locked.variant_status = Invitation.VariantStatus.READY
                             locked.generation_error = ""
                             locked.save(update_fields=["variant_status", "generation_error"])
@@ -96,6 +96,6 @@ class Command(BaseCommand):
             except Exception as exc:
                 Invitation.objects.filter(pk=invitation.pk, variant_status=Invitation.VariantStatus.GENERATING).update(
                     variant_status=Invitation.VariantStatus.ERROR, generation_error=str(exc)[:500])
-                self.stderr.write(f"Не удалось подготовить вариант для кода {invitation.pk}: {type(exc).__name__}")
+                self.stderr.write(f"Could not prepare the question set for code {invitation.pk}: {type(exc).__name__}")
             if options["once"]:
                 return

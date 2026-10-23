@@ -24,7 +24,7 @@ class LessonQuestionInline(admin.StackedInline):
     fields = [("position", "active", "kind", "points"), "prompt",
               ("option_a", "option_b"), ("option_c", "option_d"), "correct_option",
               "accepted_answers", "model_answer", "grading_criterion"]
-    verbose_name = "Задание: заполните поля выбранного типа"
+    verbose_name = "Question: fill in the fields for the selected type"
 
 
 @admin.register(Course)
@@ -65,9 +65,9 @@ class LessonQuestionAdmin(admin.ModelAdmin):
     readonly_fields = ["revision"]
     fieldsets = [
         (None, {"fields": ["lesson", "position", "active", "kind", "points", "prompt", "revision"]}),
-        ("Выбор из четырёх", {"fields": ["option_a", "option_b", "option_c", "option_d", "correct_option"]}),
-        ("Короткий ответ", {"fields": ["accepted_answers"]}),
-        ("Развёрнутый ответ", {"fields": ["model_answer", "grading_criterion"]}),
+        ("Four-option choice", {"fields": ["option_a", "option_b", "option_c", "option_d", "correct_option"]}),
+        ("Short answer", {"fields": ["accepted_answers"]}),
+        ("Extended response", {"fields": ["model_answer", "grading_criterion"]}),
     ]
 
 
@@ -85,7 +85,7 @@ class LessonAnswerAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    @admin.action(description="Засчитать выбранные ответы")
+    @admin.action(description="Accept selected answers")
     def mark_correct(self, request, queryset):
         from .jobs import sync_lesson_completion
         for answer in queryset.filter(status__in=[LessonAnswer.Status.INCORRECT,
@@ -95,11 +95,11 @@ class LessonAnswerAdmin(admin.ModelAdmin):
                 continue
             answer.status = LessonAnswer.Status.CORRECT
             answer.score = answer.question.points
-            answer.review_reason = "Проверено учителем."
+            answer.review_reason = "Reviewed by teacher."
             answer.save(update_fields=["status", "score", "review_reason"])
             sync_lesson_completion(answer.student_id, answer.question.lesson_id)
 
-    @admin.action(description="Отклонить выбранные ответы")
+    @admin.action(description="Reject selected answers")
     def mark_incorrect(self, request, queryset):
         from .jobs import sync_lesson_completion
         for answer in queryset.filter(status__in=[LessonAnswer.Status.CORRECT,
@@ -108,11 +108,11 @@ class LessonAnswerAdmin(admin.ModelAdmin):
                                                  LessonAnswer.Status.ERROR]).select_related("question"):
             answer.status = LessonAnswer.Status.INCORRECT
             answer.score = 0
-            answer.review_reason = "Проверено учителем."
+            answer.review_reason = "Reviewed by teacher."
             answer.save(update_fields=["status", "score", "review_reason"])
             sync_lesson_completion(answer.student_id, answer.question.lesson_id)
 
-    @admin.action(description="Повторить ошибочную проверку")
+    @admin.action(description="Retry failed grading")
     def retry_failed(self, request, queryset):
         queryset.filter(status=LessonAnswer.Status.ERROR).update(status=LessonAnswer.Status.PENDING,
                                                                   review_reason="", grading_started_at=None)

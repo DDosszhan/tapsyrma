@@ -6,7 +6,7 @@ from django.urls import reverse, reverse_lazy
 
 
 class EmailAuthenticationForm(AuthenticationForm):
-    username = forms.EmailField(label="Почта", max_length=150,
+    username = forms.EmailField(label="Email", max_length=150,
                                 widget=forms.EmailInput(attrs={"autocomplete": "username"}))
 
     def clean_username(self):

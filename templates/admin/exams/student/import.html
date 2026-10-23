@@ -1,6 +1,6 @@
 {% extends "admin/base_site.html" %}
 {% block content %}
-<p>Первый столбец: <code>email</code>. Второй столбец <code>name</code> необязателен. Первая строка может быть заголовком. Все ученики файла получат выбранный класс и начальный пароль <code>{{ initial_password }}</code>, который потребуется сменить при входе.</p>
+<p>First column: <code>email</code>. Second column <code>name</code> is optional. The first row may be a header. Every student in the file will receive the selected grade and initial password <code>{{ initial_password }}</code>, which must be changed at sign in.</p>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}
-<button type="submit" class="default">Импортировать</button></form>
+<button type="submit" class="default">Import</button></form>
 {% endblock %}

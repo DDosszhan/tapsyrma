@@ -11,11 +11,11 @@ ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx"}
 def validate_syllabus_file(upload):
     extension = Path(upload.name).suffix.lower()
     if extension not in ALLOWED_EXTENSIONS:
-        raise ValidationError("Поддерживаются только TXT, PDF и DOCX.")
+        raise ValidationError("Only TXT, PDF and DOCX files are supported.")
     if upload.size == 0:
-        raise ValidationError("Файл силабуса пустой.")
+        raise ValidationError("The syllabus file is empty.")
     if upload.size > MAX_UPLOAD_BYTES:
-        raise ValidationError("Файл силабуса должен быть не больше 10 МБ.")
+        raise ValidationError("The syllabus file must be 10 MB or smaller.")
     return extension
 
 
@@ -30,7 +30,7 @@ def extract_syllabus_text(upload):
 
             reader = PdfReader(upload)
             if len(reader.pages) > 100:
-                raise ValidationError("Оставьте только нужный фрагмент PDF (до 100 страниц).")
+                raise ValidationError("Keep only the relevant PDF excerpt (up to 100 pages).")
             text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
         else:
             from docx import Document
@@ -47,13 +47,13 @@ def extract_syllabus_text(upload):
     except ValidationError:
         raise
     except Exception as exc:
-        raise ValidationError("Не удалось прочитать файл. Проверьте формат или вставьте текст вручную.") from exc
+        raise ValidationError("Could not read the file. Check its format or paste the text manually.") from exc
     finally:
         upload.seek(0)
 
     text = text.strip()
     if not text:
-        raise ValidationError("В файле нет извлекаемого текста. Для скана вставьте текст после OCR вручную.")
+        raise ValidationError("The file has no extractable text. For scans, paste OCR text manually.")
     if len(text) > MAX_TEXT_CHARS:
-        raise ValidationError("Оставьте только нужный фрагмент силабуса (до 100 000 символов).")
+        raise ValidationError("Keep only the relevant syllabus excerpt (up to 100,000 characters).")
     return text

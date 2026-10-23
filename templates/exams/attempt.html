@@ -13,22 +13,22 @@
 .visibility-warning[hidden]{display:none}
 </style>{% endblock %}
 {% block content %}
-<header class="exam-heading"><h1>{{ attempt.invitation.exam.title }}</h1><p class="muted">{{ attempt.invitation.student.name }} · {{ attempt.invitation.exam.total_points }} баллов</p></header>
-{% if attempt.deadline_at %}<p class="score exam-timer" role="timer">Осталось: <span id="countdown" data-remaining="{{ remaining_seconds }}">{{ remaining_seconds }} с</span></p>{% endif %}
+<header class="exam-heading"><h1>{{ attempt.invitation.exam.title }}</h1><p class="muted">{{ attempt.invitation.student.name }} · {{ attempt.invitation.exam.total_points }} points</p></header>
+{% if attempt.deadline_at %}<p class="score exam-timer" role="timer">Time remaining: <span id="countdown" data-remaining="{{ remaining_seconds }}">{{ remaining_seconds }} s</span></p>{% endif %}
 <p id="visibility-warning" class="visibility-warning" role="alert" hidden></p>
 <div class="exam-layout">
 <form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}
-{% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" tabindex="-1"><span class="points">{{ q.points }} баллов</span>
-<h2>Вопрос {{ forloop.counter }}</h2><p>{{ q.stem|linebreaksbr }}</p>
+{% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" tabindex="-1"><span class="points">{{ q.points }} points</span>
+<h2>Question {{ forloop.counter }}</h2><p>{{ q.stem|linebreaksbr }}</p>
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
-{% endfor %}{% else %}<label for="q_{{ q.id }}">Ваш ответ</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}
+{% endfor %}{% else %}<label for="q_{{ q.id }}">Your answer</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}
 </section>{% endfor %}
-<div class="exam-actions"><p id="save-status" class="muted" aria-live="polite">Ответы сохраняются автоматически.</p>
-<button type="submit" onclick="return confirm('Сдать экзамен? После этого ответы изменить нельзя.')">Сдать экзамен</button></div></form>
-<aside class="question-map" aria-label="Карта вопросов"><h2>Карта вопросов</h2><p><strong id="answered-count">0</strong> из {{ questions|length }} с ответом</p>
-<div class="question-grid">{% for q in questions %}<a href="#question-{{ q.id }}" data-question="{{ q.id }}" aria-label="Вопрос {{ forloop.counter }}, нет ответа">{{ forloop.counter }}</a>{% endfor %}</div>
-<div class="map-legend"><span><i></i>Нет ответа</span><span><i class="done"></i>Есть ответ</span></div></aside>
+<div class="exam-actions"><p id="save-status" class="muted" aria-live="polite">Answers are saved automatically.</p>
+<button type="submit" onclick="return confirm('Submit the exam? You cannot change your answers afterward.')">Submit exam</button></div></form>
+<aside class="question-map" aria-label="Question map"><h2>Question map</h2><p><strong id="answered-count">0</strong> of {{ questions|length }} answered</p>
+<div class="question-grid">{% for q in questions %}<a href="#question-{{ q.id }}" data-question="{{ q.id }}" aria-label="Question {{ forloop.counter }}, unanswered">{{ forloop.counter }}</a>{% endfor %}</div>
+<div class="map-legend"><span><i></i>Unanswered</span><span><i class="done"></i>Answered</span></div></aside>
 </div>
 <script>
 const form=document.getElementById('answers'),status=document.getElementById('save-status');let saveTimer,leavingExam=false,awayId=null,pendingReturn=null;
@@ -39,22 +39,22 @@ function updateMap(){
     const question=document.getElementById('question-'+link.dataset.question);
     const filled=!!(question.querySelector('input[type=radio]:checked')||question.querySelector('textarea')?.value.trim());
     link.classList.toggle('answered',filled);
-    link.setAttribute('aria-label',`Вопрос ${link.textContent}, ${filled?'есть ответ':'нет ответа'}`);
+    link.setAttribute('aria-label',`Question ${link.textContent}, ${filled?'answered':'unanswered'}`);
     if(filled)answered++;
   }
   document.getElementById('answered-count').textContent=answered;
 }
 updateMap();
-form.addEventListener('input',()=>{updateMap();clearTimeout(saveTimer);status.textContent='Сохранение…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Ответы сохранены.':'Не удалось сохранить. Сдача отправит текущие ответы.'}catch{status.textContent='Нет связи. Сдача отправит текущие ответы.'}},700)});
+form.addEventListener('input',()=>{updateMap();clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)});
 form.addEventListener('submit',()=>{leavingExam=true});
 function eventData(action,id){const data=new FormData();data.append('csrfmiddlewaretoken',form.elements.csrfmiddlewaretoken.value);data.append('action',action);data.append('event_id',id);return data}
 async function confirmReturn(id){
   try{
     const response=await fetch('{% url "exam_visibility" %}',{method:'POST',body:eventData('returned',id)});
-    if(!response.ok)throw Error('Не сохранено');
+    if(!response.ok)throw Error('Not saved');
     const data=await response.json();pendingReturn=null;
-    warning.textContent=`Страница экзамена была скрыта. Событие зафиксировано. Всего: ${data.count}.`;
-  }catch{pendingReturn=id;warning.textContent='Страница экзамена была скрыта. Пока не удалось подтвердить запись. Проверьте интернет.'}
+    warning.textContent=`The exam page was hidden. This event was recorded. Total: ${data.count}.`;
+  }catch{pendingReturn=id;warning.textContent='The exam page was hidden. The event could not be confirmed yet. Check your connection.'}
   warning.hidden=false;
 }
 document.addEventListener('visibilitychange',()=>{
@@ -72,7 +72,7 @@ if(countdown){
     const left=Math.max(0,Math.ceil((deadline-Date.now())/1000));
     const hours=Math.floor(left/3600),minutes=Math.floor(left%3600/60),seconds=left%60;
     countdown.textContent=(hours?String(hours).padStart(2,'0')+':':'')+String(minutes).padStart(2,'0')+':'+String(seconds).padStart(2,'0');
-    if(left===0){leavingExam=true;status.textContent='Время вышло. Сохраненные ответы отправлены.';location.replace('{% url "exam_session" %}')}
+    if(left===0){leavingExam=true;status.textContent='Time is up. Saved answers have been submitted.';location.replace('{% url "exam_session" %}')}
   }
   tick();setInterval(tick,1000);
 }

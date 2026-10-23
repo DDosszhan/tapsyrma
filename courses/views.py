@@ -123,14 +123,14 @@ def submit_lesson_answer(request, course_id, section_id, lesson_id, question_id)
     limit = 2000 if question.kind == LessonQuestion.Kind.OPEN else 500
     if not answer_text or len(answer_text) > limit or (question.kind == LessonQuestion.Kind.MCQ
                                                        and answer_text not in ("1", "2", "3", "4")):
-        messages.error(request, "Введите ответ допустимой длины и выберите существующий вариант.")
+        messages.error(request, "Enter an answer of the allowed length and choose a valid option.")
         return _lesson_redirect(course_id, section_id, lesson_id, question_id)
     with transaction.atomic():
         question = LessonQuestion.objects.select_for_update().get(pk=question.pk)
         if not question.active:
             raise Http404
         if request.POST.get("revision") != str(question.revision):
-            messages.error(request, "Задание обновилось. Откройте его заново и отправьте ответ ещё раз.")
+            messages.error(request, "The question has changed. Reopen it and submit your answer again.")
             return _lesson_redirect(course_id, section_id, lesson_id, question_id)
         latest = (LessonAnswer.objects.filter(student=student, question=question,
                                               question_revision=question.revision).order_by("-created_at", "-id").first())

@@ -1,5 +1,5 @@
 {% extends "admin/change_list.html" %}
 {% block content %}
-<p class="help">Чтобы продолжить проверку: отметьте сдачи со статусом «Нужна ручная проверка», выберите действие «Запустить автопроверку выбранных сдач с ошибкой» и нажмите «Выполнить». Уже проверенные вопросы не пересчитываются.</p>
+<p class="help">To resume grading, select attempts with “Manual review required” status, choose “Retry automatic grading for selected failed attempts”, then select “Go”. Previously graded questions are kept.</p>
 {{ block.super }}
 {% endblock %}

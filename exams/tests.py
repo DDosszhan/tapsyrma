@@ -193,7 +193,7 @@ class StudentAccountAdminTests(TestCase):
 
         selection["action"] = "anonymize_accounts"
         confirmation = self.client.post(url, selection)
-        self.assertContains(confirmation, "Удалить вход")
+        self.assertContains(confirmation, "Remove access")
         self.assertTrue(get_user_model().objects.filter(pk=user.pk).exists())
         original_external_id = student.external_id
         selection["confirm_anonymize"] = "yes"
@@ -201,7 +201,7 @@ class StudentAccountAdminTests(TestCase):
         student.refresh_from_db()
         self.assertFalse(get_user_model().objects.filter(pk=user.pk).exists())
         self.assertIsNone(student.user_id)
-        self.assertEqual(student.name, "Удалённый ученик")
+        self.assertEqual(student.name, "Deleted student")
         self.assertNotEqual(student.external_id, original_external_id)
         self.assertIsNotNone(student.anonymized_at)
         self.assertTrue(Attempt.objects.filter(pk=attempt.pk, invitation__student=student).exists())
@@ -221,7 +221,7 @@ class StudentAccountAdminTests(TestCase):
                 question_ids=[123], grades={"123": {"score": 1}}, score=1, error_message="Ошибка"))
 
         url = "/admin/exams/attempt/"
-        self.assertContains(self.client.get(url), "Запустить автопроверку выбранных сдач с ошибкой")
+        self.assertContains(self.client.get(url), "Retry automatic grading for selected failed attempts")
         response = self.client.post(url, {"action": "retry_grading",
             "_selected_action": [str(attempt.pk) for attempt in attempts]})
         self.assertEqual(response.status_code, 302)
@@ -248,13 +248,13 @@ class StudentAccountAdminTests(TestCase):
         response = self.client.post(url, {"grade": "9", "file": self.workbook([
             ["email"], ["third@example.invalid"], ["invalid-email"],
         ])})
-        self.assertContains(response, "некорректная почта")
+        self.assertContains(response, "invalid email address")
         self.assertFalse(get_user_model().objects.filter(username="third@example.invalid").exists())
 
         response = self.client.post(url, {"grade": "9", "file": self.workbook([
             ["email"], ["fourth@example.invalid"], ["admin@example.invalid"],
         ])})
-        self.assertContains(response, "уже занята")
+        self.assertContains(response, "already used")
         self.assertFalse(get_user_model().objects.filter(username="fourth@example.invalid").exists())
 
 
@@ -283,13 +283,13 @@ class ExamFlowTests(TestCase):
             "admin@example.invalid", "admin@example.invalid", "Admin-Password-2026!")
         self.assertRedirects(self.client.post("/login/", {
             "username": "admin@example.invalid", "password": "Admin-Password-2026!"}), "/admin/")
-        self.assertContains(self.client.get("/"), "Вы вошли без профиля ученика")
-        self.assertContains(self.client.post("/", {"code": "ANYCODE"}), "Общий код доступен только ученикам")
+        self.assertContains(self.client.get("/"), "Your account has no student profile")
+        self.assertContains(self.client.post("/", {"code": "ANYCODE"}), "Shared codes are for students only")
 
     def test_generation_validation_and_full_student_flow(self):
         invalid = {"questions": [dict(self.generated["questions"][0]), dict(self.generated["questions"][1])]}
         invalid["questions"][1]["rubric"] = [{"criterion": "Только ответ", "points": 1}]
-        with self.assertRaisesMessage(Exception, "критерии"):
+        with self.assertRaisesMessage(Exception, "criteria"):
             validate_questions(self.exam, invalid)
         self.exam.published = True
         self.exam.save()
@@ -361,7 +361,7 @@ class ExamFlowTests(TestCase):
         Student.objects.create(user=another_user, name="Другой", grade=9, password_change_required=False)
         self.client.logout()
         self.client.login(username=another_email, password="Another-Password-2026!")
-        self.assertContains(self.client.post("/", {"code": code}), "Код недействителен")
+        self.assertContains(self.client.post("/", {"code": code}), "The code is invalid")
         self.assertNotContains(self.client.get("/history/"), "Алгебра")
         self.assertEqual(self.client.get(f"/exam/result/{attempt.pk}/").status_code, 404)
 
@@ -432,9 +432,9 @@ class ExamFlowTests(TestCase):
         session["invitation_id"] = invitation.pk
         session.save()
         page = self.client.get("/exam/")
-        self.assertContains(page, "Карта вопросов")
+        self.assertContains(page, "Question map")
         self.assertContains(page, f'href="#question-{question.pk}"')
-        self.assertContains(page, "Страница экзамена была скрыта. Событие зафиксировано.")
+        self.assertContains(page, "The exam page was hidden. This event was recorded.")
         url = "/exam/visibility/"
         event_id = str(uuid.uuid4())
         self.assertEqual(self.client.post(url, {"action": "hidden", "event_id": "bad"}).status_code, 400)
@@ -462,11 +462,11 @@ class ExamFlowTests(TestCase):
         session.save()
         attempt.status = Attempt.Status.PENDING
         attempt.save(update_fields=["status"])
-        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "становилась скрытой: 1")
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "was hidden 1 time(s)")
         self.assertEqual(self.client.post(url, {"action": "hidden", "event_id": str(uuid.uuid4())}).status_code, 409)
         self.assertEqual(self.client.post(url, {"action": "returned", "event_id": event_id}).json()["count"], 1)
         self.client.force_login(self.teacher)
-        self.assertContains(self.client.get(f"/admin/exams/attempt/{attempt.pk}/change/"), "Уходы со страницы")
+        self.assertContains(self.client.get(f"/admin/exams/attempt/{attempt.pk}/change/"), "Exam page exits")
 
     def test_admin_publishes_without_bank_and_issues_code(self):
         self.client.force_login(self.teacher)
@@ -555,8 +555,8 @@ class ExamFlowTests(TestCase):
         session = self.client.session
         session["invitation_id"] = invitation.pk
         session.save()
-        self.assertContains(self.client.get("/exam/"), "вариант готовится")
-        self.assertContains(self.client.post("/exam/"), "Вариант еще не готов")
+        self.assertContains(self.client.get("/exam/"), "question set is being prepared")
+        self.assertContains(self.client.post("/exam/"), "question set is not ready yet")
         self.assertFalse(Attempt.objects.exists())
 
     def test_shared_code_allows_one_exam_choice_per_student(self):
@@ -585,7 +585,7 @@ class ExamFlowTests(TestCase):
         self.assertNotContains(choices, "AS физика")
         self.assertEqual(self.client.post("/choose/", {"exam_id": "bad"}).status_code, 400)
         self.assertContains(self.client.post("/choose/", {"exam_id": str(Exam.objects.get(title="AS физика").pk)}),
-                            "Экзамен или код больше недоступен")
+                            "This exam or code is no longer available")
         self.assertRedirects(self.client.post("/choose/", {"exam_id": self.exam.pk}), "/exam/")
         first = Invitation.objects.get(shared_code=shared, student__user=users[0])
         self.assertEqual(first.exam, self.exam)
@@ -643,7 +643,7 @@ class ExamFlowTests(TestCase):
             {"score": 2, "evidence": "2x=4"}, {"score": 1, "evidence": "x=2"},
             {"score": 0, "evidence": ""},
         ], "needs_review": False, "review_reason": ""}):
-            with self.assertRaisesMessage(ManualReviewRequired, "вне критериев"):
+            with self.assertRaisesMessage(ManualReviewRequired, "outside the criteria"):
                 grade_open(question, "ответ")
 
     def test_generation_repairs_only_invalid_slot(self):
@@ -699,12 +699,12 @@ class ExamFlowTests(TestCase):
                          GradeAppeal.Status.PENDING)
         self.client.force_login(user)
         result = self.client.get(f"/exam/result/{attempt.pk}/")
-        self.assertContains(result, "Предварительно")
-        self.assertContains(result, "Ожидает учителя")
+        self.assertContains(result, "Provisional score")
+        self.assertContains(result, "Awaiting teacher")
         self.assertContains(result, f'href="#question-{question.pk}" class="review"')
-        self.assertContains(result, "Добавить пояснение учителю")
+        self.assertContains(result, "Add a note for the teacher")
         self.assertTrue(result.context["items"][0]["auto_pending"])
-        self.assertContains(self.client.get("/history/"), "Предварительно")
+        self.assertContains(self.client.get("/history/"), "Provisional score")
         old_grade = dict(attempt.grades[str(question.pk)])
         old_grade.pop("review_pending")
         attempt.grades = {str(question.pk): old_grade}
@@ -717,7 +717,7 @@ class ExamFlowTests(TestCase):
         self.assertEqual(appeal.student_note, note)
         self.assertEqual(GradeAppeal.objects.count(), 1)
         self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), note)
-        self.assertNotContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Добавить пояснение учителю")
+        self.assertNotContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Add a note for the teacher")
         self.client.post(url, {"reason": "Повторное сообщение учителю."})
         appeal.refresh_from_db()
         self.assertEqual(appeal.student_note, note)
@@ -796,13 +796,13 @@ class ExamFlowTests(TestCase):
             score=0, status=Attempt.Status.DONE)
         url = f"/exam/result/{attempt.pk}/appeal/{question.pk}/"
         self.client.force_login(student_user)
-        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Отправить учителю")
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Send to teacher")
         self.assertEqual(self.client.post(url, {"reason": "Мой ответ содержит оба верных шага."}).status_code, 302)
         self.assertEqual(self.client.post(url, {"reason": "Повторное обращение."}).status_code, 302)
         self.assertEqual(GradeAppeal.objects.count(), 1)
         appeal = GradeAppeal.objects.get()
         self.assertEqual(appeal.original_grade, original)
-        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Ожидает учителя")
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Awaiting teacher")
         self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"),
                             f'href="#question-{question.pk}" class="review"')
         other = get_user_model().objects.create_user("other@example.invalid", "other@example.invalid", "password")

@@ -6,33 +6,33 @@ from exams.models import Exam, Student
 
 
 class Course(models.Model):
-    title = models.CharField("Название", max_length=200)
-    subject = models.CharField("Предмет", max_length=100)
-    grade = models.PositiveSmallIntegerField("Класс", choices=Exam.Grade.choices)
-    description = models.TextField("Описание", blank=True)
-    published = models.BooleanField("Опубликован", default=False)
+    title = models.CharField("Title", max_length=200)
+    subject = models.CharField("Subject", max_length=100)
+    grade = models.PositiveSmallIntegerField("Grade", choices=Exam.Grade.choices)
+    description = models.TextField("Description", blank=True)
+    published = models.BooleanField("Published", default=False)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, editable=False)
-    created_at = models.DateTimeField("Создан", auto_now_add=True)
+    created_at = models.DateTimeField("Created", auto_now_add=True)
 
     class Meta:
-        verbose_name = "Курс"
-        verbose_name_plural = "Курсы"
+        verbose_name = "Course"
+        verbose_name_plural = "Courses"
         ordering = ["grade", "subject", "title"]
         constraints = [models.CheckConstraint(condition=models.Q(grade__in=[9, 10]), name="course_grade_9_or_10")]
 
     def __str__(self):
-        return f"{self.title} · {self.grade} класс"
+        return f"{self.title} · Grade {self.grade}"
 
 
 class Section(models.Model):
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="sections", verbose_name="Курс")
-    position = models.PositiveSmallIntegerField("Порядок", default=1)
-    title = models.CharField("Название", max_length=200)
-    description = models.TextField("Описание", blank=True)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="sections", verbose_name="Course")
+    position = models.PositiveSmallIntegerField("Order", default=1)
+    title = models.CharField("Title", max_length=200)
+    description = models.TextField("Description", blank=True)
 
     class Meta:
-        verbose_name = "Раздел"
-        verbose_name_plural = "Разделы"
+        verbose_name = "Section"
+        verbose_name_plural = "Sections"
         ordering = ["position", "id"]
         constraints = [models.UniqueConstraint(fields=["course", "position"], name="unique_course_section_position")]
 
@@ -41,14 +41,14 @@ class Section(models.Model):
 
 
 class Lesson(models.Model):
-    section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name="lessons", verbose_name="Раздел")
-    position = models.PositiveSmallIntegerField("Порядок", default=1)
-    title = models.CharField("Название", max_length=200)
-    content = models.TextField("Материал урока", blank=True)
+    section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name="lessons", verbose_name="Section")
+    position = models.PositiveSmallIntegerField("Order", default=1)
+    title = models.CharField("Title", max_length=200)
+    content = models.TextField("Lesson content", blank=True)
 
     class Meta:
-        verbose_name = "Урок"
-        verbose_name_plural = "Уроки"
+        verbose_name = "Lesson"
+        verbose_name_plural = "Lessons"
         ordering = ["position", "id"]
         constraints = [models.UniqueConstraint(fields=["section", "position"], name="unique_section_lesson_position")]
 
@@ -57,14 +57,14 @@ class Lesson(models.Model):
 
 
 class LessonProgress(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="lesson_progress", verbose_name="Ученик")
-    lesson = models.ForeignKey(Lesson, on_delete=models.PROTECT, related_name="progress", verbose_name="Урок")
-    opened_at = models.DateTimeField("Открыт", auto_now_add=True)
-    completed_at = models.DateTimeField("Задания решены", null=True, blank=True)
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="lesson_progress", verbose_name="Student")
+    lesson = models.ForeignKey(Lesson, on_delete=models.PROTECT, related_name="progress", verbose_name="Lesson")
+    opened_at = models.DateTimeField("Opened", auto_now_add=True)
+    completed_at = models.DateTimeField("Practice completed", null=True, blank=True)
 
     class Meta:
-        verbose_name = "Прогресс урока"
-        verbose_name_plural = "Прогресс уроков"
+        verbose_name = "Lesson progress"
+        verbose_name_plural = "Lesson progress records"
         constraints = [models.UniqueConstraint(fields=["student", "lesson"], name="unique_student_lesson_progress")]
 
     def __str__(self):
@@ -73,35 +73,35 @@ class LessonProgress(models.Model):
 
 class LessonQuestion(models.Model):
     class Kind(models.TextChoices):
-        MCQ = "mcq", "Выбор из четырёх"
-        SHORT = "short", "Короткий ответ"
-        OPEN = "open", "Развёрнутый ответ"
+        MCQ = "mcq", "Four-option choice"
+        SHORT = "short", "Short answer"
+        OPEN = "open", "Extended response"
 
-    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name="questions", verbose_name="Урок")
-    position = models.PositiveSmallIntegerField("Порядок", default=1)
-    active = models.BooleanField("Показывать ученикам", default=True)
-    kind = models.CharField("Тип", max_length=8, choices=Kind.choices, default=Kind.MCQ)
-    prompt = models.TextField("Вопрос")
-    points = models.PositiveSmallIntegerField("Баллы", default=1)
-    option_a = models.CharField("Вариант 1", max_length=500, blank=True)
-    option_b = models.CharField("Вариант 2", max_length=500, blank=True)
-    option_c = models.CharField("Вариант 3", max_length=500, blank=True)
-    option_d = models.CharField("Вариант 4", max_length=500, blank=True)
-    correct_option = models.PositiveSmallIntegerField("Верный вариант", choices=[(n, str(n)) for n in range(1, 5)],
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name="questions", verbose_name="Lesson")
+    position = models.PositiveSmallIntegerField("Order", default=1)
+    active = models.BooleanField("Visible to students", default=True)
+    kind = models.CharField("Type", max_length=8, choices=Kind.choices, default=Kind.MCQ)
+    prompt = models.TextField("Question")
+    points = models.PositiveSmallIntegerField("Points", default=1)
+    option_a = models.CharField("Option 1", max_length=500, blank=True)
+    option_b = models.CharField("Option 2", max_length=500, blank=True)
+    option_c = models.CharField("Option 3", max_length=500, blank=True)
+    option_d = models.CharField("Option 4", max_length=500, blank=True)
+    correct_option = models.PositiveSmallIntegerField("Correct option", choices=[(n, str(n)) for n in range(1, 5)],
                                                        null=True, blank=True)
-    accepted_answers = models.TextField("Верные короткие ответы (по одному на строке)", blank=True)
-    model_answer = models.TextField("Образец развёрнутого ответа", blank=True)
-    grading_criterion = models.TextField("За что дать баллы", blank=True)
-    revision = models.PositiveIntegerField("Версия вопроса", default=1, editable=False)
+    accepted_answers = models.TextField("Accepted short answers (one per line)", blank=True)
+    model_answer = models.TextField("Model extended response", blank=True)
+    grading_criterion = models.TextField("Marking criterion", blank=True)
+    revision = models.PositiveIntegerField("Question revision", default=1, editable=False)
 
     class Meta:
-        verbose_name = "Задание урока"
-        verbose_name_plural = "Задания уроков"
+        verbose_name = "Lesson question"
+        verbose_name_plural = "Lesson questions"
         ordering = ["position", "id"]
         constraints = [models.UniqueConstraint(fields=["lesson", "position"], name="unique_lesson_question_position")]
 
     def __str__(self):
-        return f"{self.lesson}: задание {self.position}"
+        return f"{self.lesson}: question {self.position}"
 
     @property
     def options(self):
@@ -110,24 +110,24 @@ class LessonQuestion(models.Model):
     def clean(self):
         errors = {}
         if not self.prompt.strip():
-            errors["prompt"] = "Введите текст вопроса."
+            errors["prompt"] = "Enter the question text."
         if self.points is None or self.points < 1:
-            errors["points"] = "Баллы должны быть больше нуля."
+            errors["points"] = "Points must be greater than zero."
         if self.kind == self.Kind.MCQ:
             for field in ("option_a", "option_b", "option_c", "option_d"):
                 if not getattr(self, field).strip():
-                    errors[field] = "Заполните все четыре варианта."
+                    errors[field] = "Fill in all four options."
             if all(option.strip() for option in self.options) and len({option.strip().casefold() for option in self.options}) < 4:
-                errors["option_d"] = "Варианты ответа должны различаться."
+                errors["option_d"] = "Answer options must be different."
             if self.correct_option not in (1, 2, 3, 4):
-                errors["correct_option"] = "Выберите номер от 1 до 4."
+                errors["correct_option"] = "Choose a number from 1 to 4."
         elif self.kind == self.Kind.SHORT and not self.accepted_answers.strip():
-            errors["accepted_answers"] = "Укажите хотя бы один верный ответ."
+            errors["accepted_answers"] = "Enter at least one accepted answer."
         elif self.kind == self.Kind.OPEN:
             if not self.model_answer.strip():
-                errors["model_answer"] = "Укажите образец ответа."
+                errors["model_answer"] = "Enter a model answer."
             if not self.grading_criterion.strip():
-                errors["grading_criterion"] = "Укажите критерий проверки."
+                errors["grading_criterion"] = "Enter a marking criterion."
         if errors:
             raise ValidationError(errors)
 
@@ -153,38 +153,38 @@ class LessonQuestion(models.Model):
 
 class LessonAnswer(models.Model):
     class Status(models.TextChoices):
-        PENDING = "pending", "Ожидает проверки"
-        GRADING = "grading", "Проверяется"
-        CORRECT = "correct", "Верно"
-        INCORRECT = "incorrect", "Есть ошибка"
-        REVIEW = "review", "Нужна проверка учителя"
-        ERROR = "error", "Ошибка проверки"
+        PENDING = "pending", "Awaiting grading"
+        GRADING = "grading", "Being graded"
+        CORRECT = "correct", "Correct"
+        INCORRECT = "incorrect", "Needs improvement"
+        REVIEW = "review", "Teacher review required"
+        ERROR = "error", "Grading error"
 
     class ExplanationStatus(models.TextChoices):
-        NONE = "none", "Не запрошено"
-        PENDING = "pending", "Ожидает"
-        GENERATING = "generating", "Готовится"
-        READY = "ready", "Готово"
-        ERROR = "error", "Ошибка"
+        NONE = "none", "Not requested"
+        PENDING = "pending", "Pending"
+        GENERATING = "generating", "Preparing"
+        READY = "ready", "Ready"
+        ERROR = "error", "Error"
 
-    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="lesson_answers", verbose_name="Ученик")
-    question = models.ForeignKey(LessonQuestion, on_delete=models.PROTECT, related_name="answers", verbose_name="Задание")
-    question_revision = models.PositiveIntegerField("Версия задания")
-    answer = models.TextField("Ответ ученика")
-    status = models.CharField("Проверка", max_length=12, choices=Status.choices, default=Status.PENDING)
-    score = models.PositiveSmallIntegerField("Баллы", null=True, blank=True)
-    review_reason = models.CharField("Причина проверки", max_length=500, blank=True)
-    created_at = models.DateTimeField("Отправлен", auto_now_add=True)
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="lesson_answers", verbose_name="Student")
+    question = models.ForeignKey(LessonQuestion, on_delete=models.PROTECT, related_name="answers", verbose_name="Question")
+    question_revision = models.PositiveIntegerField("Question revision")
+    answer = models.TextField("Student answer")
+    status = models.CharField("Grading", max_length=12, choices=Status.choices, default=Status.PENDING)
+    score = models.PositiveSmallIntegerField("Points", null=True, blank=True)
+    review_reason = models.CharField("Review reason", max_length=500, blank=True)
+    created_at = models.DateTimeField("Submitted", auto_now_add=True)
     grading_started_at = models.DateTimeField(null=True, blank=True)
     checked_at = models.DateTimeField(null=True, blank=True)
-    explanation_status = models.CharField("Объяснение", max_length=12, choices=ExplanationStatus.choices,
+    explanation_status = models.CharField("Explanation", max_length=12, choices=ExplanationStatus.choices,
                                           default=ExplanationStatus.NONE)
-    explanation = models.TextField("Объяснение ИИ", blank=True)
+    explanation = models.TextField("AI explanation", blank=True)
     explanation_started_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        verbose_name = "Ответ на задание урока"
-        verbose_name_plural = "Ответы на задания уроков"
+        verbose_name = "Lesson answer"
+        verbose_name_plural = "Lesson answers"
         ordering = ["-created_at", "-id"]
         indexes = [models.Index(fields=["status", "created_at"], name="lesson_answer_queue_idx"),
                    models.Index(fields=["explanation_status", "created_at"], name="lesson_explain_queue_idx")]
