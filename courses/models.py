@@ -97,6 +97,10 @@ class LessonQuestion(models.Model):
         "Marking criterion", blank=True,
         help_text="For itemized marks, write one line per criterion, for example: 1: Correct method",
     )
+    student_guidance = models.TextField(
+        "Student marking guidance", blank=True,
+        help_text="Shown only after submission. Write one answer-free hint per marking criterion, in the same order.",
+    )
     revision = models.PositiveIntegerField("Question revision", default=1, editable=False)
 
     class Meta:
@@ -138,6 +142,11 @@ class LessonQuestion(models.Model):
                     self.marking_rows()
                 except ValidationError as exc:
                     errors["grading_criterion"] = exc.messages[0]
+            if self.student_guidance.strip():
+                try:
+                    self.student_marking_rows()
+                except ValidationError as exc:
+                    errors["student_guidance"] = exc.messages[0]
         if errors:
             raise ValidationError(errors)
 
@@ -158,6 +167,17 @@ class LessonQuestion(models.Model):
         if sum(row["points"] for row in rows) != self.points:
             raise ValidationError("Criterion marks must add up to the question points.")
         return rows
+
+    def student_marking_rows(self):
+        """Safe display labels never fall back to private answer-bearing criteria."""
+        rows = self.marking_rows()
+        hints = [line.strip() for line in self.student_guidance.splitlines() if line.strip()]
+        if hints and len(hints) != len(rows):
+            raise ValidationError("Add one student hint for each marking criterion.")
+        if self.kind != self.Kind.OPEN and not hints:
+            return rows
+        return [{"criterion": hints[index] if hints else f"Marking point {index + 1}",
+                 "points": row["points"]} for index, row in enumerate(rows)]
 
     def save(self, *args, **kwargs):
         tracked = ("lesson_id", "active", "kind", "prompt", "points", "option_a", "option_b",

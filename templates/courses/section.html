@@ -31,9 +31,9 @@
         {% else %}{% if answer.explanation_status == 'error' %}<p>The explanation could not be prepared. You can try again.</p>{% endif %}<form method="post" action="{% url 'lesson_explain' course.pk section.pk current.pk question.pk answer.pk %}">{% csrf_token %}<button type="submit" class="practice-explain-button">Explain my mistake</button></form>{% endif %}
       {% endif %}
     </div>{% endif %}
-    <div class="practice-marking"><strong>How marks are awarded</strong><ul>
+    {% if answer %}<div class="practice-marking"><strong>How marks are awarded</strong><ul>
       {% for row in question.marking_rows_display %}<li><span>{{ row.criterion }}</span><strong>{% if row.earned != None %}{{ row.earned }}/{% else %}Up to {% endif %}{{ row.points }}</strong></li>{% endfor %}
-    </ul></div>
+    </ul></div>{% endif %}
     {% if question.can_answer %}<form method="post" action="{% url 'lesson_answer' course.pk section.pk current.pk question.pk %}" class="practice-answer-form">{% csrf_token %}<input type="hidden" name="revision" value="{{ question.revision }}">
       {% if question.kind == 'mcq' %}{% for option in question.options %}<label class="practice-option"><input type="radio" name="answer" value="{{ forloop.counter }}" required> {{ option }}</label>{% endfor %}
       {% elif question.kind == 'short' %}<label for="answer-{{ question.pk }}">Short answer</label><input id="answer-{{ question.pk }}" type="text" name="answer" maxlength="500" required>

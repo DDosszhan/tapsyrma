@@ -201,6 +201,32 @@ class CourseSkeletonTests(TestCase):
         with self.assertRaises(ValidationError):
             question.full_clean()
 
+    def test_student_marking_guidance_appears_only_after_submission_without_the_key(self):
+        question = LessonQuestion.objects.create(
+            lesson=self.first, position=1, kind="open", points=2,
+            prompt="Write 173 as an eight-bit binary number.", model_answer="10101101",
+            grading_criterion="1: Decompose 173 as 128 + 32 + 8 + 4 + 1\n1: Final answer 10101101",
+            student_guidance="Show a valid conversion method.\nWrite an eight-bit final answer.",
+        )
+        self.client.force_login(self.user)
+        page_url = reverse("lesson_detail", args=[self.course.pk, self.section.pk, self.first.pk])
+        before = self.client.get(page_url)
+        self.assertNotContains(before, "How marks are awarded")
+        self.assertNotContains(before, "10101101")
+
+        answer_url = reverse("lesson_answer", args=[self.course.pk, self.section.pk, self.first.pk, question.pk])
+        self.client.post(answer_url, {"answer": "I do not know", "revision": question.revision})
+        after = self.client.get(page_url)
+        self.assertContains(after, "How marks are awarded")
+        self.assertContains(after, "Show a valid conversion method.")
+        self.assertContains(after, "Write an eight-bit final answer.")
+        self.assertNotContains(after, "10101101")
+        self.assertNotContains(after, "128 + 32 + 8 + 4 + 1")
+
+        question.student_guidance = "One hint only."
+        with self.assertRaises(ValidationError):
+            question.full_clean()
+
     def test_editing_question_invalidates_previous_completion(self):
         question = LessonQuestion.objects.create(lesson=self.first, position=1, kind="short", prompt="2 + 2?",
                                                   accepted_answers="4")

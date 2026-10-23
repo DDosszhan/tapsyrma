@@ -87,8 +87,8 @@ def section_detail(request, course_id, section_id, lesson_id=None):
                 LessonAnswer.Status.CORRECT, LessonAnswer.Status.INCORRECT) else []
             question.marking_rows_display = [
                 {**row, "earned": scores[index] if index < len(scores) else None}
-                for index, row in enumerate(question.marking_rows())
-            ]
+                for index, row in enumerate(question.student_marking_rows())
+            ] if answer else []
             question.can_answer = not answer or answer.status not in (
                 LessonAnswer.Status.CORRECT, LessonAnswer.Status.PENDING, LessonAnswer.Status.GRADING,
                 LessonAnswer.Status.REVIEW, LessonAnswer.Status.ERROR)

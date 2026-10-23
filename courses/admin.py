@@ -23,7 +23,7 @@ class LessonQuestionInline(admin.StackedInline):
     show_change_link = True
     fields = [("position", "active", "kind", "points"), "prompt",
               ("option_a", "option_b"), ("option_c", "option_d"), "correct_option",
-              "accepted_answers", "model_answer", "grading_criterion"]
+              "accepted_answers", "model_answer", "grading_criterion", "student_guidance"]
     verbose_name = "Question: fill in the fields for the selected type"
 
 
@@ -67,7 +67,7 @@ class LessonQuestionAdmin(admin.ModelAdmin):
         (None, {"fields": ["lesson", "position", "active", "kind", "points", "prompt", "revision"]}),
         ("Four-option choice", {"fields": ["option_a", "option_b", "option_c", "option_d", "correct_option"]}),
         ("Short answer", {"fields": ["accepted_answers"]}),
-        ("Extended response", {"fields": ["model_answer", "grading_criterion"]}),
+        ("Extended response", {"fields": ["model_answer", "grading_criterion", "student_guidance"]}),
     ]
 
 
