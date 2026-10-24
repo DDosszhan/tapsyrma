@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 245" role="img" aria-labelledby="t d">
+<title id="t">File size formulas</title><desc id="d">Uncompressed image bits equal width times height times colour depth. Uncompressed sound bits equal sample rate times seconds times bits per sample times channels.</desc>
+<rect width="760" height="245" rx="16" fill="#eef6f3"/>
+<text x="28" y="43" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#173b35">Calculate raw data first, then convert units</text>
+<rect x="28" y="65" width="704" height="72" rx="10" fill="#fff" stroke="#cbded4"/>
+<rect x="28" y="151" width="704" height="72" rx="10" fill="#fff" stroke="#cbded4"/>
+<text x="46" y="95" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#176b52">IMAGE</text>
+<text x="157" y="95" font-family="Arial,sans-serif" font-size="18" fill="#233d35">width × height × bits per pixel = bits</text>
+<text x="157" y="121" font-family="Arial,sans-serif" font-size="15" fill="#50645e">pixels × colour depth</text>
+<text x="46" y="181" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#176b52">SOUND</text>
+<text x="157" y="181" font-family="Arial,sans-serif" font-size="18" fill="#233d35">samples/second × seconds × bits/sample × channels = bits</text>
+<text x="157" y="207" font-family="Arial,sans-serif" font-size="15" fill="#50645e">sample rate × duration × sample resolution</text>
+</svg>

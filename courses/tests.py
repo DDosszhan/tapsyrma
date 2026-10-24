@@ -10,9 +10,20 @@ from exams.models import Student
 from .jobs import check_answer, explain_answer
 from .management.commands.process_lesson_answers import claim_job
 from .models import Course, Lesson, LessonAnswer, LessonProgress, LessonQuestion, Section
+from .templatetags.course_content import render_lesson_content
 
 
 class CourseSkeletonTests(TestCase):
+    def test_lesson_diagram_markup_is_whitelisted_and_text_is_escaped(self):
+        html = str(render_lesson_content(
+            "## Place values\n\n[diagram:place-values]\n\n<script>alert(1)</script>\n\n[diagram:secret]"
+        ))
+        self.assertIn("<h3>Place values</h3>", html)
+        self.assertIn("place-values.svg", html)
+        self.assertNotIn("<script>", html)
+        self.assertNotIn("secret.svg", html)
+        self.assertIn("&lt;script&gt;", html)
+
     def setUp(self):
         self.teacher = get_user_model().objects.create_superuser(
             "teacher@example.invalid", "teacher@example.invalid", "test-password")

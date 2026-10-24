@@ -1,4 +1,4 @@
-{% extends "courses/base.html" %}{% block content %}
+{% extends "courses/base.html" %}{% load course_content %}{% block content %}
 <div class="course-breadcrumb"><a href="{% url 'course_list' %}">My courses</a><span>›</span><a href="{% url 'course_detail' course.pk %}">{{ course.title }}</a><span>›</span><span>{{ section.title }}</span></div>
 {% for message in messages %}<p class="course-message">{{ message }}</p>{% endfor %}
 <header class="section-header"><span class="course-kicker">Section {{ section.position }}</span><h1>{{ section.title }}</h1>
@@ -10,7 +10,7 @@
 <div class="lesson-legend" aria-label="Lesson status legend"><span><i></i>Not opened</span><span><i class="is-opened"></i>Opened</span><span><i class="is-completed"></i>Practice completed</span></div>{% endif %}
 <article class="lesson-panel">
 {% if current %}<span class="course-kicker">Lesson {{ current.position }}</span><h2>{{ current.title }}</h2>
-  {% if current.content %}<div class="lesson-content">{{ current.content|linebreaks }}</div>{% else %}<p class="muted">Lesson content has not been added yet.</p>{% endif %}
+  {% if current.content %}<div class="lesson-content">{{ current.content|render_lesson_content }}</div>{% else %}<p class="muted">Lesson content has not been added yet.</p>{% endif %}
   <div class="lesson-practice"><h3>Practice</h3>
   {% if questions %}{% for question in questions %}
   <section class="practice-question" id="question-{{ question.pk }}">

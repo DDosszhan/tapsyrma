@@ -1,0 +1,29 @@
+## Bits need an interpretation
+
+The bit pattern 01000001 can be read as the number 65 or, using ASCII, as the character A. A file format or program tells the computer how to interpret the bits. This is why numbers, text, images and sound need different encoding rules.
+
+## Text and character sets
+
+A character set assigns numbers to characters. ASCII includes basic English letters, digits, punctuation and control characters. Unicode covers a much wider range, including writing systems used around the world and many symbols and emoji. A text file still stores bits; its encoding tells the computer how to map those bits to characters.
+
+Consider a school portal with student names in several languages. A Unicode encoding can represent letters that the basic ASCII set cannot. The actual number of bytes per character depends on the encoding, so do not assume that every Unicode character always uses the same number of bytes.
+
+## Sound: measure a changing signal
+
+A microphone produces a signal whose amplitude changes continuously. Digitising it means taking measurements at regular intervals. Each measurement is a sample. Sample rate counts how many samples are taken per second; sample resolution says how many bits store one sample.
+
+[diagram:sound-sampling]
+
+Worked example — at 8,000 samples per second and 8 bits per sample, one second of mono, uncompressed sound needs 8,000 × 8 = 64,000 bits, or 8,000 bytes. Raising the sample rate captures changes more often. Raising sample resolution provides more possible amplitude values. Both increase the uncompressed file size.
+
+Tip: “Rate” is samples per second; “resolution” is bits per sample. Keep the units attached to the numbers when you calculate.
+
+## Images: a grid of pixels
+
+A bitmap image is a grid of pixels. Resolution describes the number of pixels, often as width × height. Colour depth is the number of bits used for each pixel's colour. With 1 bit per pixel, only two values are possible; with 8 bits per pixel, 256 values are possible.
+
+[diagram:pixel-grid]
+
+Worked example — a 20 × 10 image has 200 pixels. At 8 bits per pixel, its raw pixel data needs 200 × 8 = 1,600 bits, or 200 bytes. More pixels can capture finer spatial detail; more bits per pixel can represent more colours. Either can increase the uncompressed file size.
+
+The diagram is a simplified bitmap. Real image and sound files may also contain headers, metadata and compression, so the raw-data formula in the next lesson applies when the question asks for an uncompressed estimate.

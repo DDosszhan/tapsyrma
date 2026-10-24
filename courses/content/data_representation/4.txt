@@ -1,0 +1,23 @@
+## Start with the units
+
+A bit is one 0 or 1. A nibble is 4 bits; a byte is 8 bits. For this IGCSE syllabus, use 1 KiB = 1024 bytes, 1 MiB = 1024 KiB and 1 GiB = 1024 MiB. Larger binary units continue the same pattern: TiB, PiB and EiB.
+
+Tip: A capital B means bytes; a lower-case b means bits. Dividing a number of bits by 8 gives bytes. Converting bytes to KiB means dividing by 1024, not by 1000.
+
+## Uncompressed image size
+
+Multiply width by height to find the number of pixels. Multiply that by colour depth to get bits. Convert to the unit requested in the question.
+
+[diagram:file-size]
+
+Worked example — a 128 × 64 image with a colour depth of 8 bits has 8,192 pixels. Its raw data is 8,192 × 8 = 65,536 bits = 8,192 bytes = 8 KiB. Write each unit beside the result so you can see which conversion is still needed.
+
+## Uncompressed sound size
+
+Multiply sample rate (samples/second) by duration (seconds) to get the number of samples. Multiply by sample resolution (bits/sample) to get bits. If the question specifies more than one channel, multiply by the channel count too.
+
+Worked example — 4 seconds of mono sound at 4,096 samples/second and 8 bits/sample requires 4,096 × 4 × 8 = 131,072 bits = 16,384 bytes = 16 KiB.
+
+## A reliable calculation habit
+
+Write the formula, substitute values with units, calculate bits, then convert. These formulas calculate raw sample or pixel data. A real saved file may be larger because of metadata or smaller because of compression. In exam questions, follow the assumptions and target unit given.

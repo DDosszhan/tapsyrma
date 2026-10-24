@@ -1,0 +1,23 @@
+## Why compress a file?
+
+Compression reduces the number of bits needed to store or transmit a file. A smaller file may need less storage, use less network bandwidth and take less time to send. The two main approaches differ in whether the original data can be recovered exactly.
+
+## Lossless: recover every original value
+
+Lossless compression represents repeated or predictable data more efficiently without permanently removing information. After decompression, every original bit can be restored. This matters for program code, text documents and other data where even a tiny change would be unacceptable.
+
+[diagram:compression]
+
+Worked example — run-length encoding (RLE) can describe AAAAABBBC as “5A 3B 1C”. Decompression repeats A five times, B three times and C once, reproducing the original nine-character sequence. RLE helps when there are long runs; it can be ineffective for rapidly changing data because the run descriptions add overhead.
+
+## Lossy: accept a permanent change
+
+Lossy compression removes some information permanently. An image might be stored at lower resolution or colour depth; an audio recording might be stored with fewer samples or fewer bits per sample. The decompressed result is an approximation, not an exact copy.
+
+Consider a photograph for a small web preview: a smaller, slightly less detailed version may be acceptable. A spreadsheet containing exam marks must keep its exact values, so lossy compression would be unsuitable.
+
+Tip: “Smaller” does not always mean “lossy.” State whether the original data can be reconstructed exactly and give a reason based on the file's intended use.
+
+## Check your understanding
+
+For any scenario, first decide whether exact reconstruction is essential. Then name an appropriate compression approach and explain one consequence for storage, transmission or quality. The practice questions below ask you to apply that reasoning to new examples.

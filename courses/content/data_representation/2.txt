@@ -1,0 +1,29 @@
+## Add binary numbers
+
+Binary addition uses carrying just as denary addition does. The key fact is 1 + 1 = 10₂: write 0 in the current column and carry 1 to the next column. With an incoming carry, 1 + 1 + 1 = 11₂: write 1 and carry 1.
+
+[diagram:binary-operations]
+
+Worked example — 01101110₂ + 00110101₂. Working from right to left gives 10100011₂. A denary check gives 110 + 53 = 163, and 10100011₂ also equals 163. A check is useful, but your binary working should still show where carries enter.
+
+## Why overflow happens
+
+An unsigned eight-bit register can hold values from 0 to 255. The largest pattern is 11111111₂. If an addition needs a ninth bit, the complete answer cannot fit in that register.
+
+For example, 11110000₂ + 00110000₂ = 1 00100000₂. In denary, that is 240 + 48 = 288. The leading 1 is the ninth bit: this is overflow. If only eight bits are kept, the register contains 00100000₂, which is not the complete sum.
+
+Tip: Name the overflow and explain the limit. Saying “the answer is too large” alone does not show which storage limit was exceeded.
+
+## Logical shifts
+
+A logical left shift moves every bit left and inserts zeros on the right. A logical right shift moves bits right and inserts zeros on the left. Bits pushed beyond either edge are lost.
+
+Worked example — start with 00010110₂ (22₁₀). Shift left once: 00101100₂ (44₁₀). Shift right once from the original pattern: 00001011₂ (11₁₀). The familiar “×2” and “÷2” descriptions work only when no significant bit is lost; write the actual resulting bits first.
+
+## Two's complement
+
+Eight-bit two's complement represents integers from −128 to +127. For a negative value, write the positive magnitude in eight bits, invert every bit, then add 1. To check a negative pattern directly, give the leftmost bit a weight of −128; the other weights remain +64, +32, +16, +8, +4, +2 and +1.
+
+Worked example — +13 is 00001101₂. Invert it to 11110010₂ and add 1 to obtain 11110011₂ for −13. The weighted check is −128 + 64 + 32 + 16 + 8 + 2 + 1 = −13.
+
+Tip: An eight-bit unsigned pattern and an eight-bit two's-complement pattern can look identical while representing different values. Read the question's interpretation before calculating.

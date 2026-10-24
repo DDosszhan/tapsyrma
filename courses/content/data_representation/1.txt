@@ -1,0 +1,27 @@
+## Why does a computer use bits?
+
+A computer can reliably distinguish two electronic states. We label them 0 and 1. One such value is a bit. A group of bits can represent a number, a letter, a sound sample or a pixel; the meaning depends on the rules used to interpret it. In this chapter you will convert number systems, calculate file sizes and explain how data can be compressed.
+
+## Denary and binary
+
+Denary is base 10: each place is worth ten times the place to its right. Binary is base 2: moving left, the places are worth 1, 2, 4, 8, 16, 32, 64 and 128. A 1 includes that value; a 0 does not.
+
+[diagram:place-values]
+
+Worked example — convert 00101101₂ to denary. Read the columns containing 1: 32 + 8 + 4 + 1 = 45₁₀. Leading zeros do not change the value. To express 45 in exactly eight bits, however, keep both leading zeros: 00101101.
+
+To convert 50₁₀ to binary, select the largest place value no greater than 50: 32. The remainder is 18, so select 16, then 2. The places 32, 16 and 2 contain 1; the other places contain 0. The eight-bit result is 00110010₂. Check it by adding 32 + 16 + 2.
+
+Tip: Count the requested bit positions before submitting. A correct value may still need leading zeros when a question asks for an eight-bit representation.
+
+## Hexadecimal: a shorter written form
+
+Hexadecimal is base 16. Its digits are 0–9 and A–F, where A represents 10 and F represents 15. Each hexadecimal digit corresponds to four bits. For example, 0010 1101₂ becomes 2D₁₆. Both forms represent the same value, 45₁₀.
+
+To go from binary to hexadecimal, group bits in fours from the right. Add zeros on the left if the first group is short. Convert each group separately. To go from hexadecimal to binary, replace each hex digit with exactly four bits, including any necessary leading zeros.
+
+Worked example — 101111₂ → 0010 1111₂ → 2F₁₆. Check in denary: 2 × 16 + 15 = 47. Hex is useful when reading long binary values, such as colour codes and hardware addresses. Writing a value in hex does not compress the data stored by a computer.
+
+## Before you practise
+
+For a conversion question, show either place values or a clear grouping method. Label the number base when two representations appear in the same answer. The practice below uses new values, so apply the method rather than memorising the examples.

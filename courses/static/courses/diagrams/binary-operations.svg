@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 270" role="img" aria-labelledby="t d">
+<title id="t">Binary addition and overflow</title><desc id="d">An eight-bit sum within range and a nine-bit sum that overflows an eight-bit register.</desc>
+<rect width="760" height="270" rx="16" fill="#f1f5fa"/>
+<text x="28" y="43" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#233952">An eight-bit register has room for eight bits</text>
+<rect x="28" y="64" width="335" height="178" rx="12" fill="#fff" stroke="#cfdce9"/>
+<rect x="397" y="64" width="335" height="178" rx="12" fill="#fff" stroke="#cfdce9"/>
+<text x="47" y="96" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#176b52">Fits: 110 + 53 = 163</text>
+<text x="416" y="96" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#a24d2f">Overflow: 240 + 48 = 288</text>
+<g font-family="Consolas,monospace" font-size="21" fill="#233952">
+<text x="87" y="131">01101110</text><text x="69" y="162">+ 00110101</text><path d="M70 172h196" stroke="#7892aa"/><text x="87" y="203" fill="#176b52">10100011</text>
+<text x="456" y="131">11110000</text><text x="438" y="162">+ 00110000</text><path d="M439 172h210" stroke="#7892aa"/><text x="456" y="203" fill="#a24d2f">1 00100000</text>
+</g>
+<text x="47" y="226" font-family="Arial,sans-serif" font-size="14" fill="#50657a">The result uses eight bits.</text>
+<text x="416" y="226" font-family="Arial,sans-serif" font-size="14" fill="#50657a">The complete result needs a ninth bit.</text>
+</svg>

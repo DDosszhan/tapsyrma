@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" role="img" aria-labelledby="t d">
+<title id="t">Sampling a sound signal</title><desc id="d">A continuous wave is measured at regularly spaced moments and its samples are stored as numbers.</desc>
+<rect width="760" height="280" rx="16" fill="#eef6f3"/>
+<text x="28" y="42" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#173b35">Sound is sampled over time</text>
+<path d="M54 148H713M54 74V224" stroke="#8aa9a0" stroke-width="2"/>
+<path d="M55 149 C90 75 120 74 155 149 S220 223 255 149 S320 75 355 149 S420 223 455 149 S520 75 555 149 S620 223 655 149" fill="none" stroke="#2358ac" stroke-width="4"/>
+<g stroke="#88b7a5" stroke-dasharray="5 5"><path d="M95 80V221M175 80V221M255 80V221M335 80V221M415 80V221M495 80V221M575 80V221M655 80V221"/></g>
+<g fill="#16815f" stroke="#fff" stroke-width="2"><circle cx="95" cy="103" r="7"/><circle cx="175" cy="194" r="7"/><circle cx="255" cy="149" r="7"/><circle cx="335" cy="104" r="7"/><circle cx="415" cy="194" r="7"/><circle cx="495" cy="149" r="7"/><circle cx="575" cy="104" r="7"/><circle cx="655" cy="194" r="7"/></g>
+<text x="54" y="250" font-family="Arial,sans-serif" font-size="16" fill="#344e48">More sample points per second → higher sample rate</text>
+<text x="54" y="271" font-family="Arial,sans-serif" font-size="15" fill="#344e48">More bits per point → finer amplitude values</text>
+</svg>

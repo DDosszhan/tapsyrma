@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 270" role="img" aria-labelledby="t d">
+<title id="t">Pixels in a bitmap</title><desc id="d">A four-by-four grid of coloured pixels, illustrating that image resolution counts pixels and colour depth controls available colours.</desc>
+<rect width="760" height="270" rx="16" fill="#f1f5fa"/>
+<text x="28" y="42" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#233952">A bitmap is a grid of pixels</text>
+<g stroke="#fff" stroke-width="3">
+<path d="M72 67h45v45H72zM117 67h45v45h-45zM162 67h45v45h-45zM207 67h45v45h-45z" fill="#2d74c4"/>
+<path d="M72 112h45v45H72zM117 112h45v45h-45zM162 112h45v45h-45zM207 112h45v45h-45z" fill="#58a5d1"/>
+<path d="M72 157h45v45H72zM117 157h45v45h-45zM162 157h45v45h-45zM207 157h45v45h-45z" fill="#efd36f"/>
+<path d="M72 202h45v45H72zM117 202h45v45h-45zM162 202h45v45h-45zM207 202h45v45h-45z" fill="#db8453"/>
+</g>
+<g fill="#fff" stroke="#fff" stroke-width="3"><rect x="117" y="112" width="45" height="45"/><rect x="162" y="112" width="45" height="45"/><rect x="117" y="157" width="45" height="45"/><rect x="162" y="157" width="45" height="45"/></g>
+<path d="M287 105h100" stroke="#8aa3ba" stroke-width="3"/><path d="M387 105l-11-7v14z" fill="#8aa3ba"/>
+<text x="410" y="105" font-family="Arial,sans-serif" font-size="19" font-weight="700" fill="#233952">4 × 4 = 16 pixels</text>
+<text x="410" y="143" font-family="Arial,sans-serif" font-size="18" fill="#344e65">Resolution counts the pixels.</text>
+<text x="410" y="180" font-family="Arial,sans-serif" font-size="18" fill="#344e65">Colour depth gives bits per pixel.</text>
+<text x="410" y="219" font-family="Arial,sans-serif" font-size="18" fill="#176b52">Raw size = pixels × bits per pixel</text>
+</svg>

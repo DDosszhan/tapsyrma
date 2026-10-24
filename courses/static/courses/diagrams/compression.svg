@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 255" role="img" aria-labelledby="t d">
+<title id="t">Lossless and lossy compression</title><desc id="d">Run-length encoding stores five As, three Bs and one C as run counts and restores them exactly; lossy compression discards some detail.</desc>
+<rect width="760" height="255" rx="16" fill="#f1f5fa"/>
+<text x="28" y="42" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#233952">What happens when the file is opened again?</text>
+<rect x="28" y="61" width="704" height="82" rx="10" fill="#fff" stroke="#cfdce9"/>
+<text x="45" y="88" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#176b52">LOSSLESS · run-length encoding</text>
+<text x="45" y="117" font-family="Consolas,monospace" font-size="18" fill="#233952">AAAAABBBC  →  5A 3B 1C  →  AAAAABBBC</text>
+<rect x="28" y="155" width="704" height="75" rx="10" fill="#fff" stroke="#cfdce9"/>
+<text x="45" y="183" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#a24d2f">LOSSY · some detail is removed</text>
+<text x="45" y="211" font-family="Arial,sans-serif" font-size="17" fill="#233952">Original image or sound  →  smaller approximation  →  exact original unavailable</text>
+</svg>
