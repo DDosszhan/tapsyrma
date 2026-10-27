@@ -5,5 +5,5 @@
 {% if exams %}<ul>{% for exam in exams %}<li>
 <form method="post">{% csrf_token %}<strong>{{ exam.title }}</strong> — {{ exam.subject }}, {{ exam.question_count }} question{{ exam.question_count|pluralize }}, {{ exam.total_points }} points, {{ exam.duration_minutes }} minutes
 <button type="submit" name="exam_id" value="{{ exam.pk }}">Choose</button></form>
-</li>{% endfor %}</ul>{% elif not error %}<p>There are no published exams for your grade yet.</p>{% endif %}
+</li>{% endfor %}</ul>{% elif not error %}<p>There are no published exams available for you yet.</p>{% endif %}
 {% endblock %}

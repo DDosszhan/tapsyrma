@@ -1,8 +1,8 @@
 {% extends "exams/base.html" %}{% block content %}
 <h1>Available exams</h1>
-{% if exams %}<ul>{% for exam in exams %}<li><strong>{{ exam.title }}</strong> — {{ exam.subject }}, Grade {{ exam.grade }}, {{ exam.question_count }} question{{ exam.question_count|pluralize }}, {{ exam.total_points }} points, {{ exam.duration_minutes }} minutes</li>{% endfor %}</ul>{% else %}<p>No exams have been published yet.</p>{% endif %}
+{% if exams %}<ul>{% for exam in exams %}<li><strong>{{ exam.title }}</strong> — {{ exam.subject }}, {{ exam.get_grade_display }}, {{ exam.question_count }} question{{ exam.question_count|pluralize }}, {{ exam.total_points }} points, {{ exam.duration_minutes }} minutes</li>{% endfor %}</ul>{% else %}<p>No exams have been published yet.</p>{% endif %}
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
-{% if request.user.is_authenticated %}{% if request.user.student_profile %}<p>Enter the code given by your teacher. A shared code lets you choose one exam.</p>
+{% if request.user.is_authenticated %}{% if request.user.student_profile %}<p>Enter the code you received. A shared code lets you choose one exam.</p>
 <form method="post">{% csrf_token %}<label for="code">Code</label><input id="code" name="code" type="text" maxlength="12" autocomplete="one-time-code" required autofocus><button type="submit">Continue</button></form>
 {% else %}<p class="error">Your account has no student profile. Sign in with a student account for your grade to use a shared code.</p>{% if request.user.is_staff %}<p><a href="{% url 'admin:index' %}">Open administration</a></p>{% endif %}{% endif %}
 {% else %}<p><a href="{% url 'login' %}">Sign in</a>, to use the code you received.</p>{% endif %}

@@ -10,7 +10,10 @@ from exams.models import Exam, Student
 class Course(models.Model):
     title = models.CharField("Title", max_length=200)
     subject = models.CharField("Subject", max_length=100)
-    grade = models.PositiveSmallIntegerField("Grade", choices=Exam.Grade.choices)
+    grade = models.PositiveSmallIntegerField("Grade", choices=[
+        (Exam.Grade.NINE, Exam.Grade.NINE.label),
+        (Exam.Grade.TEN, Exam.Grade.TEN.label),
+    ])
     description = models.TextField("Description", blank=True)
     published = models.BooleanField("Published", default=False)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, editable=False)

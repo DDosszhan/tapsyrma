@@ -3,6 +3,7 @@
 {% block extra_head %}<style>
 .exam-heading{margin-bottom:22px}.exam-heading h1{margin:0 0 8px}.exam-heading p{margin:0}
 .exam-questions .question h2{margin:0 0 16px;font-size:1.2em}.exam-questions .question p{margin:0 0 16px}
+.question-stem{white-space:pre-wrap}
 .exam-questions textarea{border:1px solid #aeb9c8;border-radius:8px;resize:vertical}
 .exam-questions input[type=radio]{accent-color:#124ab3}.exam-questions label{padding:6px 0}
 .exam-actions{background:white;border:1px solid #d6dfe9;border-radius:10px;padding:20px;margin-top:20px}
@@ -19,7 +20,7 @@
 <div class="exam-layout">
 <form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}
 {% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" tabindex="-1"><span class="points">{{ q.points }} points</span>
-<h2>Question {{ forloop.counter }}</h2><p>{{ q.stem|linebreaksbr }}</p>
+<h2>Question {{ forloop.counter }}</h2><p class="question-stem">{{ q.stem }}</p>
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
 {% endfor %}{% else %}<label for="q_{{ q.id }}">Your answer</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}

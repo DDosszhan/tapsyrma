@@ -11,6 +11,7 @@ class Exam(models.Model):
     class Grade(models.IntegerChoices):
         NINE = 9, "Grade 9"
         TEN = 10, "Grade 10"
+        EMPLOYEE = 0, "Сотрудник"
 
     title = models.CharField("Title", max_length=200)
     subject = models.CharField("Subject", max_length=100)
@@ -33,16 +34,18 @@ class Exam(models.Model):
         verbose_name_plural = "Exams"
         ordering = ["-created_at"]
         constraints = [
-            models.CheckConstraint(condition=models.Q(grade__in=[9, 10]), name="exam_grade_9_or_10"),
+            models.CheckConstraint(condition=models.Q(grade__in=[0, 9, 10]), name="exam_grade_0_9_or_10"),
             models.CheckConstraint(condition=models.Q(duration_minutes__gte=1), name="exam_duration_positive"),
         ]
 
     def __str__(self):
-        return f"Grade {self.grade} — {self.title}"
+        return f"{self.get_grade_display()} — {self.title}"
 
     @property
     def assessment_style(self):
-        return "IGCSE" if self.grade == 9 else "AS Level"
+        if self.grade == self.Grade.EMPLOYEE:
+            return "Employee assessment"
+        return "IGCSE" if self.grade == self.Grade.NINE else "AS Level"
 
     def clean(self):
         errors = {}

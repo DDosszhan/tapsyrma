@@ -286,6 +286,47 @@ class ExamFlowTests(TestCase):
         self.assertContains(self.client.get("/"), "Your account has no student profile")
         self.assertContains(self.client.post("/", {"code": "ANYCODE"}), "Shared codes are for students only")
 
+    def test_employee_grade_can_create_profile_exam_and_use_shared_code(self):
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.post("/admin/exams/student/add/", {
+            "email": "employee@example.invalid", "name": "Сотрудник", "grade": "0",
+        }).status_code, 302)
+        student = Student.objects.get(user__email="employee@example.invalid")
+        self.assertEqual(student.grade, Exam.Grade.EMPLOYEE)
+        student.password_change_required = False
+        student.save(update_fields=["password_change_required"])
+        self.assertEqual(self.client.post("/admin/exams/exam/add/", {
+            "title": "Вводный тест", "subject": "Рабочие процедуры", "grade": "0",
+            "syllabus_text": "Порядок обработки обращений", "question_count": "1",
+            "total_points": "1", "duration_minutes": "30", "auto_structure": "on",
+        }).status_code, 302)
+        employee_exam = Exam.objects.get(title="Вводный тест")
+        self.assertEqual(employee_exam.grade, Exam.Grade.EMPLOYEE)
+        self.assertEqual(employee_exam.get_grade_display(), "Сотрудник")
+        self.assertEqual(employee_exam.question_rules.count(), 1)
+        employee_exam.published = True
+        employee_exam.save(update_fields=["published"])
+        self.exam.published = True
+        self.exam.save(update_fields=["published"])
+        code = "STAFF234"
+        SharedCode.objects.create(
+            code_hash=hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest(),
+            expires_at=timezone.now() + timedelta(hours=1), created_by=self.teacher,
+        )
+
+        self.client.force_login(student.user)
+        catalog = self.client.get("/")
+        self.assertContains(catalog, "Сотрудник")
+        self.assertNotContains(catalog, "Grade 0")
+        self.assertRedirects(self.client.post("/", {"code": code}), "/choose/")
+        choices = self.client.get("/choose/")
+        self.assertContains(choices, "Вводный тест")
+        self.assertNotContains(choices, self.exam.title)
+        self.assertContains(self.client.post("/choose/", {"exam_id": self.exam.pk}),
+                            "This exam or code is no longer available")
+        self.assertRedirects(self.client.post("/choose/", {"exam_id": employee_exam.pk}), "/exam/")
+        self.assertEqual(Invitation.objects.get(student=student).exam, employee_exam)
+
     def test_generation_validation_and_full_student_flow(self):
         invalid = {"questions": [dict(self.generated["questions"][0]), dict(self.generated["questions"][1])]}
         invalid["questions"][1]["rubric"] = [{"criterion": "Только ответ", "points": 1}]
@@ -861,3 +902,10 @@ class ExamFlowTests(TestCase):
         with patch("exams.ai.structured_response", return_value=self.generated) as response:
             self.assertEqual(len(generate_round(self.exam)), 2)
         self.assertIn("AS Level", response.call_args.args[2])
+        self.exam.grade = Exam.Grade.EMPLOYEE
+        with patch("exams.ai.structured_response", return_value=self.generated) as response:
+            self.assertEqual(len(generate_round(self.exam)), 2)
+        self.assertIn("staff assessment", response.call_args.args[2].lower())
+        self.assertIn("same language as the supplied material", response.call_args.args[2])
+        self.assertNotIn("IGCSE", response.call_args.args[2])
+        self.assertNotIn("AS Level", response.call_args.args[2])

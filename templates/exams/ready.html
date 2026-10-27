@@ -1,9 +1,9 @@
 {% extends "exams/base.html" %}{% block content %}
-<h1>{{ invitation.exam.title }}</h1><p>{{ invitation.student.name }} · {{ invitation.exam.subject }} · Grade {{ invitation.exam.grade }} · {{ invitation.exam.assessment_style }} format</p>
-<p>{{ invitation.exam.question_count }} question{{ invitation.exam.question_count|pluralize }}, {{ invitation.exam.total_points }} points, {{ invitation.exam.duration_minutes }} minutes. The timer starts when you select “Start exam”. You can return using the same code; your teacher authorizes another attempt.</p>
+<h1>{{ invitation.exam.title }}</h1><p>{{ invitation.student.name }} · {{ invitation.exam.subject }} · {{ invitation.exam.get_grade_display }} · {{ invitation.exam.assessment_style }} format</p>
+<p>{{ invitation.exam.question_count }} question{{ invitation.exam.question_count|pluralize }}, {{ invitation.exam.total_points }} points, {{ invitation.exam.duration_minutes }} minutes. The timer starts when you select “Start exam”. You can return using the same code; contact the person who issued it about another attempt.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if expired %}<p class="error">The start deadline has passed.</p>
 {% elif invitation.variant_status == "ready" %}<form method="post">{% csrf_token %}<button type="submit">Start exam</button></form>
-{% elif invitation.variant_status == "error" %}<p>Your question set could not be prepared. Ask your teacher to retry generation.</p>
+{% elif invitation.variant_status == "error" %}<p>Your question set could not be prepared. Ask the person who issued your code to retry generation.</p>
 {% else %}<p>Your question set is being prepared. Refresh this page shortly.</p><meta http-equiv="refresh" content="10">{% endif %}
 {% endblock %}
