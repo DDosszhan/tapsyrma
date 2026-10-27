@@ -1,0 +1,57 @@
+## Inside the CPU: ALU, CU and Von Neumann Architecture
+
+### Learning goals
+
+By the end of this lesson, you should be able to distinguish the CPU from a microprocessor, explain the separate roles of the ALU and CU, and describe how a Von Neumann computer stores instructions and data.
+
+### Why this matters
+
+When you tap a calculator button, how does the computer turn that action into a result? The central processing unit (CPU) follows stored instructions and processes data. In this lesson, you will meet the units that coordinate the work.
+
+### Step 1: CPU and microprocessor
+
+The CPU processes instructions and data. A microprocessor is an integrated circuit on a single chip that can contain a CPU. The CPU is not the entire computer: it works with memory and input/output devices.
+
+### Step 2: Arithmetic Logic Unit (ALU)
+
+The ALU performs arithmetic operations, such as addition, and logical operations, such as comparisons. It produces results that can be stored in registers.
+
+[diagram:cpu-units]
+
+### Step 3: Control Unit (CU)
+
+The CU controls and coordinates activities in the CPU. It decodes instructions and sends control signals to other components; it is not the unit that performs calculations.
+
+### Step 4: Von Neumann model
+
+In a Von Neumann architecture, program instructions and data are stored in the same main memory. The CPU fetches instructions from memory and executes them in sequence unless a control instruction changes the order.
+
+[diagram:von-neumann]
+
+### Worked example 1: Adding two values
+
+A program asks the processor to add 7 and 5. The CU arranges the instruction steps, the ALU performs the addition, and the result 12 can be placed in a register.
+
+### Worked example 2: Making a comparison
+
+An app checks whether the temperature is greater than 30°C. The ALU can evaluate the comparison while the CU coordinates the instruction and the next action.
+
+### Common mistakes
+
+Tip: The CU coordinates operations; the ALU handles arithmetic and logic.
+
+Tip: A microprocessor is a single-chip implementation containing a CPU, not the name for the entire computer.
+
+Tip: A Von Neumann system stores program instructions and data in the same main memory.
+
+### Quick recap
+
+CPU = processes instructions; ALU = arithmetic and logic; CU = coordination; Von Neumann = shared memory for data and instructions.
+
+### Apply your knowledge
+
+Sketch what happens when a vending machine calculates change. Identify where calculation and control happen.
+
+### Check your understanding
+
+Complete the six questions on Tapsyrma. Read every question carefully and justify your reasoning when asked.

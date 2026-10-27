@@ -1,0 +1,127 @@
+{
+  "course": {
+    "title": "Cambridge IGCSE Computer Science 0478 (2026–2028)",
+    "subject": "Computer Science",
+    "grade": 9
+  },
+  "section": {
+    "title": "3.2 Input and output devices",
+    "position": 2
+  },
+  "lesson": {
+    "title": "Input Devices and Touchscreen Technologies",
+    "position": 4,
+    "duration_minutes": 18,
+    "language": "en"
+  },
+  "images": [
+    {
+      "slug": "input-families",
+      "file": "images/input-families.svg",
+      "alt": "Examples of input devices grouped by the data they capture."
+    },
+    {
+      "slug": "touch-types",
+      "file": "images/touch-types.svg",
+      "alt": "Resistive, capacitive and infrared touchscreen detection methods."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which device is best suited to capture speech as digital input?",
+      "option_a": "Microphone",
+      "option_b": "Laser printer",
+      "option_c": "Actuator",
+      "option_d": "LCD projector",
+      "correct_option": 1,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "A capacitive touchscreen primarily detects a change in:",
+      "option_a": "air pressure",
+      "option_b": "magnetic tape",
+      "option_c": "electrical capacitance",
+      "option_d": "laser reflection",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Which dedicated input device is designed specifically to read printed QR codes?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "QR code scanner\nQR scanner",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "What type of scanner captures the shape of a physical object?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "3D scanner\nthree-dimensional scanner\n3-D scanner",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain why a barcode scanner can make checkout faster and more accurate than typing product codes.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "It captures a product identifier quickly without manual character entry. It reduces manual typing mistakes when identifying items.",
+      "grading_criterion": "1: It captures a product identifier quickly without manual character entry.\n1: It reduces manual typing mistakes when identifying items.",
+      "student_guidance": "Think about the time needed to enter or capture a product identifier.\nThink about what can go wrong during manual entry."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Describe how resistive and infrared touchscreens detect a touch.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "Resistive: pressure makes two conductive layers touch. Infrared: touching the screen interrupts light beams across its surface.",
+      "grading_criterion": "1: Resistive: pressure makes two conductive layers touch.\n1: Infrared: touching the screen interrupts light beams across its surface.",
+      "student_guidance": "Describe the physical change a press makes inside one screen.\nDescribe what happens to the light grid in the other screen."
+    }
+  ]
+}

@@ -16,6 +16,30 @@ DIAGRAMS = {
     "compression": ("Run-length encoding compared with lossy compression", "courses/diagrams/compression.svg"),
 }
 
+DIAGRAMS.update({
+    slug: (alt, f"courses/diagrams/hardware/{slug}.svg")
+    for slug, alt in {
+        "cpu-units": "Main memory connected to the CPU, showing the control unit and arithmetic logic unit.",
+        "von-neumann": "Instructions and data stored together in main memory for the CPU to fetch.",
+        "register-map": "The five Cambridge CPU registers with their roles.",
+        "bus-map": "Direction and purpose of address, data and control buses.",
+        "fde-cycle": "Three stages of the fetch-decode-execute cycle with relevant registers.",
+        "performance": "Clock, cache and cores as distinct CPU performance factors.",
+        "input-families": "Examples of input devices grouped by the data they capture.",
+        "touch-types": "Resistive, capacitive and infrared touchscreen detection methods.",
+        "control-loop": "Flow of information from a sensor to a controller and actuator.",
+        "output-families": "Common output devices and the kinds of outputs they produce.",
+        "memory-hierarchy": "Relationship between CPU, primary storage and secondary storage.",
+        "volatile": "Effect of power loss on RAM, ROM and SSD storage.",
+        "three-storage": "Distinct physical mechanisms of HDD, optical disc and SSD.",
+        "storage-choice": "Factors to compare when selecting a storage medium.",
+        "paging": "Memory pages moving between RAM and secondary storage.",
+        "cloud": "Two devices accessing data on a physical remote cloud server.",
+        "network-path": "A device accessing a remote server through a network interface and router.",
+        "address-types": "Examples of correctly formatted MAC, IPv4 and IPv6 addresses.",
+    }.items()
+})
+
 
 @register.filter
 def render_lesson_content(value):

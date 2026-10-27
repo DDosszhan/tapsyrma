@@ -1,0 +1,63 @@
+## Output Devices, Sensors and Actuators
+
+### Learning goals
+
+By the end of this lesson, you should be able to choose output devices, match sensors to the data they capture and a suitable use, and explain how a controller drives an actuator.
+
+### Why this matters
+
+Computers communicate results using output devices, but they can also interact with the physical world. Sensors provide measurements; actuators produce physical changes.
+
+### Step 1: Output devices
+
+An output device presents information or a result from the computer. Speakers produce sound, screens display images, printers produce printed output, and actuators cause physical movement or action.
+
+### Step 2: Printers and 3D printing
+
+Inkjet printers spray ink droplets; laser printers use electrostatic attraction and toner; 3D printers build objects layer by layer from digital designs.
+
+### Step 3: Displays and projectors
+
+LCD screens modulate light through liquid crystals; LED screens typically use LEDs as a light source (often an LED-backlit LCD). LCD and DLP projectors use different image-forming technologies.
+
+[diagram:output-families]
+
+### Step 4: Sensors
+
+Sensors detect a physical property and provide input. Select one by what it measures and where it will be used. Temperature sensors measure temperature for greenhouse control; humidity sensors measure water vapour in air for ventilation; light sensors measure illumination for automatic lamps; moisture sensors measure water in soil for irrigation; pH sensors measure acidity or alkalinity for water-quality checks.
+
+Gas sensors detect a gas for leak alarms; flow sensors measure how quickly a fluid moves through a pipe; pressure sensors measure force per area for tyre monitoring; level sensors detect the height of liquid in a tank. Accelerometers measure acceleration for phone orientation; proximity sensors detect nearby objects for parking alerts; infra-red sensors detect infrared radiation for movement alarms; magnetic-field sensors detect a field for door alarms; acoustic sensors detect sound for noise monitoring.
+
+### Step 5: Sensor to actuator
+
+A controller can compare sensor readings with a target and then activate an actuator, such as a motor opening a ventilation flap.
+
+[diagram:control-loop]
+
+### Worked example 1: Greenhouse controller
+
+A temperature sensor reports 34°C. The controller compares it with a threshold of 30°C and switches on a fan actuator to cool the greenhouse.
+
+### Worked example 2: Printing a display model
+
+A school wants a physical model of a bridge: a 3D printer builds an object in layers, whereas an inkjet printer produces a two-dimensional printed image.
+
+### Common mistakes
+
+Tip: Sensors provide measurements as input to a controller; they are not output devices.
+
+Tip: An actuator responds to a control signal and changes the environment; a sensor measures it.
+
+Tip: LED-backlit LCD screens differ from displays whose pixels emit their own light.
+
+### Quick recap
+
+Output informs or acts; sensors measure; actuators act. Choose an output device or sensor by the task and the environment.
+
+### Apply your knowledge
+
+Design an automatic plant-watering system: choose a sensor, a processing unit and an actuator, and explain the signal flow.
+
+### Check your understanding
+
+Complete the six questions on Tapsyrma. Read every question carefully and justify your reasoning when asked.

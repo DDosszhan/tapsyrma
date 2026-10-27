@@ -1,0 +1,61 @@
+## How Magnetic, Optical and Solid-State Storage Work
+
+### Learning goals
+
+By the end of this lesson, you should be able to describe magnetic, optical and solid-state storage and choose a device by speed, capacity, cost and durability.
+
+### Why this matters
+
+A hard disk, a Blu-ray disc and a USB flash drive can all store files, but each uses a different physical technology. Understanding how data is recorded helps you select suitable storage.
+
+### Step 1: Magnetic storage
+
+A hard disk drive has rotating platters arranged into tracks and sectors. A read/write head uses magnetic effects to read and write data.
+
+### Step 2: Optical storage
+
+Optical discs such as CD, DVD and Blu-ray are read using lasers that detect differences in reflected light from pits and lands. Optical media can be useful for distribution or archives.
+
+[diagram:three-storage]
+
+### Step 3: Solid-state storage
+
+Flash memory stores charge in cells made from transistors, commonly using floating-gate or similar structures; NAND and NOR flash are named in the syllabus. SSDs, SD cards and USB flash drives use solid-state technology.
+
+### Step 4: Comparing devices
+
+HDDs provide substantial capacity at relatively low cost, but mechanical motion makes them vulnerable to shocks. SSDs offer fast access and no moving mechanical parts. Optical discs require a suitable drive.
+
+### Step 5: Choosing storage
+
+Consider capacity, portability, durability, speed, cost and whether data needs to be rewritten.
+
+[diagram:storage-choice]
+
+### Worked example 1: School video archive
+
+For many terabytes of video at low cost, an HDD may be suitable. For fast loading of a laptop operating system, an SSD is often preferable.
+
+### Worked example 2: Offline distribution
+
+A school has 100 computers without reliable internet and compatible drives. An optical disc could distribute read-only materials, while a USB flash drive might be more convenient if rewriting is required.
+
+### Common mistakes
+
+Tip: An SSD stores data in flash cells without spinning platters.
+
+Tip: A laser reads patterns on an optical disc; the disc is not read magnetically.
+
+Tip: A USB connector does not tell you how the device stores data; check the storage technology itself.
+
+### Quick recap
+
+HDD = magnetic rotating platters; optical = laser/pits/lands; flash = non-volatile transistor cells without moving storage parts.
+
+### Apply your knowledge
+
+Select storage for a mobile field recorder and for a large, low-cost backup. Justify each selection.
+
+### Check your understanding
+
+Complete the six questions on Tapsyrma. Read every question carefully and justify your reasoning when asked.

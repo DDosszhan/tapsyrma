@@ -16,10 +16,11 @@ from .templatetags.course_content import render_lesson_content
 class CourseSkeletonTests(TestCase):
     def test_lesson_diagram_markup_is_whitelisted_and_text_is_escaped(self):
         html = str(render_lesson_content(
-            "## Place values\n\n[diagram:place-values]\n\n<script>alert(1)</script>\n\n[diagram:secret]"
+            "## Place values\n\n[diagram:place-values]\n\n[diagram:cpu-units]\n\n<script>alert(1)</script>\n\n[diagram:secret]"
         ))
         self.assertIn("<h3>Place values</h3>", html)
         self.assertIn("place-values.svg", html)
+        self.assertIn("hardware/cpu-units.svg", html)
         self.assertNotIn("<script>", html)
         self.assertNotIn("secret.svg", html)
         self.assertIn("&lt;script&gt;", html)

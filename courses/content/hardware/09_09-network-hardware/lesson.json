@@ -1,0 +1,127 @@
+{
+  "course": {
+    "title": "Cambridge IGCSE Computer Science 0478 (2026–2028)",
+    "subject": "Computer Science",
+    "grade": 9
+  },
+  "section": {
+    "title": "3.4 Network hardware",
+    "position": 4
+  },
+  "lesson": {
+    "title": "Network Hardware: NICs, MAC Addresses, IP and Routers",
+    "position": 9,
+    "duration_minutes": 20,
+    "language": "en"
+  },
+  "images": [
+    {
+      "slug": "network-path",
+      "file": "images/network-path.svg",
+      "alt": "A device accessing a remote server through a network interface and router."
+    },
+    {
+      "slug": "address-types",
+      "file": "images/address-types.svg",
+      "alt": "Examples of correctly formatted MAC, IPv4 and IPv6 addresses."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "What hardware allows a computer to connect to a network?",
+      "option_a": "NIC",
+      "option_b": "ALU",
+      "option_c": "CIR",
+      "option_d": "ROM",
+      "correct_option": 1,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which address format is an IPv4 address?",
+      "option_a": "2001:db8::5",
+      "option_b": "00:1A:2B:3C:4D:5E",
+      "option_c": "192.168.1.20",
+      "option_d": "AB:CD:EF:12:34:56",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "What does NIC stand for?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "network interface card\nnetwork interface controller",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "How many bits are in an IPv6 address?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "128\n128 bits\n128-bit\n128 bit",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain two differences between a MAC address and an IP address.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "A MAC address identifies a network interface and is usually assigned at manufacture; an IP address is allocated for network communication. MAC addresses are commonly written in hexadecimal pairs; IPv4 is normally dotted decimal or IPv6 hexadecimal groups.",
+      "grading_criterion": "1: A MAC address identifies a network interface and is usually assigned at manufacture; an IP address is allocated for network communication.\n1: MAC addresses are commonly written in hexadecimal pairs; IPv4 is normally dotted decimal or IPv6 hexadecimal groups.",
+      "student_guidance": "Compare what each address identifies and how it is obtained.\nCompare how the two kinds of address are normally written."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain two roles of a router on a school network.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "It forwards packets to destinations between networks. It can connect the local network to the internet or allocate local IP addresses.",
+      "grading_criterion": "1: It forwards packets to destinations between networks.\n1: It can connect the local network to the internet or allocate local IP addresses.",
+      "student_guidance": "Consider what happens to packets travelling between separate networks.\nThink about another service a school router might provide locally."
+    }
+  ]
+}

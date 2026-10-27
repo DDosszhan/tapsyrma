@@ -1,0 +1,61 @@
+## CPU Registers and System Buses
+
+### Learning goals
+
+By the end of this lesson, you should be able to identify what PC, MAR, MDR, CIR and ACC hold, distinguish the three system buses, and trace a memory read.
+
+### Why this matters
+
+A CPU cannot search every memory cell whenever it needs the next instruction. Small registers hold the current address, instruction or data. Buses carry information between the CPU and memory.
+
+### Step 1: Five registers
+
+PC stores the address of the next instruction. MAR stores the memory address being accessed. MDR stores data or an instruction being transferred to or from memory. CIR stores the current instruction being decoded/executed. ACC stores intermediate results from ALU operations.
+
+### Step 2: Address bus
+
+The address bus carries an address from the CPU to main memory. At this level it is treated as one-way (CPU to memory).
+
+[diagram:register-map]
+
+### Step 3: Data bus
+
+The data bus carries data and instructions between main memory and CPU in either direction.
+
+### Step 4: Control bus
+
+The control bus carries control signals, including memory-read and memory-write signals; it coordinates transfers between components.
+
+### Step 5: Putting them together
+
+To read memory, the CPU places an address in MAR, sends it through the address bus, issues a read signal, and receives the contents into MDR through the data bus.
+
+[diagram:bus-map]
+
+### Worked example 1: Reading an instruction
+
+Suppose the PC contains address 104. The address is copied to MAR and placed on the address bus. After the memory-read signal, the instruction at address 104 arrives through the data bus into MDR.
+
+### Worked example 2: Saving a calculation
+
+After an ALU calculation, a result such as 18 may be held temporarily in ACC. If the result needs to be written to memory, MDR holds the outgoing data and MAR identifies its destination address.
+
+### Common mistakes
+
+Tip: PC holds the address of the next instruction, not the instruction itself.
+
+Tip: MAR holds a memory address; MDR holds the data or instruction transferred to or from that address.
+
+Tip: The data bus carries data and instructions in both directions between CPU and memory.
+
+### Quick recap
+
+PC = next address; MAR = selected address; MDR = transferred contents; CIR = current instruction; ACC = intermediate result. Address/data/control buses have different jobs.
+
+### Apply your knowledge
+
+Given PC = 250 and an instruction stored at memory address 250, explain which registers and buses are used to fetch it.
+
+### Check your understanding
+
+Complete the six questions on Tapsyrma. Read every question carefully and justify your reasoning when asked.

@@ -1,0 +1,127 @@
+{
+  "course": {
+    "title": "Cambridge IGCSE Computer Science 0478 (2026–2028)",
+    "subject": "Computer Science",
+    "grade": 9
+  },
+  "section": {
+    "title": "3.1 Computer architecture",
+    "position": 1
+  },
+  "lesson": {
+    "title": "Fetch–Decode–Execute, CPU Performance and Embedded Systems",
+    "position": 3,
+    "duration_minutes": 20,
+    "language": "en"
+  },
+  "images": [
+    {
+      "slug": "fde-cycle",
+      "file": "images/fde-cycle.svg",
+      "alt": "Three stages of the fetch-decode-execute cycle with relevant registers."
+    },
+    {
+      "slug": "performance",
+      "file": "images/performance.svg",
+      "alt": "Clock, cache and cores as distinct CPU performance factors."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which unit decodes the instruction during the FDE cycle?",
+      "option_a": "ALU",
+      "option_b": "CU",
+      "option_c": "SSD",
+      "option_d": "NIC",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which device is most clearly an embedded system?",
+      "option_a": "General-purpose desktop PC",
+      "option_b": "Laptop used for homework",
+      "option_c": "Washing machine controller",
+      "option_d": "Office workstation",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "What does FDE stand for?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "fetch decode execute\nfetch-decode-execute\nfetch, decode, execute\nfetch/decode/execute",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Give the abbreviation of the register that holds the current instruction.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "CIR",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "Describe the fetch stage using PC, MAR, MDR and CIR.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "The address in PC is copied to MAR (and PC is advanced to the next instruction). The CPU requests the instruction from RAM and it is transferred into MDR. The fetched instruction is copied from MDR into CIR.",
+      "grading_criterion": "1: The address in PC is copied to MAR (and PC is advanced to the next instruction).\n1: The CPU requests the instruction from RAM and it is transferred into MDR.\n1: The fetched instruction is copied from MDR into CIR.",
+      "student_guidance": "Start with the address of the next instruction and where it is copied.\nTrace the request to memory and where its reply first arrives.\nFinish with the register used while the fetched instruction is interpreted."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain how a larger cache and multiple cores could improve CPU performance.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "Cache can reduce the need to access slower RAM for frequently used data/instructions. Multiple cores can execute work concurrently when tasks can be parallelised.",
+      "grading_criterion": "1: Cache can reduce the need to access slower RAM for frequently used data/instructions.\n1: Multiple cores can execute work concurrently when tasks can be parallelised.",
+      "student_guidance": "Consider where repeatedly used information can be accessed quickly.\nConsider when a task can be divided between processing units."
+    }
+  ]
+}

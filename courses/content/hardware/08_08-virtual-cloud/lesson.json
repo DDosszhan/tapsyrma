@@ -1,0 +1,127 @@
+{
+  "course": {
+    "title": "Cambridge IGCSE Computer Science 0478 (2026–2028)",
+    "subject": "Computer Science",
+    "grade": 9
+  },
+  "section": {
+    "title": "3.3 Data storage",
+    "position": 3
+  },
+  "lesson": {
+    "title": "Virtual Memory and Cloud Storage",
+    "position": 8,
+    "duration_minutes": 18,
+    "language": "en"
+  },
+  "images": [
+    {
+      "slug": "paging",
+      "file": "images/paging.svg",
+      "alt": "Memory pages moving between RAM and secondary storage."
+    },
+    {
+      "slug": "cloud",
+      "file": "images/cloud.svg",
+      "alt": "Two devices accessing data on a physical remote cloud server."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Virtual memory typically uses space on:",
+      "option_a": "CPU registers",
+      "option_b": "secondary storage",
+      "option_c": "an input sensor",
+      "option_d": "the address bus",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Cloud data is physically stored on:",
+      "option_a": "nothing physical",
+      "option_b": "light beams only",
+      "option_c": "remote storage servers",
+      "option_d": "CPU caches in every device",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Name the memory-management technique that moves fixed-size pages between RAM and secondary storage.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "paging\npage swapping",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Give the abbreviation for random access memory.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "RAM",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain why a computer may become slower when it uses virtual memory heavily.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "Some required pages are stored on secondary storage instead of RAM. Reading/writing pages on secondary storage is slower than accessing RAM.",
+      "grading_criterion": "1: Some required pages are stored on secondary storage instead of RAM.\n1: Reading/writing pages on secondary storage is slower than accessing RAM.",
+      "student_guidance": "Identify where less-used memory pages go when RAM is full.\nCompare the access speeds of the two storage locations."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Give one advantage and one disadvantage of cloud storage compared with local storage.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "Cloud storage enables remote access or off-site copies/collaboration. It may require internet access, cost fees, or raise privacy/security concerns.",
+      "grading_criterion": "1: Cloud storage enables remote access or off-site copies/collaboration.\n1: It may require internet access, cost fees, or raise privacy/security concerns.",
+      "student_guidance": "Consider how a student might access the same file from another location.\nConsider a dependency or risk introduced by remote storage."
+    }
+  ]
+}

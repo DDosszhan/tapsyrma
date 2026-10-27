@@ -1,0 +1,127 @@
+{
+  "course": {
+    "title": "Cambridge IGCSE Computer Science 0478 (2026–2028)",
+    "subject": "Computer Science",
+    "grade": 9
+  },
+  "section": {
+    "title": "3.2 Input and output devices",
+    "position": 2
+  },
+  "lesson": {
+    "title": "Output Devices, Sensors and Actuators",
+    "position": 5,
+    "duration_minutes": 20,
+    "language": "en"
+  },
+  "images": [
+    {
+      "slug": "control-loop",
+      "file": "images/control-loop.svg",
+      "alt": "Flow of information from a sensor to a controller and actuator."
+    },
+    {
+      "slug": "output-families",
+      "file": "images/output-families.svg",
+      "alt": "Common output devices and the kinds of outputs they produce."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which device converts a control signal into physical movement?",
+      "option_a": "Temperature sensor",
+      "option_b": "Actuator",
+      "option_c": "Barcode scanner",
+      "option_d": "Microphone",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which printer builds a three-dimensional object layer by layer?",
+      "option_a": "Inkjet printer",
+      "option_b": "Laser printer",
+      "option_c": "3D printer",
+      "option_d": "Dot-matrix scanner",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Name a sensor that measures acidity or alkalinity.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "pH sensor\npH probe",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Which sensor measures a device's acceleration?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "accelerometer\nacceleration sensor",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain the roles of a temperature sensor and a fan actuator in an automatic cooling system.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "The sensor measures temperature and sends the reading to the controller. The actuator switches or drives the fan to change the temperature.",
+      "grading_criterion": "1: The sensor measures temperature and sends the reading to the controller.\n1: The actuator switches or drives the fan to change the temperature.",
+      "student_guidance": "Identify what the first device measures and where it sends the reading.\nDescribe the physical action produced after the controller decides."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain how a laser printer and an inkjet printer put an image onto paper.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "A laser printer uses electrostatic attraction to apply dry toner. An inkjet printer sprays droplets of liquid ink onto the paper.",
+      "grading_criterion": "1: A laser printer uses electrostatic attraction to apply dry toner.\n1: An inkjet printer sprays droplets of liquid ink onto the paper.",
+      "student_guidance": "Consider how one printer applies a dry powdered material.\nConsider how the other printer deposits a liquid on the page."
+    }
+  ]
+}

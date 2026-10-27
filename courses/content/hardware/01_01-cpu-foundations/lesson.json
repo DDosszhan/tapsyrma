@@ -1,0 +1,127 @@
+{
+  "course": {
+    "title": "Cambridge IGCSE Computer Science 0478 (2026–2028)",
+    "subject": "Computer Science",
+    "grade": 9
+  },
+  "section": {
+    "title": "3.1 Computer architecture",
+    "position": 1
+  },
+  "lesson": {
+    "title": "Inside the CPU: ALU, CU and Von Neumann Architecture",
+    "position": 1,
+    "duration_minutes": 18,
+    "language": "en"
+  },
+  "images": [
+    {
+      "slug": "cpu-units",
+      "file": "images/cpu-units.svg",
+      "alt": "Main memory connected to the CPU, showing the control unit and arithmetic logic unit."
+    },
+    {
+      "slug": "von-neumann",
+      "file": "images/von-neumann.svg",
+      "alt": "Instructions and data stored together in main memory for the CPU to fetch."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which unit performs arithmetic and logical operations?",
+      "option_a": "Control unit",
+      "option_b": "Arithmetic logic unit",
+      "option_c": "Read-only memory",
+      "option_d": "Network interface card",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "In Von Neumann architecture, where are instructions and data stored?",
+      "option_a": "In the same main memory",
+      "option_b": "Only in ROM",
+      "option_c": "In separate mandatory memories",
+      "option_d": "Only in CPU cache",
+      "correct_option": 1,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Write the three-letter abbreviation for the control unit.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "CU",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Write the three-letter abbreviation for the arithmetic logic unit.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "ALU",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Describe the different roles of the ALU and CU when the CPU processes an instruction.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "The ALU performs arithmetic or logical operations. The CU decodes/coordinates instructions and sends control signals.",
+      "grading_criterion": "1: The ALU performs arithmetic or logical operations.\n1: The CU decodes/coordinates instructions and sends control signals.",
+      "student_guidance": "Think about the operations one unit carries out on values.\nThink about how the other unit interprets instructions and directs components."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain why main memory is needed when a CPU runs a program that processes data.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "Main memory holds program instructions for the CPU to fetch. Main memory also holds data the program uses or processes.",
+      "grading_criterion": "1: Main memory holds program instructions for the CPU to fetch.\n1: Main memory also holds data the program uses or processes.",
+      "student_guidance": "Consider where the CPU obtains the program's next instruction.\nConsider where values used by that program are held while it runs."
+    }
+  ]
+}

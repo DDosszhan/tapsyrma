@@ -1,0 +1,127 @@
+{
+  "course": {
+    "title": "Cambridge IGCSE Computer Science 0478 (2026–2028)",
+    "subject": "Computer Science",
+    "grade": 9
+  },
+  "section": {
+    "title": "3.1 Computer architecture",
+    "position": 1
+  },
+  "lesson": {
+    "title": "CPU Registers and System Buses",
+    "position": 2,
+    "duration_minutes": 20,
+    "language": "en"
+  },
+  "images": [
+    {
+      "slug": "register-map",
+      "file": "images/register-map.svg",
+      "alt": "The five Cambridge CPU registers with their roles."
+    },
+    {
+      "slug": "bus-map",
+      "file": "images/bus-map.svg",
+      "alt": "Direction and purpose of address, data and control buses."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which register stores the address of the next instruction?",
+      "option_a": "MDR",
+      "option_b": "ACC",
+      "option_c": "PC",
+      "option_d": "CIR",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which bus transfers instructions and data between CPU and RAM?",
+      "option_a": "Address bus",
+      "option_b": "Data bus",
+      "option_c": "Control bus",
+      "option_d": "Power cable",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Give the abbreviation of the memory address register.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "MAR",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Give the abbreviation of the current instruction register.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "CIR",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Describe the different roles of MAR and MDR during a memory read.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "MAR holds the address of the memory location to read. MDR holds the data or instruction read from that location.",
+      "grading_criterion": "1: MAR holds the address of the memory location to read.\n1: MDR holds the data or instruction read from that location.",
+      "student_guidance": "Identify what points to the memory location being read.\nIdentify what temporarily holds the value returned from that location."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain the purpose of the address bus and the control bus when fetching data from memory.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "The address bus carries the location to be accessed to memory. The control bus carries a memory-read control signal.",
+      "grading_criterion": "1: The address bus carries the location to be accessed to memory.\n1: The control bus carries a memory-read control signal.",
+      "student_guidance": "Think about how memory learns which location the CPU wants.\nThink about which signal tells memory to perform a read."
+    }
+  ]
+}

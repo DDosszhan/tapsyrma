@@ -1,0 +1,61 @@
+## Primary and Secondary Storage: RAM and ROM
+
+### Learning goals
+
+By the end of this lesson, you should be able to compare RAM, ROM and secondary storage, explain volatility, and choose where working and saved data belong.
+
+### Why this matters
+
+Why does a computer remember its startup program after a power cut, yet lose unsaved work? The answer is that different kinds of memory and storage have different jobs.
+
+### Step 1: Primary storage
+
+Primary storage is directly accessible by the CPU. The syllabus focuses on RAM and ROM. Both help a computer operate, but they differ in what they hold and whether they retain data without power.
+
+### Step 2: RAM
+
+Random Access Memory is volatile, read/write working memory. It holds programs and data currently in use, so unsaved data in RAM is normally lost when power is removed.
+
+[diagram:memory-hierarchy]
+
+### Step 3: ROM
+
+Read Only Memory is non-volatile and stores firmware/startup instructions that must remain available when the device is off. In modern devices firmware storage may be rewritable even though the syllabus uses the general term ROM.
+
+### Step 4: Secondary storage
+
+Secondary storage keeps data more permanently and is not directly accessed by the CPU in the syllabus model. Examples include HDDs, SSDs, optical discs, SD cards and USB drives.
+
+### Step 5: Why both are required
+
+RAM supports active work and ROM retains startup instructions. Secondary storage retains the operating system, documents and installed software between sessions.
+
+[diagram:volatile]
+
+### Worked example 1: Unsaved document
+
+You type an essay without saving and the power fails. The latest edits may have been in volatile RAM and can be lost. A previously saved copy on secondary storage remains.
+
+### Worked example 2: Starting a computer
+
+When power is restored, non-volatile firmware instructions are available to begin startup; the operating system is then loaded from secondary storage into RAM for execution.
+
+### Common mistakes
+
+Tip: RAM holds working data temporarily; saved user files are normally kept on secondary storage.
+
+Tip: In the syllabus model, ROM is primary storage for retained firmware; an HDD is secondary storage.
+
+Tip: Non-volatile means data survives power loss; it does not mean the data can never change.
+
+### Quick recap
+
+RAM = volatile working memory; ROM = non-volatile retained startup instructions; secondary storage = longer-term data.
+
+### Apply your knowledge
+
+Explain where you expect a running game, saved game progress, and startup firmware to be stored, and why.
+
+### Check your understanding
+
+Complete the six questions on Tapsyrma. Read every question carefully and justify your reasoning when asked.

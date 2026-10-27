@@ -1,0 +1,127 @@
+{
+  "course": {
+    "title": "Cambridge IGCSE Computer Science 0478 (2026–2028)",
+    "subject": "Computer Science",
+    "grade": 9
+  },
+  "section": {
+    "title": "3.3 Data storage",
+    "position": 3
+  },
+  "lesson": {
+    "title": "How Magnetic, Optical and Solid-State Storage Work",
+    "position": 7,
+    "duration_minutes": 20,
+    "language": "en"
+  },
+  "images": [
+    {
+      "slug": "three-storage",
+      "file": "images/three-storage.svg",
+      "alt": "Distinct physical mechanisms of HDD, optical disc and SSD."
+    },
+    {
+      "slug": "storage-choice",
+      "file": "images/storage-choice.svg",
+      "alt": "Factors to compare when selecting a storage medium."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which storage technology uses rotating magnetic platters?",
+      "option_a": "SSD",
+      "option_b": "HDD",
+      "option_c": "Blu-ray",
+      "option_d": "ROM register",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which storage uses a laser to read pits and lands?",
+      "option_a": "Optical disc",
+      "option_b": "RAM",
+      "option_c": "SD card",
+      "option_d": "Magnetic tape head",
+      "correct_option": 1,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Give the three-letter abbreviation for solid-state drive.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "SSD",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Name one optical storage format listed in the syllabus.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "CD\nDVD\nBlu-ray\nBlu ray\nBluRay\nBlu-ray disc\nCD-ROM\nDVD-ROM",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Describe how data is stored or read on a magnetic HDD.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "Rotating magnetic platters are organised into tracks and sectors. A read/write head uses magnetic effects to store or detect data.",
+      "grading_criterion": "1: Rotating magnetic platters are organised into tracks and sectors.\n1: A read/write head uses magnetic effects to store or detect data.",
+      "student_guidance": "Describe the structure of the moving storage surface.\nExplain the role of the part that reads or changes the stored pattern."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain why an SSD may be more suitable than an HDD for a portable laptop.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "An SSD has no moving storage parts and is less vulnerable to mechanical shock. An SSD generally provides faster data access/loading.",
+      "grading_criterion": "1: An SSD has no moving storage parts and is less vulnerable to mechanical shock.\n1: An SSD generally provides faster data access/loading.",
+      "student_guidance": "Compare how the devices withstand being moved or knocked.\nCompare the time needed to retrieve data from each device."
+    }
+  ]
+}

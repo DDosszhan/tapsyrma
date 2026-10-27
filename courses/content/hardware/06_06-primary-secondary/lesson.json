@@ -1,0 +1,127 @@
+{
+  "course": {
+    "title": "Cambridge IGCSE Computer Science 0478 (2026–2028)",
+    "subject": "Computer Science",
+    "grade": 9
+  },
+  "section": {
+    "title": "3.3 Data storage",
+    "position": 3
+  },
+  "lesson": {
+    "title": "Primary and Secondary Storage: RAM and ROM",
+    "position": 6,
+    "duration_minutes": 18,
+    "language": "en"
+  },
+  "images": [
+    {
+      "slug": "memory-hierarchy",
+      "file": "images/memory-hierarchy.svg",
+      "alt": "Relationship between CPU, primary storage and secondary storage."
+    },
+    {
+      "slug": "volatile",
+      "file": "images/volatile.svg",
+      "alt": "Effect of power loss on RAM, ROM and SSD storage."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which storage is volatile?",
+      "option_a": "ROM",
+      "option_b": "Blu-ray disc",
+      "option_c": "RAM",
+      "option_d": "SSD",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which device is secondary storage?",
+      "option_a": "Accumulator",
+      "option_b": "Memory address register",
+      "option_c": "Control unit",
+      "option_d": "Hard disk drive",
+      "correct_option": 4,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "What does ROM stand for?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "read only memory\nread-only memory",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "What does RAM stand for?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "random access memory",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain why a computer needs both RAM and ROM.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "RAM provides working storage for programs and data currently being used. ROM retains firmware/startup instructions without power.",
+      "grading_criterion": "1: RAM provides working storage for programs and data currently being used.\n1: ROM retains firmware/startup instructions without power.",
+      "student_guidance": "Think about where active programs and working data are held.\nThink about what must remain available when power is off."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain why an unsaved document may be lost after a power failure but a previously saved copy survives.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "Unsaved changes may be held in volatile RAM and are lost when power is removed. A saved copy is held in non-volatile secondary storage and remains.",
+      "grading_criterion": "1: Unsaved changes may be held in volatile RAM and are lost when power is removed.\n1: A saved copy is held in non-volatile secondary storage and remains.",
+      "student_guidance": "Consider what happens to changes held only during a running session.\nConsider how a saved copy persists when the computer is off."
+    }
+  ]
+}
