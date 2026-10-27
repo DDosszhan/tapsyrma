@@ -58,6 +58,33 @@ class CourseSkeletonTests(TestCase):
         self.assertContains(self.client.get(reverse("course_list")), "Курс 10")
         self.assertEqual(self.client.get(reverse("section_detail", args=[self.course.pk, self.section.pk])).status_code, 404)
 
+    def test_hardware_topic_is_nested_and_progress_rolls_up(self):
+        chapter = Section.objects.create(course=self.course, position=3, title="3. Hardware")
+        topic = Section.objects.create(course=self.course, parent=chapter, position=1,
+                                       title="3.1 Computer architecture")
+        lesson = Lesson.objects.create(section=topic, position=1, title="Inside the CPU")
+        self.client.force_login(self.user)
+
+        listing = self.client.get(reverse("course_list"))
+        self.assertEqual(listing.context["courses"][0].section_count, 2)
+        self.assertEqual(listing.context["courses"][0].lesson_count, 3)
+        course_page = self.client.get(reverse("course_detail", args=[self.course.pk]))
+        self.assertContains(course_page, "3. Hardware")
+        self.assertNotContains(course_page, "3.1 Computer architecture")
+        chapter_summary = next(row for row in course_page.context["sections"] if row.pk == chapter.pk)
+        self.assertEqual((chapter_summary.lesson_count, chapter_summary.opened_count), (1, 0))
+
+        chapter_page = self.client.get(reverse("section_detail", args=[self.course.pk, chapter.pk]))
+        self.assertContains(chapter_page, "3.1 Computer architecture")
+        self.assertContains(chapter_page, "0 of 1")
+        self.assertNotContains(chapter_page, "Lessons will appear here")
+        lesson_page = self.client.get(reverse("lesson_detail", args=[self.course.pk, topic.pk, lesson.pk]))
+        self.assertContains(lesson_page, "Inside the CPU")
+        self.assertContains(lesson_page, "3. Hardware")
+        chapter_summary = next(row for row in self.client.get(reverse("course_detail", args=[self.course.pk])).context["sections"]
+                               if row.pk == chapter.pk)
+        self.assertEqual((chapter_summary.lesson_count, chapter_summary.opened_count), (1, 1))
+
     def test_opening_a_lesson_updates_only_own_progress_and_completion_is_separate(self):
         self.client.force_login(self.user)
         section_url = reverse("section_detail", args=[self.course.pk, self.section.pk])

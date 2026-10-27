@@ -12,6 +12,8 @@ from courses.templatetags.course_content import DIAGRAMS
 
 CONTENT_DIR = Path(__file__).resolve().parents[2] / "content" / "hardware"
 DIAGRAM_DIR = Path(__file__).resolve().parents[2] / "static" / "courses" / "diagrams" / "hardware"
+ROOT_TITLE = "3. Hardware"
+ROOT_POSITION = 3
 SECTIONS = (
     "3.1 Computer architecture",
     "3.2 Input and output devices",
@@ -83,7 +85,7 @@ def matches(lesson, content, questions):
 
 
 class Command(BaseCommand):
-    help = "Preview or import Chapter 3 Hardware into an existing grade-9 Computer Science course."
+    help = "Preview or import Chapter 3 Hardware and its topics into an existing grade-9 course."
 
     def add_arguments(self, parser):
         parser.add_argument("--course-id", type=int, required=True, help="Existing course ID.")
@@ -93,27 +95,80 @@ class Command(BaseCommand):
         lessons = load_lessons()
         apply = options["apply"]
         with transaction.atomic():
-            course = Course.objects.select_for_update().filter(pk=options["course_id"]).first() if apply else Course.objects.filter(pk=options["course_id"]).first()
+            courses = Course.objects.select_for_update() if apply else Course.objects
+            course = courses.filter(pk=options["course_id"]).first()
             if course is None or course.grade != 9 or course.subject.casefold() != "computer science":
                 raise CommandError("Select an existing grade-9 Computer Science course.")
-            next_section = max(course.sections.values_list("position", flat=True), default=0) + 1
+            sections = list(course.sections.select_for_update() if apply else course.sections.all())
+            roots = [section for section in sections if section.title == ROOT_TITLE]
+            if len(roots) > 1 or roots and roots[0].parent_id is not None:
+                raise CommandError(f"Conflicting section {ROOT_TITLE!r}; import refused.")
+            root = roots[0] if roots else None
+            topics = {}
+            for title in SECTIONS:
+                found = [section for section in sections if section.title == title]
+                if len(found) > 1 or found and found[0].parent_id not in (None, root.pk if root else None):
+                    raise CommandError(f"Conflicting topic {title!r}; import refused.")
+                topics[title] = found[0] if found else None
+            for section in sections:
+                if (section.parent_id is None and section.position == ROOT_POSITION
+                        and section is not root and section not in topics.values()):
+                    raise CommandError(f"Section position {ROOT_POSITION} is occupied; import refused.")
+                if (root and section.parent_id == root.pk and section.title not in SECTIONS
+                        and section.position in range(1, len(SECTIONS) + 1)):
+                    raise CommandError(f"Topic position {section.position} is occupied; import refused.")
             states = {}
             for title in SECTIONS:
-                found = list(course.sections.filter(title=title))
-                if len(found) > 1:
-                    raise CommandError(f"More than one section named {title!r}; import refused.")
-                section = found[0] if found else None
+                section = topics[title]
                 existing = list(section.lessons.prefetch_related("questions")) if section else []
                 if len(existing) != len({item.title for item in existing}):
                     raise CommandError(f"Duplicate lesson titles in {title!r}; import refused.")
                 states[title] = {
                     "section": section,
-                    "section_position": section.position if section else next_section,
                     "lessons": {item.title: item for item in existing},
                     "next_lesson": max((item.position for item in existing), default=0) + 1,
                 }
-                if section is None:
-                    next_section += 1
+            for data, content in lessons:
+                existing = states[data["section"]["title"]]["lessons"].get(data["lesson"]["title"])
+                if existing and not matches(existing, content, data["questions"]):
+                    raise CommandError(f"Conflicting existing lesson {existing.title!r}; import refused.")
+
+            moved = sum(topic is not None and (root is None or topic.parent_id != root.pk
+                        or topic.position != position)
+                        for position, topic in enumerate(topics.values(), 1))
+            if not apply:
+                self.stdout.write(f"Would place {len(SECTIONS)} topics under {ROOT_TITLE}; {moved} existing topic(s) would move.")
+            else:
+                if root is None:
+                    temporary_root_position = max((section.position for section in sections
+                                                   if section.parent_id is None), default=0) + 1
+                    root = Section(course=course, position=temporary_root_position, title=ROOT_TITLE)
+                    root.full_clean()
+                    root.save()
+                temporary_topic_position = max((section.position for section in sections), default=0) + len(SECTIONS) + 1
+                for position, topic in enumerate(topics.values(), 1):
+                    if topic is not None and (topic.parent_id != root.pk or topic.position != position):
+                        topic.parent = root
+                        topic.position = temporary_topic_position
+                        topic.full_clean()
+                        topic.save(update_fields=["parent", "position"])
+                        temporary_topic_position += 1
+                for position, title in enumerate(SECTIONS, 1):
+                    topic = topics[title]
+                    if topic is None:
+                        topic = Section(course=course, parent=root, position=position, title=title)
+                        topic.full_clean()
+                        topic.save()
+                    elif topic.position != position:
+                        topic.position = position
+                        topic.full_clean()
+                        topic.save(update_fields=["position"])
+                    states[title]["section"] = topic
+                if root.position != ROOT_POSITION:
+                    root.position = ROOT_POSITION
+                    root.full_clean()
+                    root.save(update_fields=["position"])
+
             added = already = 0
             for data, content in lessons:
                 title = data["section"]["title"]
@@ -122,8 +177,6 @@ class Command(BaseCommand):
                 questions = data["questions"]
                 existing = state["lessons"].get(lesson_title)
                 if existing:
-                    if not matches(existing, content, questions):
-                        raise CommandError(f"Conflicting existing lesson {lesson_title!r}; import refused.")
                     already += 1
                     continue
                 position = state["next_lesson"]
@@ -133,11 +186,6 @@ class Command(BaseCommand):
                     self.stdout.write(f"Would add {title} / {position}: {lesson_title} ({len(questions)} questions)")
                     continue
                 section = state["section"]
-                if section is None:
-                    section = Section(course=course, position=state["section_position"], title=title)
-                    section.full_clean()
-                    section.save()
-                    state["section"] = section
                 lesson = Lesson(section=section, position=position, title=lesson_title, content=content)
                 lesson.full_clean()
                 lesson.save()
@@ -146,6 +194,8 @@ class Command(BaseCommand):
                     question.full_clean()
                     question.save()
                 state["lessons"][lesson_title] = lesson
+            if apply:
+                self.stdout.write(f"{len(SECTIONS)} topic(s) under {ROOT_TITLE}; {moved} existing topic(s) moved.")
             self.stdout.write(self.style.SUCCESS(
                 f"{added} lesson(s) {'imported' if apply else 'would be imported'}; {already} already imported."
             ))

@@ -9,6 +9,9 @@ class SectionInline(admin.TabularInline):
     show_change_link = True
     fields = ["position", "title", "description"]
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(parent__isnull=True)
+
 
 class LessonInline(admin.TabularInline):
     model = Lesson
@@ -43,10 +46,15 @@ class CourseAdmin(admin.ModelAdmin):
 
 @admin.register(Section)
 class SectionAdmin(admin.ModelAdmin):
-    list_display = ["title", "course", "position"]
-    list_filter = ["course__grade", "course"]
-    search_fields = ["title", "course__title"]
+    list_display = ["title", "course", "parent", "position"]
+    list_filter = ["course__grade", "course", "parent"]
+    search_fields = ["title", "course__title", "parent__title"]
     inlines = [LessonInline]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "parent":
+            kwargs["queryset"] = Section.objects.filter(parent__isnull=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(Lesson)

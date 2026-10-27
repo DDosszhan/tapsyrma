@@ -28,6 +28,10 @@ class Course(models.Model):
 
 class Section(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="sections", verbose_name="Course")
+    parent = models.ForeignKey(
+        "self", on_delete=models.CASCADE, related_name="subsections", null=True, blank=True,
+        verbose_name="Parent section (blank for a chapter)",
+    )
     position = models.PositiveSmallIntegerField("Order", default=1)
     title = models.CharField("Title", max_length=200)
     description = models.TextField("Description", blank=True)
@@ -36,10 +40,39 @@ class Section(models.Model):
         verbose_name = "Section"
         verbose_name_plural = "Sections"
         ordering = ["position", "id"]
-        constraints = [models.UniqueConstraint(fields=["course", "position"], name="unique_course_section_position")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["course", "position"], condition=models.Q(parent__isnull=True),
+                name="unique_root_section_position",
+            ),
+            models.UniqueConstraint(
+                fields=["parent", "position"], condition=models.Q(parent__isnull=False),
+                name="unique_subsection_position",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.course.title} · {self.title}"
+
+    def clean(self):
+        errors = {}
+        if self.parent_id:
+            if self.pk == self.parent_id:
+                errors["parent"] = "A section cannot be its own parent."
+            else:
+                parent = type(self).objects.filter(pk=self.parent_id).only("course_id", "parent_id").first()
+                if parent is None:
+                    errors["parent"] = "Select an existing parent section."
+                elif parent.course_id != self.course_id:
+                    errors["parent"] = "The parent must belong to the same course."
+                elif parent.parent_id:
+                    errors["parent"] = "A topic cannot contain another topic."
+            if self.pk and self.subsections.exists():
+                errors["parent"] = "A section with topics cannot become a topic."
+        if self.pk and self.subsections.exclude(course_id=self.course_id).exists():
+            errors["course"] = "All topics must belong to the same course."
+        if errors:
+            raise ValidationError(errors)
 
 
 class Lesson(models.Model):

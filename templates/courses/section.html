@@ -1,14 +1,23 @@
 {% extends "courses/base.html" %}{% load course_content %}{% block content %}
-<div class="course-breadcrumb"><a href="{% url 'course_list' %}">My courses</a><span>›</span><a href="{% url 'course_detail' course.pk %}">{{ course.title }}</a><span>›</span><span>{{ section.title }}</span></div>
+<div class="course-breadcrumb"><a href="{% url 'course_list' %}">My courses</a><span>›</span><a href="{% url 'course_detail' course.pk %}">{{ course.title }}</a><span>›</span>{% if section.parent %}<a href="{% url 'section_detail' course.pk section.parent.pk %}">{{ section.parent.title }}</a><span>›</span>{% endif %}<span>{{ section.title }}</span></div>
 {% for message in messages %}<p class="course-message">{{ message }}</p>{% endfor %}
-<header class="section-header"><span class="course-kicker">Section {{ section.position }}</span><h1>{{ section.title }}</h1>
+<header class="section-header"><span class="course-kicker">{% if section.parent %}Topic{% else %}Section {{ section.position }}{% endif %}</span><h1>{{ section.title }}</h1>
 {% if section.description %}<p>{{ section.description|linebreaksbr }}</p>{% endif %}</header>
-<div class="course-progress"><strong>{{ opened_count }} of {{ lessons|length }}</strong> lessons opened · {{ remaining_count }} remaining · {{ completed_count }} with completed practice
-{% if lessons %}<progress value="{{ opened_count }}" max="{{ lessons|length }}" aria-label="Section progress"></progress>{% endif %}</div>
+<div class="course-progress"><strong>{{ opened_count }} of {{ lesson_total }}</strong> lessons opened · {{ remaining_count }} remaining · {{ completed_count }} with completed practice
+{% if lesson_total %}<progress value="{{ opened_count }}" max="{{ lesson_total }}" aria-label="Section progress"></progress>{% endif %}</div>
+{% if subsections %}<h2>Topics</h2><div class="course-grid section-grid">
+{% for topic in subsections %}<a class="course-card" href="{% url 'section_detail' course.pk topic.pk %}">
+  <span class="section-number">Topic {{ topic.position }}</span><h2>{{ topic.title }}</h2>
+  <p>{{ topic.description|default:"Lessons and practice"|truncatechars:150 }}</p>
+  <div class="course-stats"><span><strong>{{ topic.opened_count }}</strong> of {{ topic.lesson_count }} lesson{{ topic.lesson_count|pluralize }} opened</span><span>Remaining: {{ topic.remaining_count }}</span></div>
+  {% if topic.lesson_count %}<progress value="{{ topic.opened_count }}" max="{{ topic.lesson_count }}" aria-label="Lessons opened: {{ topic.opened_count }} of {{ topic.lesson_count }}"></progress>{% endif %}
+  <div class="course-stats"><span>Practice completed: {{ topic.completed_count }}</span></div>
+  <div class="course-arrow">Open topic →</div>
+</a>{% endfor %}</div>{% endif %}
 {% if lessons %}<nav class="lesson-menu" aria-label="Section lessons">
 {% for lesson in lessons %}<a class="lesson-tab{% if lesson.is_opened %} is-opened{% endif %}{% if lesson.is_completed %} is-completed{% endif %}{% if current.pk == lesson.pk %} is-current{% endif %}" href="{% url 'lesson_detail' course.pk section.pk lesson.pk %}" title="Lesson {{ lesson.position }}: {{ lesson.title }} — {% if lesson.is_completed %}Practice completed{% elif lesson.is_opened %}Opened{% else %}Not opened{% endif %}" aria-label="Lesson {{ lesson.position }}: {{ lesson.title }} — {% if lesson.is_completed %}Practice completed{% elif lesson.is_opened %}Opened{% else %}Not opened{% endif %}"{% if current.pk == lesson.pk %} aria-current="page"{% endif %}>{{ lesson.position }}</a>{% endfor %}</nav>
 <div class="lesson-legend" aria-label="Lesson status legend"><span><i></i>Not opened</span><span><i class="is-opened"></i>Opened</span><span><i class="is-completed"></i>Practice completed</span></div>{% endif %}
-<article class="lesson-panel">
+{% if lessons %}<article class="lesson-panel">
 {% if current %}<span class="course-kicker">Lesson {{ current.position }}</span><h2>{{ current.title }}</h2>
   {% if current.content %}<div class="lesson-content">{{ current.content|render_lesson_content }}</div>{% else %}<p class="muted">Lesson content has not been added yet.</p>{% endif %}
   <div class="lesson-practice"><h3>Practice</h3>
@@ -47,5 +56,6 @@
 {% elif lessons %}<h2>Choose a lesson above</h2><p class="muted">Opened lessons turn green and section progress updates.</p>
 {% else %}<h2>No lessons yet</h2><p class="muted">The first lesson will appear here when it is added.</p>{% endif %}
 </article>
+{% elif not subsections %}<div class="course-empty">Lessons will appear here when they are added.</div>{% endif %}
 {% if has_pending %}<script>setTimeout(() => location.reload(), 4000)</script>{% endif %}
 {% endblock %}

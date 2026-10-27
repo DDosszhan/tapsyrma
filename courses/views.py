@@ -24,7 +24,7 @@ def _student(request):
 def course_list(request):
     student = _student(request)
     courses = list(Course.objects.filter(published=True, grade=student.grade).annotate(
-        section_count=Count("sections", distinct=True),
+        section_count=Count("sections", filter=Q(sections__parent__isnull=True), distinct=True),
         lesson_count=Count("sections__lessons", distinct=True),
         opened_count=Count("sections__lessons__progress", filter=Q(
             sections__lessons__progress__student=student), distinct=True),
@@ -42,14 +42,23 @@ def course_list(request):
 def course_detail(request, course_id):
     student = _student(request)
     course = get_object_or_404(Course, pk=course_id, published=True, grade=student.grade)
-    sections = list(course.sections.annotate(
-        lesson_count=Count("lessons", distinct=True),
-        opened_count=Count("lessons__progress", filter=Q(lessons__progress__student=student), distinct=True),
-        completed_count=Count("lessons__progress", filter=Q(
+    sections = list(course.sections.filter(parent__isnull=True).annotate(
+        direct_lessons=Count("lessons", distinct=True),
+        topic_lessons=Count("subsections__lessons", distinct=True),
+        direct_opened=Count("lessons__progress", filter=Q(lessons__progress__student=student), distinct=True),
+        topic_opened=Count("subsections__lessons__progress", filter=Q(
+            subsections__lessons__progress__student=student), distinct=True),
+        direct_completed=Count("lessons__progress", filter=Q(
             lessons__progress__student=student,
             lessons__progress__completed_at__isnull=False), distinct=True),
+        topic_completed=Count("subsections__lessons__progress", filter=Q(
+            subsections__lessons__progress__student=student,
+            subsections__lessons__progress__completed_at__isnull=False), distinct=True),
     ))
     for section in sections:
+        section.lesson_count = section.direct_lessons + section.topic_lessons
+        section.opened_count = section.direct_opened + section.topic_opened
+        section.completed_count = section.direct_completed + section.topic_completed
         section.remaining_count = section.lesson_count - section.opened_count
     return render(request, "courses/course.html", {"course": course, "sections": sections})
 
@@ -58,8 +67,17 @@ def course_detail(request, course_id):
 @require_GET
 def section_detail(request, course_id, section_id, lesson_id=None):
     student = _student(request)
-    section = get_object_or_404(Section.objects.select_related("course"), pk=section_id,
+    section = get_object_or_404(Section.objects.select_related("course", "parent"), pk=section_id,
         course_id=course_id, course__published=True, course__grade=student.grade)
+    subsections = list(section.subsections.annotate(
+        lesson_count=Count("lessons", distinct=True),
+        opened_count=Count("lessons__progress", filter=Q(lessons__progress__student=student), distinct=True),
+        completed_count=Count("lessons__progress", filter=Q(
+            lessons__progress__student=student,
+            lessons__progress__completed_at__isnull=False), distinct=True),
+    ))
+    for topic in subsections:
+        topic.remaining_count = topic.lesson_count - topic.opened_count
     lessons = list(section.lessons.all())
     current = next((lesson for lesson in lessons if lesson.pk == lesson_id), None)
     if lesson_id is not None:
@@ -70,8 +88,9 @@ def section_detail(request, course_id, section_id, lesson_id=None):
     for lesson in lessons:
         lesson.is_opened = lesson.pk in progress
         lesson.is_completed = lesson.is_opened and progress[lesson.pk].completed_at is not None
-    opened_count = sum(lesson.is_opened for lesson in lessons)
-    completed_count = sum(lesson.is_completed for lesson in lessons)
+    opened_count = sum(lesson.is_opened for lesson in lessons) + sum(topic.opened_count for topic in subsections)
+    completed_count = sum(lesson.is_completed for lesson in lessons) + sum(topic.completed_count for topic in subsections)
+    lesson_total = len(lessons) + sum(topic.lesson_count for topic in subsections)
     questions = list(current.questions.filter(active=True)) if current else []
     has_pending = False
     if questions:
@@ -104,8 +123,9 @@ def section_detail(request, course_id, section_id, lesson_id=None):
                                                             LessonAnswer.ExplanationStatus.GENERATING)):
                 has_pending = True
     return render(request, "courses/section.html", {"course": section.course, "section": section,
-        "lessons": lessons, "current": current, "opened_count": opened_count,
-        "completed_count": completed_count, "remaining_count": len(lessons) - opened_count,
+        "subsections": subsections, "lessons": lessons, "current": current, "opened_count": opened_count,
+        "completed_count": completed_count, "lesson_total": lesson_total,
+        "remaining_count": lesson_total - opened_count,
         "questions": questions, "has_pending": has_pending})
 
 
