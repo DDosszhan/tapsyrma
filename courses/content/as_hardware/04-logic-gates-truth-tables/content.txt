@@ -1,0 +1,45 @@
+## Can computers make decisions using only 0 and 1?
+
+Digital circuits use logic gates to combine binary inputs into outputs. A logical 0 represents FALSE; a logical 1 represents TRUE. A gate implements a rule, not a numerical calculation on decimal values.
+
+## Step 1: The six gates
+
+NOT reverses one input: NOT 0 is 1, and NOT 1 is 0. AND gives 1 only when both inputs are 1. OR gives 1 if one or both inputs are 1. NAND is NOT(AND). NOR is NOT(OR). XOR (exclusive OR) gives 1 if the two inputs are different. All listed gates except NOT are treated as two-input gates at AS level.
+
+Learn the circuit symbols as well as their names. NOT is a triangle with a small circle at its output. AND has a flat input side and a rounded output side; OR has a curved input side and a pointed output side. A small output circle added to AND makes NAND, and one added to OR makes NOR: the circle means inversion. XOR resembles OR with an extra curved line beside its inputs. Draw two input wires for each gate except NOT, which has one.
+
+[diagram:as-gates-reference]
+
+## Step 2: Build a truth table
+
+A truth table lists every possible input combination and the resulting output. For two inputs A and B, use rows 00, 01, 10 and 11 in that order. The four outputs are AND: 0,0,0,1; OR: 0,1,1,1; NAND: 1,1,1,0; NOR: 1,0,0,0; XOR: 0,1,1,0. Each output corresponds to the input row in the same position. NOT has just one input, so its complete table has two rows: input 0 gives 1, and input 1 gives 0. Three distinct binary inputs require eight rows. Work through every row consistently.
+
+[diagram:as-truthtable-example]
+
+## Step 3: Represent logic with expressions
+
+Use AND, OR and NOT explicitly in descriptions, such as X = (A AND B) OR C. Parentheses show the intended evaluation order. Gates can be drawn as circuits or described with equivalent expressions.
+
+## Worked example 1: Access to a lab
+
+A lab door opens only if the teacher key A is active AND permission B is active. The output is X = A AND B. The door opens only in the 11 row.
+
+## Worked example 2: XOR alarm
+
+A warning light activates when exactly one of two switches is on. XOR gives 1 for input rows 01 and 10, and 0 for rows 00 and 11.
+
+## Worked example 3: NOR condition
+
+A machine should run only when neither safety alarm A nor maintenance lock B is active. The rule is X = NOT(A OR B), a NOR gate. Only input row 00 produces output 1. Its circuit symbol is the OR shape with an inversion circle at the output.
+
+## Common mistakes
+
+OR includes the case where both inputs are 1; XOR does not. NAND is the inverse of AND, not another name for NOR. NOT has a single input. A complete two-input truth table must have four rows.
+
+## Quick recap
+
+Recognise all six gate symbols, including the inversion circles and XOR's extra input curve. Memorise each gate's condition for output 1, then apply it consistently to every truth-table row.
+
+## Apply your knowledge
+
+On paper, draw the six standard gate symbols with labelled input and output wires. Then make complete truth tables for NAND and NOR and describe a real-world condition that could use XOR. Check the symbols against the diagram before answering the practice questions.

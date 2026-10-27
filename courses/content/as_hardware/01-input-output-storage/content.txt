@@ -1,0 +1,45 @@
+## Why computers need more than a CPU
+
+A computer must receive data, process it, present results and often store data for later. A CPU cannot do these jobs alone. A ticket machine, for example, accepts a touchscreen selection, checks available tickets, displays a price and prints a ticket.
+
+[diagram:as-io-process]
+
+## Step 1: Input and output
+
+An input device provides data or instructions to a computer. Examples include a microphone, touchscreen and sensors. An output device communicates results to the user or environment. Examples include speakers, printers and a virtual reality headset display. A touchscreen can be both an input device (detecting touch) and an output device (displaying information).
+
+## Step 2: How important devices operate
+
+A microphone converts sound vibrations into electrical signals that can be sampled digitally. Speakers convert electrical signals into sound. A laser printer uses a laser, toner and a heated fuser to produce a printed page. A 3D printer creates an object layer by layer from a digital design.
+
+A capacitive touchscreen has a transparent sensing grid over the display. A finger changes the electrical capacitance at nearby points; the controller locates the touch and sends its coordinates as input. The display supplies visual output at the same surface. A VR headset shows slightly different images to the two eyes to create depth. Motion sensors track head movement, and the computer updates the displayed viewpoint as the wearer turns.
+
+## Step 3: Primary and secondary storage
+
+Primary memory stores data and instructions readily accessible for current processing. RAM is volatile: it loses its contents when power is removed. Secondary storage preserves files without power. A magnetic hard disk stores bits by magnetising areas on spinning platters. Flash storage (such as an SSD) stores charge electronically and has no moving mechanical disk. An optical drive directs a laser at a spinning disc and detects differences in reflected light to read stored patterns. On a recordable disc, a stronger laser alters the recording layer so those patterns can later be read. Removable storage allows files to be transported between devices.
+
+[diagram:as-storage-compare]
+
+## Step 4: Buffers prevent speed mismatches
+
+A buffer temporarily holds data while it moves between devices or processes working at different speeds. For example, a printer is slower than the computer sending it a document. Incoming print data is buffered and then processed at the printer's rate.
+
+## Worked example 1: Ticket machine
+
+A passenger selects a destination on the touchscreen. Touch detection is input. The CPU calculates the fare. The screen and printed ticket are output. Ticket data may be saved to secondary storage.
+
+## Worked example 2: Printer buffer
+
+A computer sends 12 pages quickly, but the printer can print only one page at a time. The data waits temporarily in a buffer while printing proceeds. Without suitable buffering, the sender might need to wait or data transfer could be interrupted.
+
+## Common mistakes
+
+Do not call every storage device 'RAM'. A solid-state drive is secondary storage, not SRAM. Remember that the same physical touchscreen can act as both input and output. A buffer is temporary holding space, not necessarily long-term file storage.
+
+## Quick recap
+
+Input enters, processing transforms, output communicates, and storage retains. Buffers manage differences in transfer or processing rates.
+
+## Apply your knowledge
+
+Explain how an interactive kiosk uses both input and output. Decide which device would store files with the power off. Describe when buffering is helpful.

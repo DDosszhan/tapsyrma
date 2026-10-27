@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title description">
+  <title id="title">Six AS logic-gate symbols</title>
+  <desc id="description">Standard circuit symbols for NOT, AND, OR, NAND, NOR and XOR, with input and output wires. Only NOT has one input.</desc>
+  <rect width="1200" height="760" rx="22" fill="#f8fbff"/>
+  <text x="36" y="54" font-family="Arial,sans-serif" font-size="34" font-weight="700" fill="#153357">Six AS logic-gate symbols</text>
+  <text x="36" y="86" font-family="Arial,sans-serif" font-size="20" fill="#37546f">A and B are inputs; X is the output. A small circle means inversion.</text>
+  <g transform="translate(24 120)" font-family="Arial,sans-serif">
+    <rect width="368" height="286" rx="18" fill="#fff" stroke="#b8cfe3" stroke-width="2"/>
+    <text x="24" y="42" font-size="27" font-weight="700" fill="#153357">NOT</text>
+    <g fill="none" stroke="#2563a6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M56 148 H130 M238 148 H314"/>
+      <path d="M130 106 L130 190 L218 148 Z" fill="#fff"/>
+      <circle cx="228" cy="148" r="10" fill="#fff"/>
+    </g>
+    <g font-size="21" font-weight="700" fill="#153357"><text x="29" y="155">A</text><text x="322" y="155">X</text></g>
+    <text x="24" y="258" font-size="20" fill="#37546f">X is the opposite of A</text>
+  </g>
+  <g transform="translate(416 120)" font-family="Arial,sans-serif">
+    <rect width="368" height="286" rx="18" fill="#fff" stroke="#b8cfe3" stroke-width="2"/>
+    <text x="24" y="42" font-size="27" font-weight="700" fill="#153357">AND</text>
+    <g fill="none" stroke="#2563a6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M56 126 H132 M56 170 H132 M245 148 H314"/>
+      <path d="M132 105 H185 C218 105 245 124 245 148 C245 172 218 191 185 191 H132 Z" fill="#fff"/>
+    </g>
+    <g font-size="21" font-weight="700" fill="#153357"><text x="29" y="133">A</text><text x="29" y="177">B</text><text x="322" y="155">X</text></g>
+    <text x="24" y="258" font-size="20" fill="#37546f">1 only if A and B are 1</text>
+  </g>
+  <g transform="translate(808 120)" font-family="Arial,sans-serif">
+    <rect width="368" height="286" rx="18" fill="#fff" stroke="#b8cfe3" stroke-width="2"/>
+    <text x="24" y="42" font-size="27" font-weight="700" fill="#153357">OR</text>
+    <g fill="none" stroke="#2563a6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M56 126 H145 M56 170 H145 M245 148 H314"/>
+      <path d="M132 105 Q209 105 245 148 Q209 191 132 191 Q166 148 132 105 Z" fill="#fff"/>
+    </g>
+    <g font-size="21" font-weight="700" fill="#153357"><text x="29" y="133">A</text><text x="29" y="177">B</text><text x="322" y="155">X</text></g>
+    <text x="24" y="258" font-size="20" fill="#37546f">1 if A or B is 1</text>
+  </g>
+  <g transform="translate(24 424)" font-family="Arial,sans-serif">
+    <rect width="368" height="286" rx="18" fill="#fff" stroke="#b8cfe3" stroke-width="2"/>
+    <text x="24" y="42" font-size="27" font-weight="700" fill="#153357">NAND</text>
+    <g fill="none" stroke="#2563a6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M56 126 H132 M56 170 H132 M265 148 H314"/>
+      <path d="M132 105 H185 C218 105 245 124 245 148 C245 172 218 191 185 191 H132 Z" fill="#fff"/>
+      <circle cx="255" cy="148" r="10" fill="#fff"/>
+    </g>
+    <g font-size="21" font-weight="700" fill="#153357"><text x="29" y="133">A</text><text x="29" y="177">B</text><text x="322" y="155">X</text></g>
+    <text x="24" y="258" font-size="20" fill="#37546f">Opposite of AND</text>
+  </g>
+  <g transform="translate(416 424)" font-family="Arial,sans-serif">
+    <rect width="368" height="286" rx="18" fill="#fff" stroke="#b8cfe3" stroke-width="2"/>
+    <text x="24" y="42" font-size="27" font-weight="700" fill="#153357">NOR</text>
+    <g fill="none" stroke="#2563a6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M56 126 H145 M56 170 H145 M265 148 H314"/>
+      <path d="M132 105 Q209 105 245 148 Q209 191 132 191 Q166 148 132 105 Z" fill="#fff"/>
+      <circle cx="255" cy="148" r="10" fill="#fff"/>
+    </g>
+    <g font-size="21" font-weight="700" fill="#153357"><text x="29" y="133">A</text><text x="29" y="177">B</text><text x="322" y="155">X</text></g>
+    <text x="24" y="258" font-size="20" fill="#37546f">Opposite of OR</text>
+  </g>
+  <g transform="translate(808 424)" font-family="Arial,sans-serif">
+    <rect width="368" height="286" rx="18" fill="#fff" stroke="#b8cfe3" stroke-width="2"/>
+    <text x="24" y="42" font-size="27" font-weight="700" fill="#153357">XOR</text>
+    <g fill="none" stroke="#2563a6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M56 126 H145 M56 170 H145 M245 148 H314"/>
+      <path d="M132 105 Q209 105 245 148 Q209 191 132 191 Q166 148 132 105 Z" fill="#fff"/>
+      <path d="M116 105 Q150 148 116 191"/>
+    </g>
+    <g font-size="21" font-weight="700" fill="#153357"><text x="29" y="133">A</text><text x="29" y="177">B</text><text x="322" y="155">X</text></g>
+    <text x="24" y="258" font-size="20" fill="#37546f">1 when A and B differ</text>
+  </g>
+  <text x="36" y="743" font-family="Arial,sans-serif" font-size="18" fill="#37546f">All gates except NOT have two inputs in the AS syllabus.</text>
+</svg>

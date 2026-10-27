@@ -1,0 +1,125 @@
+{
+  "course": {
+    "title": "Cambridge International AS Level Computer Science 9618 (2027–2029)",
+    "subject": "Computer Science",
+    "grade": 10
+  },
+  "section": {
+    "title": "3.2 Logic Gates and Logic Circuits",
+    "position": 2
+  },
+  "lesson": {
+    "title": "Logic Gates and Truth Tables",
+    "position": 4
+  },
+  "images": [
+    {
+      "slug": "as-gates-reference",
+      "file": "images/as-gates-reference.svg",
+      "alt": "Standard symbols for NOT, AND, OR, NAND, NOR and XOR logic gates."
+    },
+    {
+      "slug": "as-truthtable-example",
+      "file": "images/as-truthtable-example.svg",
+      "alt": "Truth-table outputs for two-input AND and OR gates."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which gate outputs 1 when two inputs are different?",
+      "option_a": "AND",
+      "option_b": "OR",
+      "option_c": "XOR",
+      "option_d": "NOR",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "What is the output of a two-input OR gate when both inputs are 1?",
+      "option_a": "0",
+      "option_b": "1",
+      "option_c": "Undefined",
+      "option_d": "Depends on clock speed",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "How many input combinations appear in a complete truth table for three binary inputs?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "8\neight",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which gate has only one input in the AS syllabus?",
+      "option_a": "NOT",
+      "option_b": "XOR",
+      "option_c": "NAND",
+      "option_d": "AND",
+      "correct_option": 1,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "For A = 1 and B = 0, determine the outputs of AND, OR and NAND, and briefly justify your answers.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "AND = 0 because both inputs are not 1. OR = 1 because one input is 1. NAND = 1 because it reverses the AND result.",
+      "grading_criterion": "1: Determine AND correctly with a reason.\n1: Determine OR correctly with a reason.\n1: Determine NAND correctly with a reason.",
+      "student_guidance": "Use the condition for AND.\nUse the condition for OR.\nConsider inversion of an earlier result."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "Explain the outputs of OR and XOR for A = 1, B = 1, then identify the symbol feature that distinguishes a NOR gate from an OR gate.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "OR outputs 1 because at least one input is 1. XOR outputs 0 because the two inputs are the same rather than different. The NOR symbol has the OR outline with a small inversion circle at its output.",
+      "grading_criterion": "1: Give the correct OR output and reason.\n1: Give the correct XOR output and reason.\n1: Identify the small inversion circle at the NOR symbol's output.",
+      "student_guidance": "Think about inclusive OR.\nThink about whether the inputs differ.\nLook for how inversion is indicated in a gate drawing."
+    }
+  ]
+}

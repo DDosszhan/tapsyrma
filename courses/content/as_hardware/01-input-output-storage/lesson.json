@@ -1,0 +1,125 @@
+{
+  "course": {
+    "title": "Cambridge International AS Level Computer Science 9618 (2027–2029)",
+    "subject": "Computer Science",
+    "grade": 10
+  },
+  "section": {
+    "title": "3.1 Computers and their components",
+    "position": 1
+  },
+  "lesson": {
+    "title": "Input, Output, Storage and Buffers",
+    "position": 1
+  },
+  "images": [
+    {
+      "slug": "as-io-process",
+      "file": "images/as-io-process.svg",
+      "alt": "Input, processing and output in an interactive computer system."
+    },
+    {
+      "slug": "as-storage-compare",
+      "file": "images/as-storage-compare.svg",
+      "alt": "Primary memory keeps active data; secondary storage retains files."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which device can function as both input and output?",
+      "option_a": "Touchscreen",
+      "option_b": "Microphone",
+      "option_c": "Speaker",
+      "option_d": "Magnetic hard disk",
+      "correct_option": 1,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which storage technology uses magnetised spinning platters?",
+      "option_a": "Flash SSD",
+      "option_b": "Magnetic hard disk",
+      "option_c": "Optical disc",
+      "option_d": "RAM",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Name the temporary storage area used when devices operate at different speeds.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "buffer\na buffer",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which statement about RAM is accurate?",
+      "option_a": "RAM retains all data with no power",
+      "option_b": "RAM is always removable",
+      "option_c": "RAM is volatile primary memory",
+      "option_d": "RAM stores data only on optical discs",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "Explain why a printer may need a buffer when receiving a large document.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "The computer can transmit data faster than the printer can output pages. A buffer temporarily stores the incoming data so the printer can retrieve it at its own rate.",
+      "grading_criterion": "1: Identify a difference in data rates between sender and printer.\n1: Explain that the buffer temporarily holds incoming data.\n1: Explain how the printer uses buffered data as it becomes ready.",
+      "student_guidance": "Compare the speeds of the two devices.\nDescribe where incoming information waits.\nDescribe how printing proceeds."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "Describe how a touchscreen ticket machine uses input, processing and output.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "The touchscreen detects the passenger selection as input. The processor determines the fare or available route. The screen shows the result or a printer produces a ticket as output.",
+      "grading_criterion": "1: Identify a suitable touchscreen input.\n1: Describe a relevant processing action.\n1: Identify a suitable output.",
+      "student_guidance": "Think of the passenger’s action.\nThink of the calculation or decision.\nThink of what the passenger receives."
+    }
+  ]
+}

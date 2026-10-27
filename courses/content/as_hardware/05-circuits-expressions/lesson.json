@@ -1,0 +1,125 @@
+{
+  "course": {
+    "title": "Cambridge International AS Level Computer Science 9618 (2027–2029)",
+    "subject": "Computer Science",
+    "grade": 10
+  },
+  "section": {
+    "title": "3.2 Logic Gates and Logic Circuits",
+    "position": 2
+  },
+  "lesson": {
+    "title": "From Problems to Logic Circuits",
+    "position": 5
+  },
+  "images": [
+    {
+      "slug": "as-circuit-chain",
+      "file": "images/as-circuit-chain.svg",
+      "alt": "A and B enter an AND gate; its output and C enter an OR gate to produce X."
+    },
+    {
+      "slug": "as-logic-conversions",
+      "file": "images/as-logic-conversions.svg",
+      "alt": "A problem, Boolean expression and truth table describe the same logic."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "For X = (A AND B) OR C, what is X when A=1, B=0, C=1?",
+      "option_a": "0",
+      "option_b": "1",
+      "option_c": "Cannot be determined",
+      "option_d": "Two outputs",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "How many rows are in a truth table with inputs A, B and C?",
+      "option_a": "3",
+      "option_b": "6",
+      "option_c": "8",
+      "option_d": "9",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "For X = (A AND B) OR C, give X when A=0, B=1, C=0.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "0\nzero",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which expression is 1 only when A=1 and B=1 and C=0?",
+      "option_a": "A OR B OR C",
+      "option_b": "(A AND B) OR C",
+      "option_c": "A XOR B XOR C",
+      "option_d": "A AND B AND (NOT C)",
+      "correct_option": 4,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "Construct the complete truth-table outputs for X = (A AND B) OR C in row order 000,001,010,011,100,101,110,111. Explain a reliable method.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "Outputs: 0,1,0,1,0,1,1,1. Use an intermediate column T = A AND B, then compute X = T OR C for each row.",
+      "grading_criterion": "1: Give the first four output values correctly: 0,1,0,1.\n1: Give the last four output values correctly: 0,1,1,1.\n1: Explain using an intermediate AND result and then OR with C.",
+      "student_guidance": "Work through input combinations beginning with A=0.\nContinue with A=1.\nThink about making a temporary column."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "A buzzer should sound if door A is open AND alarm B is armed, OR if emergency button C is pressed. Write the expression and describe the gate connections.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "X = (A AND B) OR C. Connect A and B to an AND gate, then send that result and C into an OR gate; its output drives the buzzer.",
+      "grading_criterion": "1: Write the correct Boolean expression.\n1: Describe connecting A and B to an AND gate.\n1: Describe combining that result with C using an OR gate.",
+      "student_guidance": "Translate the paired condition first.\nChoose the gate for the paired condition.\nDescribe the final combination with the emergency input."
+    }
+  ]
+}

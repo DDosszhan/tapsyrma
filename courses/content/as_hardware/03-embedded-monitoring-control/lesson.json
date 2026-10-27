@@ -1,0 +1,125 @@
+{
+  "course": {
+    "title": "Cambridge International AS Level Computer Science 9618 (2027–2029)",
+    "subject": "Computer Science",
+    "grade": 10
+  },
+  "section": {
+    "title": "3.1 Computers and their components",
+    "position": 1
+  },
+  "lesson": {
+    "title": "Embedded, Monitoring and Control Systems",
+    "position": 3
+  },
+  "images": [
+    {
+      "slug": "as-control-loop",
+      "file": "images/as-control-loop.svg",
+      "alt": "Temperature sensor, controller and heater or fan in a feedback loop."
+    },
+    {
+      "slug": "as-monitor-vs-control",
+      "file": "images/as-monitor-vs-control.svg",
+      "alt": "Monitoring reports measurements; control also triggers an action."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which is the best example of an embedded system?",
+      "option_a": "A general-purpose desktop PC",
+      "option_b": "The controller inside a washing machine",
+      "option_c": "A cloud storage account",
+      "option_d": "A removable hard disk",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "What is the main role of an actuator?",
+      "option_a": "Record a temperature",
+      "option_b": "Store files permanently",
+      "option_c": "Carry out a physical action",
+      "option_d": "Convert an image to text",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "Which component detects a physical condition such as temperature?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "sensor\na sensor\ntemperature sensor\na temperature sensor",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "A system only logs air pressure and emails warnings. It is primarily a:",
+      "option_a": "Control system",
+      "option_b": "Monitoring system",
+      "option_c": "Compiler",
+      "option_d": "Database server",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "Explain how feedback is used by an automatic greenhouse fan.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "A temperature sensor repeatedly measures the greenhouse temperature. The controller compares the reading with a target. It turns the fan on or off through an actuator and uses later sensor readings to check and adjust its decision.",
+      "grading_criterion": "1: Describe repeated sensing of temperature.\n1: Describe comparison with a target or threshold.\n1: Describe action and adjustment based on subsequent readings.",
+      "student_guidance": "Describe the measurement.\nDescribe the decision rule.\nDescribe what happens after action is taken."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "Explain why a smart thermostat is considered an embedded system and give one possible disadvantage.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "It is a computer integrated into a thermostat to perform a specific temperature-control function. A possible disadvantage is limited upgradeability or specialised repair needs.",
+      "grading_criterion": "1: Explain that computing is built into a larger device.\n1: Identify its dedicated control task.\n1: Give a plausible limitation of an embedded system.",
+      "student_guidance": "Consider where the computer is located.\nName the primary task.\nThink about upgrades or repairs."
+    }
+  ]
+}

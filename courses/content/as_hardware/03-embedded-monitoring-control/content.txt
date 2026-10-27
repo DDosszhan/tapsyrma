@@ -1,0 +1,39 @@
+## What makes a smart device smart?
+
+A washing machine, thermostat or alarm may contain a computer dedicated to a particular function. The embedded computer often works with sensors and other hardware automatically.
+
+## Step 1: Embedded systems
+
+An embedded system is a computer system integrated into a larger device and designed for a specific task or limited set of tasks. It can be efficient, inexpensive to mass-produce and reliable for its purpose. Possible drawbacks include limited upgradeability and difficulty repairing specialised components.
+
+## Step 2: Sensors and actuators
+
+A sensor measures a physical condition and produces data. Examples include temperature sensors, pressure sensors, infrared sensors and sound sensors. An actuator receives an electrical control signal and causes a physical action, such as moving a motor, opening a valve or switching a heater.
+
+[diagram:as-control-loop]
+
+## Step 3: Monitoring versus control
+
+A monitoring system records, displays or alerts about conditions but does not necessarily change them. A control system uses data to take action through an actuator. In a feedback control system, a sensor checks the effect of an action so the controller can adjust its response.
+
+[diagram:as-monitor-vs-control]
+
+## Worked example 1: Greenhouse monitoring
+
+A temperature sensor measures 31°C. The system logs the value and sends an alert. It has monitored temperature; without automatically operating a fan or vent, this example is not a temperature control system.
+
+## Worked example 2: Automatic heating
+
+A thermostat has a target of 22°C. The sensor reports 19°C. The controller activates a heater. Later, the temperature reaches the target and the controller switches the heater off. Repeated measurement provides feedback.
+
+## Common mistakes
+
+A sensor does not directly cool the room: it provides a measurement. An actuator performs an action. Do not assume that every system with a sensor is a control system. A general-purpose laptop is not usually described as an embedded system.
+
+## Quick recap
+
+Embedded systems are designed for dedicated functions. Sensors detect conditions, actuators act, monitoring reports and feedback control adjusts actions based on new measurements.
+
+## Apply your knowledge
+
+Design an automatic fan for a classroom. Identify a sensor, actuator, decision rule and feedback step.

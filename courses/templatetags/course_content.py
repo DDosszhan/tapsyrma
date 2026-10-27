@@ -40,6 +40,22 @@ DIAGRAMS.update({
     }.items()
 })
 
+DIAGRAMS.update({
+    slug: (alt, f"courses/diagrams/as_hardware/{slug}.svg")
+    for slug, alt in {
+        "as-io-process": "Input, processing and output in an interactive computer system.",
+        "as-storage-compare": "Primary memory keeps active data; secondary storage retains files.",
+        "as-memory-family": "RAM, SRAM, DRAM and ROM roles in a computer.",
+        "as-rom-types": "PROM, EPROM and EEPROM programming and erasure methods.",
+        "as-control-loop": "Temperature sensor, controller and heater or fan in a feedback loop.",
+        "as-monitor-vs-control": "Monitoring reports measurements; control also triggers an action.",
+        "as-gates-reference": "Standard symbols for NOT, AND, OR, NAND, NOR and XOR logic gates.",
+        "as-truthtable-example": "Truth-table outputs for two-input AND and OR gates.",
+        "as-circuit-chain": "A and B enter an AND gate; its output and C enter an OR gate to produce X.",
+        "as-logic-conversions": "A problem, Boolean expression and truth table describe the same logic.",
+    }.items()
+})
+
 
 @register.filter
 def render_lesson_content(value):

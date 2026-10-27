@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title description">
+  <title id="title">Logic circuit for X = (A AND B) OR C</title>
+  <desc id="description">A and B feed a two-input AND gate. Its output and C feed a two-input OR gate. The OR output is X.</desc>
+  <rect width="1200" height="500" rx="22" fill="#f8fbff"/>
+  <text x="36" y="57" font-family="Arial,sans-serif" font-size="34" font-weight="700" fill="#153357">From expression to circuit</text>
+  <text x="36" y="95" font-family="Arial,sans-serif" font-size="25" fill="#37546f">X = (A AND B) OR C</text>
+  <g fill="none" stroke="#2563a6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M100 190 H330 M100 290 H330"/>
+    <path d="M330 160 H395 C452 160 500 195 500 240 C500 285 452 320 395 320 H330 Z" fill="#fff"/>
+    <path d="M500 240 H700 V265 H810"/>
+    <path d="M100 345 H810"/>
+    <path d="M790 210 Q905 210 985 300 Q905 390 790 390 Q830 300 790 210 Z" fill="#fff"/>
+    <path d="M985 300 H1110"/>
+  </g>
+  <g font-family="Arial,sans-serif" font-size="28" font-weight="700" fill="#153357">
+    <text x="56" y="199">A</text>
+    <text x="56" y="299">B</text>
+    <text x="56" y="354">C</text>
+    <text x="1120" y="309">X</text>
+  </g>
+  <text x="570" y="220" font-family="Arial,sans-serif" font-size="20" fill="#37546f">T = A AND B</text>
+  <text x="376" y="374" font-family="Arial,sans-serif" font-size="23" font-weight="700" fill="#153357">AND</text>
+  <text x="861" y="443" font-family="Arial,sans-serif" font-size="23" font-weight="700" fill="#153357">OR</text>
+  <text x="36" y="470" font-family="Arial,sans-serif" font-size="20" fill="#37546f">The AND result T and input C are the OR gate's two inputs.</text>
+</svg>

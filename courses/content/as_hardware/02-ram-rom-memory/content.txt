@@ -1,0 +1,39 @@
+## Why memory types matter
+
+Different computer tasks need memory with different speed, cost, capacity and ability to retain information without power. A processor cache and stored firmware are not interchangeable.
+
+## Step 1: RAM versus ROM
+
+Random Access Memory (RAM) is normally volatile, writable working memory used for instructions and data while programs run. Read Only Memory (ROM) is non-volatile and traditionally stores firmware or instructions that should remain available after power loss. 'Read only' describes its usual role; some ROM-family technologies can be reprogrammed using special methods.
+
+[diagram:as-memory-family]
+
+## Step 2: SRAM versus DRAM
+
+Static RAM (SRAM) retains bits while powered without periodic refresh and is fast but relatively expensive and less dense. It is commonly used for CPU cache. Dynamic RAM (DRAM) stores bits using tiny capacitors. The charge leaks, so memory must be refreshed periodically. DRAM is cheaper per bit and typically used for main memory.
+
+## Step 3: PROM, EPROM and EEPROM
+
+Programmable ROM (PROM) can be programmed once. Erasable Programmable ROM (EPROM) can be erased with ultraviolet light and then reprogrammed. Electrically Erasable Programmable ROM (EEPROM) can be erased and reprogrammed electrically, commonly without removing the chip. Flash is a form of electrically erasable non-volatile memory, usually erased in blocks.
+
+[diagram:as-rom-types]
+
+## Worked example 1: Choosing cache memory
+
+A CPU needs very fast memory for frequently used data. SRAM is an appropriate choice because it has low latency and does not require refresh. A large main-memory capacity is more economically provided by DRAM.
+
+## Worked example 2: Saving device firmware
+
+A device must retain its start-up instructions after power loss. A non-volatile ROM-family technology, such as EEPROM or flash, is suitable because stored instructions survive when power is switched off.
+
+## Common mistakes
+
+SRAM is still volatile. 'Static' does not mean it retains data without electricity. DRAM refresh is not the same as reloading a program. EEPROM erasure is electrical, while EPROM erasure traditionally uses UV light.
+
+## Quick recap
+
+RAM is working memory and normally volatile. SRAM is fast and suited to cache; DRAM is dense and suited to main memory. PROM is programmed once, EPROM is UV-erasable, and EEPROM is electrically erasable.
+
+## Apply your knowledge
+
+Select memory for a CPU cache, main RAM and retained device configuration. Explain each choice.

@@ -1,0 +1,125 @@
+{
+  "course": {
+    "title": "Cambridge International AS Level Computer Science 9618 (2027–2029)",
+    "subject": "Computer Science",
+    "grade": 10
+  },
+  "section": {
+    "title": "3.1 Computers and their components",
+    "position": 1
+  },
+  "lesson": {
+    "title": "RAM, ROM and Memory Technologies",
+    "position": 2
+  },
+  "images": [
+    {
+      "slug": "as-memory-family",
+      "file": "images/as-memory-family.svg",
+      "alt": "RAM, SRAM, DRAM and ROM roles in a computer."
+    },
+    {
+      "slug": "as-rom-types",
+      "file": "images/as-rom-types.svg",
+      "alt": "PROM, EPROM and EEPROM programming and erasure methods."
+    }
+  ],
+  "questions": [
+    {
+      "position": 1,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which memory is most commonly used for a CPU cache?",
+      "option_a": "EPROM",
+      "option_b": "DRAM",
+      "option_c": "SRAM",
+      "option_d": "Magnetic disk",
+      "correct_option": 3,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 2,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Why does DRAM require refresh?",
+      "option_a": "Its capacitors lose charge over time",
+      "option_b": "It uses ultraviolet light",
+      "option_c": "It cannot be written",
+      "option_d": "It is optical storage",
+      "correct_option": 1,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 3,
+      "active": true,
+      "kind": "short",
+      "points": 1,
+      "prompt": "What does EEPROM stand for?",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "Electrically Erasable Programmable Read Only Memory\nElectrically Erasable Programmable Read-Only Memory",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 4,
+      "active": true,
+      "kind": "mcq",
+      "points": 1,
+      "prompt": "Which memory can normally be programmed only once?",
+      "option_a": "EEPROM",
+      "option_b": "PROM",
+      "option_c": "DRAM",
+      "option_d": "SRAM",
+      "correct_option": 2,
+      "accepted_answers": "",
+      "model_answer": "",
+      "grading_criterion": "",
+      "student_guidance": ""
+    },
+    {
+      "position": 5,
+      "active": true,
+      "kind": "open",
+      "points": 2,
+      "prompt": "Explain two reasons why SRAM is usually chosen for CPU cache instead of DRAM.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "SRAM provides very fast access, which suits a CPU cache, and it does not require periodic refreshing while powered.",
+      "grading_criterion": "1: State that SRAM provides fast access suitable for cache.\n1: State that SRAM does not need periodic refresh while powered.",
+      "student_guidance": "Consider access speed.\nConsider refresh operations."
+    },
+    {
+      "position": 6,
+      "active": true,
+      "kind": "open",
+      "points": 3,
+      "prompt": "A thermostat must keep its configuration after a power cut. Identify a suitable memory technology and explain why it is appropriate.",
+      "option_a": "",
+      "option_b": "",
+      "option_c": "",
+      "option_d": "",
+      "correct_option": null,
+      "accepted_answers": "",
+      "model_answer": "EEPROM is suitable because it is non-volatile and can be rewritten electrically when configuration settings change.",
+      "grading_criterion": "1: Identify a suitable non-volatile programmable memory, such as EEPROM or flash.\n1: Explain that stored data remains after power is lost.\n1: Explain that configuration can be updated when required.",
+      "student_guidance": "Think of a memory that survives power loss.\nDescribe what happens during a blackout.\nConsider whether settings may change later."
+    }
+  ]
+}
