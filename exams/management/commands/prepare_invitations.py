@@ -40,6 +40,38 @@ class Command(BaseCommand):
 
             claim = [invitation.generation_started_at]
 
+            if invitation.exam.mode == Exam.Mode.FIXED:
+                try:
+                    with transaction.atomic():
+                        locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
+                        if (locked.variant_status != Invitation.VariantStatus.GENERATING
+                                or locked.generation_started_at != claim[0]):
+                            raise ValidationError("Another process is already preparing this question set.")
+                        source = list(Question.objects.filter(exam=locked.exam, invitation__isnull=True).order_by("slot"))
+                        if (len(source) != locked.exam.question_count
+                                or [q.slot for q in source] != list(range(1, locked.exam.question_count + 1))
+                                or sum(q.points for q in source) != locked.exam.total_points):
+                            raise ValidationError("The uploaded question set does not match the exam totals.")
+                        if locked.questions.exists():
+                            raise ValidationError("This invitation already has a question set.")
+                        fields = ("slot", "kind", "points", "subtopic", "stem", "options", "correct_option",
+                                  "rubric", "model_answer", "subtopic_explanation", "answer_explanation", "image",
+                                  "grading_mode", "requires_image")
+                        Question.objects.bulk_create([
+                            Question(exam=locked.exam, invitation=locked,
+                                     **{field: getattr(q, field) for field in fields}) for q in source
+                        ])
+                        locked.variant_status = Invitation.VariantStatus.READY
+                        locked.generation_error = ""
+                        locked.save(update_fields=["variant_status", "generation_error"])
+                except Exception as exc:
+                    Invitation.objects.filter(pk=invitation.pk, variant_status=Invitation.VariantStatus.GENERATING).update(
+                        variant_status=Invitation.VariantStatus.ERROR, generation_error=str(exc)[:500])
+                    self.stderr.write(f"Could not prepare the question set for code {invitation.pk}: {type(exc).__name__}")
+                if options["once"]:
+                    return
+                continue
+
             def persist(question):
                 with transaction.atomic():
                     # ponytail: one exam lock serializes whole-variant uniqueness checks.

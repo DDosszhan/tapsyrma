@@ -7,19 +7,24 @@
 .result-layout .question{margin-top:0}
 .result-layout .question-map{top:24px}
 .question-stem{white-space:pre-wrap}
+.question-image{display:block;max-width:100%;height:auto;margin:0 0 16px}
 </style>{% endblock %}
 {% block content %}
 <h1>Result: {{ exam.title }}</h1>
+{% if exam.mode == "fixed" and not exam.answers_released %}
+<p>Your answers have been submitted. Results and marking details will appear after the teacher closes the assessment.</p>
+{% else %}
 {% if visibility_count %}<p class="muted">The exam page was hidden {{ visibility_count }} time(s). {% if exam.grade == 0 %}The exam administrator{% else %}Your teacher{% endif %} can see when this happened.</p>{% endif %}
 {% if attempt.status == "done" %}
 <p class="score">{% if pending_review_count %}Provisional score: {% endif %}{{ attempt.score }} / {{ exam.total_points }} points</p>
 {% if pending_review_count %}<p>Questions awaiting {% if exam.grade == 0 %}manual{% else %}teacher{% endif %} review: {{ pending_review_count }}. The displayed score may change.</p>{% endif %}
-<p class="muted">Open responses were graded by AI against saved criteria. {% if exam.grade == 0 %}An examiner can review your work and adjust the score.{% else %}Your teacher can review your work and decide the EduPage grade.{% endif %}</p>
+<p class="muted">Open responses were graded by AI or sent for teacher review. {% if exam.grade == 0 %}An examiner can review your work and adjust the score.{% else %}Your teacher can review your work and decide the EduPage grade.{% endif %}</p>
 {% elif attempt.status == "error" %}<p>Automatic grading failed. {% if exam.grade == 0 %}The exam administrator{% else %}Your teacher{% endif %} can see your work and retry grading.</p>
 {% else %}<p>Your answers were submitted and saved. Grading is in progress.</p><script>setTimeout(()=>location.reload(),5000)</script>{% endif %}
 <div class="exam-layout result-layout"><div class="exam-questions">
 {% for item in items %}<section class="question" id="question-{{ item.question.pk }}">{% if item.auto_pending %}<span class="points">Awaiting {% if exam.grade == 0 %}review{% else %}teacher{% endif %}</span>{% elif item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
 <h2>Question {{ forloop.counter }}</h2><p class="question-stem">{{ item.question.stem }}</p>
+{% if item.question.image %}<img class="question-image" src="{% url 'exam_question_image' item.question.id %}" alt="Diagram for question {{ forloop.counter }}">{% endif %}
 <p><strong>Your answer:</strong> {% if item.question.kind == "mcq" %}{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}{% else %}{{ item.answer|default:"No answer given"|linebreaksbr }}{% endif %}</p>
 {% if item.grade %}<p><strong>Grading:</strong> {{ item.grade.explanation }}</p>{% endif %}
 {% if item.appeal %}<p><strong>Appeal:</strong> {{ item.appeal.get_status_display }}.{% if item.appeal.reviewed_at %} {{ item.appeal.teacher_note }}{% endif %}</p>
@@ -33,4 +38,5 @@
 </div><aside class="question-map" aria-label="Result map"><h2>Result map</h2><p>Select a number to jump to a question.</p>
 <div class="question-grid">{% for item in items %}<a href="#question-{{ item.question.pk }}" class="{{ item.map_status }}" aria-label="Question {{ forloop.counter }}, {{ item.map_label }}">{{ forloop.counter }}</a>{% endfor %}</div>
 <div class="map-legend"><span><i class="correct"></i>Full marks</span><span><i class="wrong"></i>Points lost</span><span><i class="review"></i>Awaiting teacher</span><span><i></i>Not graded</span></div></aside></div>
+{% endif %}
 {% endblock %}

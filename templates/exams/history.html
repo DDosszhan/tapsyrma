@@ -4,7 +4,7 @@
 {% for attempt in attempts %}<li>
   <a href="{% url 'exam_result_history' attempt.pk %}">{{ attempt.invitation.exam.title }}</a>
   · {{ attempt.started_at|date:"d.m.Y H:i" }} · {{ attempt.get_status_display }}
-  {% if attempt.status == "done" and attempt.score is not None %} · {% if attempt.pending_review_count %}Provisional score: {% endif %}{{ attempt.score }} / {{ attempt.invitation.exam.total_points }} points{% endif %}
+  {% if attempt.status == "done" and attempt.score is not None %}{% if attempt.invitation.exam.mode != "fixed" or attempt.invitation.exam.answers_released %} · {% if attempt.pending_review_count %}Provisional score: {% endif %}{{ attempt.score }} / {{ attempt.invitation.exam.total_points }} points{% endif %}{% endif %}
 </li>{% endfor %}
 </ul>{% else %}<p>You have no exam attempts yet.</p>{% endif %}
 {% endblock %}

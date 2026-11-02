@@ -10,15 +10,18 @@ from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from django.db.models import Q
 from django.forms.models import BaseInlineFormSet
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html_join
+from django.utils.html import format_html, format_html_join
 from .ai import blueprint
+from .fixed_questions import (XLSX_COLUMNS, normalize_question, read_fixed_questions,
+                              validate_question_image, validate_question_set, validate_stored_questions)
 from .models import Attempt, AttemptVisibilityEvent, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, SharedCode, Student
 from .student_import import read_student_emails
 from .syllabus import extract_syllabus_text, validate_syllabus_file
@@ -51,9 +54,19 @@ class ExamAdminForm(forms.ModelForm):
         model = Exam
         fields = "__all__"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "mode" in self.fields:
+            self.fields["mode"].required = False
+        for name in ("question_count", "total_points"):
+            if name in self.fields:
+                self.fields[name].required = False
+
     def clean(self):
         cleaned = super().clean()
-        upload = self.files.get("syllabus_file")
+        mode = cleaned.get("mode") or self.instance.mode
+        cleaned["mode"] = mode
+        upload = self.files.get("syllabus_file") if mode == Exam.Mode.GENERATED else None
         if upload:
             try:
                 validate_syllabus_file(upload)
@@ -63,14 +76,33 @@ class ExamAdminForm(forms.ModelForm):
                     cleaned["syllabus_text"] = extract_syllabus_text(upload)
             except ValidationError as exc:
                 self.add_error("syllabus_file", exc)
-        if cleaned.get("auto_structure") and cleaned.get("question_count") is not None and cleaned.get("total_points") is not None:
+        if mode == Exam.Mode.FIXED:
+            if not self.instance.pk:
+                cleaned["question_count"] = 0
+                cleaned["total_points"] = Decimal("0")
+            if cleaned.get("published") and self.instance.pk:
+                try:
+                    _, count, points = validate_stored_questions(self.instance)
+                    self.instance.question_count = count
+                    self.instance.total_points = Decimal(points)
+                    if "question_count" in self.fields:
+                        cleaned["question_count"] = count
+                    if "total_points" in self.fields:
+                        cleaned["total_points"] = Decimal(points)
+                except ValidationError as exc:
+                    self.add_error("published", exc)
+        elif cleaned.get("auto_structure") and cleaned.get("question_count") is not None and cleaned.get("total_points") is not None:
             try:
                 automatic_rules(cleaned["question_count"], cleaned["total_points"])
             except ValidationError as exc:
                 self.add_error("total_points", exc)
+        if mode == Exam.Mode.GENERATED:
+            for name in ("question_count", "total_points"):
+                if cleaned.get(name) is None and name in self.fields:
+                    self.add_error(name, "This field is required for generated exams.")
         if cleaned.get("published") and not self.instance.pk:
-            self.add_error("published", "Save the exam and its question structure first.")
-        if cleaned.get("published") and self.instance.pk:
+            self.add_error("published", "Save the exam and its questions first.")
+        if mode == Exam.Mode.GENERATED and cleaned.get("published") and self.instance.pk:
             try:
                 blueprint(self.instance)
             except ValidationError as exc:
@@ -112,20 +144,141 @@ class QuestionRuleInline(admin.TabularInline):
     verbose_name_plural = "Question types — delete a row to exclude a type"
 
 
+class FixedQuestionForm(forms.ModelForm):
+    option_1 = forms.CharField(label="Option 1", required=False)
+    option_2 = forms.CharField(label="Option 2", required=False)
+    option_3 = forms.CharField(label="Option 3", required=False)
+    option_4 = forms.CharField(label="Option 4", required=False)
+    correct_option_number = forms.CharField(label="Correct option (1–4 or A–D)", required=False)
+    criteria_text = forms.CharField(
+        label="Criteria", required=False, widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="Optional for open answers. One per line, e.g. '1: Correct method'.")
+
+    class Meta:
+        model = Question
+        fields = ["slot", "kind", "grading_mode", "points", "subtopic", "stem", "image", "requires_image",
+                  "model_answer", "subtopic_explanation", "answer_explanation"]
+        widgets = {"stem": forms.Textarea(attrs={"rows": 4}),
+                   "model_answer": forms.Textarea(attrs={"rows": 2}),
+                   "subtopic_explanation": forms.Textarea(attrs={"rows": 2}),
+                   "answer_explanation": forms.Textarea(attrs={"rows": 2})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            for number, option in enumerate(self.instance.options[:4], 1):
+                self.fields[f"option_{number}"].initial = option
+            if self.instance.kind == "mcq" and self.instance.correct_option is not None:
+                self.fields["correct_option_number"].initial = self.instance.correct_option + 1
+            self.fields["criteria_text"].initial = "\n".join(
+                f"{row['points']}: {row['criterion']}" for row in self.instance.rubric)
+
+    def clean_image(self):
+        image = self.cleaned_data.get("image")
+        if isinstance(image, UploadedFile):
+            validate_question_image(image)
+        return image
+
+    def clean(self):
+        cleaned = super().clean()
+        if any(name not in cleaned for name in ("slot", "kind", "grading_mode", "points", "stem")):
+            return cleaned
+        try:
+            row = normalize_question({
+                "slot": cleaned["slot"], "kind": cleaned["kind"],
+                "grading_mode": cleaned["grading_mode"], "points": cleaned["points"],
+                "subtopic": cleaned.get("subtopic"), "stem": cleaned["stem"],
+                "options": [cleaned.get(f"option_{number}") for number in range(1, 5)],
+                "correct_option_number": cleaned.get("correct_option_number"),
+                "rubric": cleaned.get("criteria_text"), "model_answer": cleaned.get("model_answer"),
+                "subtopic_explanation": cleaned.get("subtopic_explanation"),
+                "answer_explanation": cleaned.get("answer_explanation"),
+                "requires_image": cleaned.get("requires_image"),
+            }, reference=f"Question {cleaned['slot']}")
+        except ValidationError as exc:
+            raise ValidationError(exc.messages) from exc
+        self.instance.options = row["options"]
+        self.instance.correct_option = row["correct_option"]
+        self.instance.rubric = row["rubric"]
+        self.instance.requires_image = row["requires_image"]
+        cleaned["model_answer"] = row["model_answer"]
+        cleaned["_fixed"] = row
+        return cleaned
+
+
+class FixedQuestionFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(form.errors for form in self.forms):
+            return
+        rows = [form.cleaned_data["_fixed"] for form in self.forms
+                if form.cleaned_data and not form.cleaned_data.get("DELETE")]
+        _, count, points = validate_question_set(rows, require_questions=self.instance.published)
+        if self.instance.published:
+            for form in self.forms:
+                if form.cleaned_data and not form.cleaned_data.get("DELETE"):
+                    if form.cleaned_data["_fixed"]["requires_image"] and not form.cleaned_data.get("image"):
+                        raise ValidationError(f"Question {form.cleaned_data['_fixed']['slot']} needs its image before publishing.")
+        self.instance.question_count = count
+        self.instance.total_points = Decimal(points)
+
+
+class FixedQuestionInline(admin.StackedInline):
+    model = Question
+    form = FixedQuestionForm
+    formset = FixedQuestionFormSet
+    extra = 1
+    fields = [("slot", "kind", "grading_mode", "points"), "subtopic", "stem", ("image", "requires_image"),
+              ("option_1", "option_2"), ("option_3", "option_4"), "correct_option_number",
+              "criteria_text", "model_answer", "subtopic_explanation", "answer_explanation"]
+    verbose_name = "Fixed question"
+    verbose_name_plural = "Fixed questions — exactly the same wording for every student"
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(invitation__isnull=True)
+
+
+class FixedQuestionUploadForm(forms.Form):
+    file = forms.FileField(label="Question file", help_text="XLSX, TXT, PDF or DOCX; up to 10 MB.")
+
+
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
     form = ExamAdminForm
-    inlines = [QuestionRuleInline]
-    list_display = ["title", "subject", "grade", "question_count", "duration_minutes", "total_points", "published", "created_at"]
-    list_filter = ["grade", "subject"]
+    inlines = [QuestionRuleInline, FixedQuestionInline]
+    list_display = ["title", "subject", "grade", "mode", "question_count", "duration_minutes", "total_points", "published", "created_at"]
+    list_filter = ["grade", "mode", "subject"]
     search_fields = ["title", "subject", "syllabus_text"]
-    readonly_fields = ["created_by", "created_at", "updated_at"]
+    readonly_fields = ["created_by", "created_at", "updated_at", "upload_questions_link"]
     fieldsets = [
-        ("Exam", {"fields": ["title", "subject", "grade"]}),
+        ("Exam", {"fields": ["title", "subject", "grade", "mode"]}),
         ("Syllabus", {"fields": ["syllabus_file", "syllabus_text"], "description": "Upload a TXT, PDF or DOCX file, or paste the text. Check the extracted text after saving."}),
         ("Structure", {"fields": ["question_count", "total_points", "duration_minutes", "auto_structure", "published"], "description": "Automatic: about 25% MCQ and the rest open response; points are allocated to match your totals. To customize, clear the checkbox and edit the question types below."}),
+        ("Upload fixed questions", {"fields": ["upload_questions_link"], "description": "Save a fixed exam draft, then upload a file or enter questions below."}),
         ("History", {"fields": ["created_by", "created_at", "updated_at"], "classes": ["collapse"]}),
     ]
+
+    def get_fieldsets(self, request, obj=None):
+        if obj and obj.mode == Exam.Mode.FIXED:
+            return [
+                ("Exam", {"fields": ["title", "subject", "grade", "mode"]}),
+                ("Fixed questions", {"fields": ["question_count", "total_points", "duration_minutes",
+                                                  "published", "answers_released", "upload_questions_link"],
+                                     "description": "Enter questions below or replace the full set from a file. Save the questions before publishing."}),
+                ("History", {"fields": ["created_by", "created_at", "updated_at"], "classes": ["collapse"]}),
+            ]
+        return super().get_fieldsets(request, obj)
+
+    @admin.display(description="Import questions")
+    def upload_questions_link(self, obj):
+        if not obj or not obj.pk:
+            return "Save the fixed exam draft first."
+        if obj.mode != Exam.Mode.FIXED:
+            return "Available for fixed exams."
+        if obj.published or obj.invitation_set.exists():
+            return "Questions are locked after publication or code issue."
+        url = reverse("admin:exams_exam_upload_questions", args=[obj.pk])
+        return format_html('<a href="{}">Upload XLSX, TXT, PDF or DOCX</a>', url)
 
     def has_module_permission(self, request):
         return request.user.is_superuser
@@ -149,7 +302,12 @@ class ExamAdmin(admin.ModelAdmin):
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
-        if form.instance.auto_structure:
+        if form.instance.mode == Exam.Mode.FIXED:
+            points = list(form.instance.questions.filter(invitation__isnull=True).values_list("points", flat=True))
+            form.instance.question_count = len(points)
+            form.instance.total_points = Decimal(sum(points))
+            form.instance.save(update_fields=["question_count", "total_points"])
+        elif form.instance.auto_structure:
             form.instance.question_rules.all().delete()
             ExamQuestionRule.objects.bulk_create([
                 ExamQuestionRule(exam=form.instance, kind=kind, count=count, points_each=points)
@@ -158,17 +316,81 @@ class ExamAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         base = list(self.readonly_fields)
+        if obj:
+            base.append("mode")
+        if obj and obj.mode == Exam.Mode.FIXED:
+            base += ["question_count", "total_points"]
         if obj and (obj.published or obj.questions.exists() or obj.invitation_set.exists()):
             base += ["subject", "grade", "syllabus_file", "syllabus_text", "question_count", "total_points", "auto_structure"]
         return base
 
     def get_inline_instances(self, request, obj=None):
         instances = super().get_inline_instances(request, obj)
-        if (request.method == "POST" and request.POST.get("auto_structure") == "on") or (
-            obj and (obj.published or obj.questions.exists() or obj.invitation_set.exists())
-        ):
+        mode = obj.mode if obj else (request.POST.get("mode") or Exam.Mode.GENERATED if request.method == "POST" else None)
+        if obj and (obj.published or obj.invitation_set.exists()):
             return []
+        if mode == Exam.Mode.FIXED:
+            return [inline for inline in instances if isinstance(inline, FixedQuestionInline)]
+        if mode == Exam.Mode.GENERATED:
+            if (request.method == "POST" and request.POST.get("auto_structure") == "on") or (
+                obj and obj.questions.exists()
+            ):
+                return []
+            return [inline for inline in instances if isinstance(inline, QuestionRuleInline)]
         return instances
+
+    def get_urls(self):
+        custom = [
+            path("question-template/", self.admin_site.admin_view(self.question_template_view),
+                 name="exams_exam_question_template"),
+            path("<int:object_id>/upload-questions/", self.admin_site.admin_view(self.upload_questions_view),
+                 name="exams_exam_upload_questions"),
+        ]
+        return custom + super().get_urls()
+
+    def question_template_view(self, request):
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+        from openpyxl import Workbook
+        from io import BytesIO
+
+        book = Workbook()
+        book.active.title = "Questions"
+        book.active.append(XLSX_COLUMNS)
+        output = BytesIO()
+        book.save(output)
+        response = HttpResponse(output.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = 'attachment; filename="fixed_exam_questions.xlsx"'
+        return response
+
+    def upload_questions_view(self, request, object_id):
+        exam = self.get_object(request, object_id)
+        if not exam or not self.has_change_permission(request, exam):
+            raise PermissionDenied
+        if exam.mode != Exam.Mode.FIXED or exam.published or exam.invitation_set.exists():
+            raise PermissionDenied("Only a fixed exam draft without issued codes can be replaced.")
+        form = FixedQuestionUploadForm(request.POST or None, request.FILES or None)
+        if request.method == "POST" and form.is_valid():
+            try:
+                rows = read_fixed_questions(form.cleaned_data["file"])
+                with transaction.atomic():
+                    locked = Exam.objects.select_for_update().get(pk=exam.pk)
+                    if locked.mode != Exam.Mode.FIXED or locked.published or locked.invitation_set.exists():
+                        raise ValidationError("This exam was published or a code was issued during upload.")
+                    locked.questions.filter(invitation__isnull=True).delete()
+                    Question.objects.bulk_create([Question(exam=locked, **row) for row in rows])
+                    locked.question_count = len(rows)
+                    locked.total_points = sum(row["points"] for row in rows)
+                    locked.save(update_fields=["question_count", "total_points"])
+            except ValidationError as exc:
+                form.add_error("file", exc)
+            else:
+                self.message_user(request, f"Imported {len(rows)} questions. Review them before publishing.")
+                return HttpResponseRedirect(reverse("admin:exams_exam_change", args=[exam.pk]))
+        context = {**self.admin_site.each_context(request), "title": f"Import questions: {exam.title}",
+                   "opts": self.model._meta, "exam": exam, "form": form,
+                   "template_url": reverse("admin:exams_exam_question_template")}
+        return render(request, "admin/exams/exam/upload_questions.html", context)
 
     class Media:
         js = ("exams/exam_admin_v2.js",)

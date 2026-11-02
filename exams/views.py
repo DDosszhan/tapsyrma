@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import mimetypes
 import secrets
 from uuid import UUID
 from datetime import timedelta
@@ -9,7 +10,7 @@ from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import Http404, HttpResponseBadRequest, JsonResponse
+from django.http import FileResponse, Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -94,6 +95,27 @@ def _questions(attempt):
     if len(by_id) != len(attempt.question_ids):
         raise Http404
     return [by_id[pk] for pk in attempt.question_ids]
+
+
+@login_required
+def question_image(request, question_id):
+    question = get_object_or_404(Question.objects.select_related("invitation__student"), pk=question_id)
+    if not question.image:
+        raise Http404
+    if not request.user.is_superuser:
+        if not question.invitation_id or question.invitation.student.user_id != request.user.pk:
+            raise Http404
+        attempt = Attempt.objects.filter(invitation_id=question.invitation_id).first()
+        if not attempt or question.pk not in attempt.question_ids:
+            raise Http404
+    try:
+        stored_file = question.image.open("rb")
+    except (FileNotFoundError, OSError, ValueError):
+        raise Http404 from None
+    content_type = mimetypes.guess_type(question.image.name)[0] or "application/octet-stream"
+    response = FileResponse(stored_file, content_type=content_type)
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 def _close_expired(attempt):
@@ -272,6 +294,8 @@ def appeal(request, attempt_id, question_id):
     with transaction.atomic():
         attempt = get_object_or_404(Attempt.objects.select_for_update(), pk=attempt_id,
                                     invitation__student__user=request.user, status=Attempt.Status.DONE)
+        if attempt.invitation.exam.mode == Exam.Mode.FIXED and not attempt.invitation.exam.answers_released:
+            raise Http404
         question = get_object_or_404(Question, pk=question_id)
         if question_id not in attempt.question_ids or str(question_id) not in attempt.grades:
             raise Http404

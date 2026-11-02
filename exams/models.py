@@ -8,6 +8,10 @@ from django.db import models
 
 
 class Exam(models.Model):
+    class Mode(models.TextChoices):
+        GENERATED = "generated", "Different generated questions for each student"
+        FIXED = "fixed", "Same teacher-provided questions for everyone"
+
     class Grade(models.IntegerChoices):
         NINE = 9, "Grade 9"
         TEN = 10, "Grade 10"
@@ -16,6 +20,7 @@ class Exam(models.Model):
     title = models.CharField("Title", max_length=200)
     subject = models.CharField("Subject", max_length=100)
     grade = models.PositiveSmallIntegerField("Grade", choices=Grade.choices)
+    mode = models.CharField("Question source", max_length=12, choices=Mode.choices, default=Mode.GENERATED)
     syllabus_file = models.FileField("Syllabus file", upload_to="syllabi/%Y/%m/", blank=True)
     syllabus_text = models.TextField("Syllabus text", blank=True, help_text="Check the extracted text before generating questions.")
     question_count = models.PositiveSmallIntegerField("Total questions")
@@ -28,6 +33,7 @@ class Exam(models.Model):
     created_at = models.DateTimeField("Created", auto_now_add=True)
     updated_at = models.DateTimeField("Updated", auto_now=True)
     published = models.BooleanField("Published", default=False)
+    answers_released = models.BooleanField("Show answers and grading details to students", default=False)
 
     class Meta:
         verbose_name = "Exam"
@@ -49,13 +55,13 @@ class Exam(models.Model):
 
     def clean(self):
         errors = {}
-        if not self.syllabus_text.strip():
+        if self.mode == self.Mode.GENERATED and not self.syllabus_text.strip():
             errors["syllabus_text"] = "Add syllabus text or upload a file with extractable text."
         elif len(self.syllabus_text) > 100_000:
             errors["syllabus_text"] = "Keep only the relevant syllabus excerpt (up to 100,000 characters)."
-        if self.question_count is not None and self.question_count < 1:
+        if self.mode == self.Mode.GENERATED and self.question_count is not None and self.question_count < 1:
             errors["question_count"] = "Enter at least one question."
-        if self.total_points is not None and self.total_points <= Decimal("0"):
+        if self.mode == self.Mode.GENERATED and self.total_points is not None and self.total_points <= Decimal("0"):
             errors["total_points"] = "Total points must be greater than zero."
         if errors:
             raise ValidationError(errors)
@@ -90,19 +96,26 @@ class ExamQuestionRule(models.Model):
 
 
 class Question(models.Model):
+    class GradingMode(models.TextChoices):
+        AI = "ai", "AI grading"
+        MANUAL = "manual", "Teacher grading"
+
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="questions")
     invitation = models.ForeignKey("Invitation", on_delete=models.PROTECT, related_name="questions", null=True, blank=True)
     slot = models.PositiveSmallIntegerField("Position in exam")
     kind = models.CharField("Type", max_length=20, choices=ExamQuestionRule.Kind.choices)
+    grading_mode = models.CharField("Grading", max_length=8, choices=GradingMode.choices, default=GradingMode.AI)
     points = models.PositiveSmallIntegerField("Points")
-    subtopic = models.CharField("Subtopic", max_length=200)
+    subtopic = models.CharField("Subtopic", max_length=200, blank=True)
     stem = models.TextField("Question")
     options = models.JSONField("Answer options", default=list, blank=True)
     correct_option = models.PositiveSmallIntegerField("Correct answer number", null=True, blank=True)
-    rubric = models.JSONField("Criteria", default=list)
-    model_answer = models.TextField("Model answer")
-    subtopic_explanation = models.TextField("Subtopic explanation")
-    answer_explanation = models.TextField("Answer explanation")
+    rubric = models.JSONField("Criteria", default=list, blank=True)
+    model_answer = models.TextField("Model answer", blank=True)
+    subtopic_explanation = models.TextField("Subtopic explanation", blank=True)
+    answer_explanation = models.TextField("Answer explanation", blank=True)
+    image = models.FileField("Question image", upload_to="exam_question_images/%Y/%m/", blank=True)
+    requires_image = models.BooleanField("Image required for this question", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

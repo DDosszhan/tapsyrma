@@ -1,0 +1,8 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p>Uploading replaces the current fixed questions in this draft. Review the imported questions and attach any required images before publishing.</p>
+<p><a href="{{ template_url }}">Download the XLSX template</a>. Each row is one question. Use <code>open</code> or <code>mcq</code> for <code>kind</code>, and <code>ai</code> or <code>manual</code> for <code>grading_mode</code>. For MCQ, fill four options and the correct option (1–4 or A–D). Criteria and model answer are optional for open questions; write each criterion on a separate line as <code>1: Description</code>. Set <code>requires_image</code> to <code>yes</code> when an image must be attached after import.</p>
+<p>TXT, DOCX and PDF also work when each question starts on its own line, for example <code>Question 1 — Logic Gates [3 marks]</code>. The text up to the next question heading is kept as the question. Put an optional <code>[[MODEL ANSWER]]</code> and <code>[[CRITERIA]]</code> section after the question text. A criteria section uses the same <code>1: Description</code> lines. Scanned PDFs need a text layer or OCR. Lines such as <code>Question type: File upload or manually marked response</code> select teacher grading and are removed from student text; <code>IMPORTANT: Insert supplied image ...</code> is removed and requires you to attach the image in the question editor.</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}
+<button type="submit" class="default">Replace questions from file</button></form>
+{% endblock %}

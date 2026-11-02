@@ -24,7 +24,7 @@ def private_media(request, path):
     if not request.user.is_superuser:
         raise PermissionDenied
     parts = PurePosixPath(path).parts
-    if len(parts) < 2 or parts[0] != "syllabi" or ".." in parts:
+    if len(parts) < 2 or parts[0] not in {"syllabi", "exam_question_images"} or ".." in parts:
         raise Http404
     try:
         stored_file = default_storage.open(path, "rb")
@@ -46,6 +46,7 @@ urlpatterns = [
          course_views.request_lesson_explanation, name="lesson_explain"),
     path("choose/", exam_views.choose_exam, name="choose_exam"),
     path("exam/", exam_views.session, name="exam_session"),
+    path("exam/questions/<int:question_id>/image/", exam_views.question_image, name="exam_question_image"),
     path("exam/save/", exam_views.save, name="exam_save"),
     path("exam/visibility/", exam_views.visibility, name="exam_visibility"),
     path("exam/submit/", exam_views.submit, name="exam_submit"),

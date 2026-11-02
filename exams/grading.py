@@ -16,7 +16,11 @@ def grade_attempt(attempt):
             continue
         question = questions[pk]
         answer = attempt.answers.get(str(pk), "")
-        if question.kind == "mcq":
+        if question.grading_mode == Question.GradingMode.MANUAL and answer:
+            grade = {"score": 0, "criteria": [0] * len(question.rubric),
+                     "explanation": "This answer is awaiting teacher review.", "review_pending": True}
+            review_reason = "Manual grading requested for this question."
+        elif question.kind == "mcq":
             earned = question.points if answer == str(question.correct_option) else 0
             grade = {"score": earned, "criteria": [earned],
                      "explanation": "Correct option." if earned else "The selected option is incorrect."}
