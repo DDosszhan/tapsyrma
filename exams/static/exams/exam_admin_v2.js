@@ -18,6 +18,47 @@ document.addEventListener('DOMContentLoaded', () => {
   if (mode) mode.addEventListener('change', update);
   update();
 
+  const fieldsByKind = {
+    open: ['criteria_text', 'scheme_link', 'model_answer'],
+    mcq: ['option_1', 'option_2', 'option_3', 'option_4', 'correct_option_number'],
+    cloze: ['answer_items'],
+    matching: ['answer_items'],
+    multiselect: ['answer_items', 'option_1', 'option_2', 'option_3', 'option_4'],
+    ordering: ['answer_items'],
+  };
+  const answerFields = [...new Set(Object.values(fieldsByKind).flat())];
+  const updateQuestionFields = inline => {
+    if (!inline) return;
+    const kind = inline.querySelector('select[name$="-kind"]')?.value;
+    if (!fieldsByKind[kind]) return;
+    const visible = new Set(fieldsByKind[kind]);
+    for (const name of answerFields) {
+      inline.querySelectorAll(`.field-${name}`).forEach(row => {
+        const show = visible.has(name) || row.classList.contains('errors') || !!row.querySelector('.errorlist');
+        row.style.display = show ? '' : 'none';
+        row.querySelectorAll('input, select, textarea').forEach(input => {
+          if (input.dataset.originalDisabled === undefined) {
+            input.dataset.originalDisabled = input.disabled ? '1' : '0';
+          }
+          input.disabled = !show || input.dataset.originalDisabled === '1';
+        });
+      });
+    }
+  };
+  if (fixedQuestions) {
+    fixedQuestions.querySelectorAll('.inline-related:not(.empty-form)').forEach(updateQuestionFields);
+    fixedQuestions.addEventListener('change', event => {
+      if (event.target.matches('select[name$="-kind"]')) {
+        updateQuestionFields(event.target.closest('.inline-related'));
+      }
+    });
+    document.addEventListener('formset:added', event => {
+      if (event.detail?.formsetName === 'questions' && fixedQuestions.contains(event.target)) {
+        updateQuestionFields(event.target.closest('.inline-related'));
+      }
+    });
+  }
+
   const generateSchemes = document.getElementById('generate-schemes');
   if (generateSchemes) generateSchemes.addEventListener('click', async () => {
     const urls = JSON.parse(generateSchemes.dataset.urls);
