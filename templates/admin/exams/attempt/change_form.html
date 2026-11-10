@@ -1,0 +1,48 @@
+{% extends "admin/change_form.html" %}
+
+{% block after_field_sets %}
+{{ block.super }}
+<style>
+  .attempt-review { margin-top: 24px; }
+  .attempt-review__card { padding: 18px 20px; margin: 16px 0; border: 1px solid var(--hairline-color, #ddd); border-radius: 6px; }
+  .attempt-review__card h3 { margin: 0 0 12px; }
+  .attempt-review__text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .attempt-review__image { display: block; max-width: 100%; height: auto; margin: 12px 0; }
+  .attempt-review__card ul { margin: 8px 0 16px; padding-left: 24px; }
+  .attempt-review__card li { margin: 6px 0; }
+</style>
+<section class="attempt-review" aria-labelledby="attempt-review-title">
+  <h2 id="attempt-review-title">Ответы по вопросам</h2>
+  {% for item in attempt_items %}
+    <article class="attempt-review__card">
+      <h3>Вопрос {{ item.number }}{% if item.question %} · {{ item.question.points }} балл(ов){% endif %}</h3>
+      {% if item.question %}
+        <p class="attempt-review__text">{{ item.question.stem }}</p>
+        {% if item.question.image %}
+          <img class="attempt-review__image" src="{% url 'exam_question_image' item.question.pk %}?attempt={{ original.pk }}" alt="Изображение к вопросу {{ item.number }}">
+        {% endif %}
+      {% else %}
+        <p>Вопрос #{{ item.question_id }} больше недоступен.</p>
+      {% endif %}
+      <p><strong>Ответ ученика:</strong></p>
+      {% if item.answer_rows %}
+        <ul>{% for label, value in item.answer_rows %}<li><strong>{{ label }}:</strong> <span class="attempt-review__text">{{ value|default:"Нет ответа" }}</span></li>{% endfor %}</ul>
+      {% else %}
+        <p class="attempt-review__text">{{ item.answer_text|default:"Нет ответа" }}</p>
+      {% endif %}
+      {% if item.grade %}
+        <p><strong>Оценка:</strong> {{ item.grade.score }}{% if item.question %} / {{ item.question.points }}{% endif %}{% if item.grade.review_pending %} · ожидает проверки учителя{% endif %}</p>
+        {% if item.grade.explanation %}<p class="attempt-review__text"><strong>Пояснение проверки:</strong> {{ item.grade.explanation }}</p>{% endif %}
+        {% if item.criteria %}
+          <p><strong>Критерии:</strong></p>
+          <ul>{% for label, earned, possible in item.criteria %}<li>{{ label }} — {% if earned is not None %}{{ earned }} / {% endif %}{{ possible }}</li>{% endfor %}</ul>
+        {% endif %}
+      {% else %}
+        <p><strong>Оценка:</strong> ещё не проверено</p>
+      {% endif %}
+    </article>
+  {% empty %}
+    <p>В этой попытке пока нет вопросов.</p>
+  {% endfor %}
+</section>
+{% endblock %}

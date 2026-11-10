@@ -103,10 +103,17 @@ def question_image(request, question_id):
     if not question.image:
         raise Http404
     if not request.user.is_superuser:
-        if not question.invitation_id or question.invitation.student.user_id != request.user.pk:
-            raise Http404
-        attempt = Attempt.objects.filter(invitation_id=question.invitation_id).first()
-        if not attempt or question.pk not in attempt.question_ids:
+        allowed = False
+        attempt_id = request.GET.get("attempt", "")
+        if (request.user.is_staff and request.user.has_perm("exams.view_attempt")
+                and attempt_id.isascii() and attempt_id.isdecimal() and len(attempt_id) <= 19
+                and int(attempt_id) <= 9223372036854775807):
+            attempt = Attempt.objects.filter(pk=int(attempt_id)).first()
+            allowed = bool(attempt and question.pk in attempt.question_ids)
+        if not allowed and question.invitation_id and question.invitation.student.user_id == request.user.pk:
+            attempt = Attempt.objects.filter(invitation_id=question.invitation_id).first()
+            allowed = bool(attempt and question.pk in attempt.question_ids)
+        if not allowed:
             raise Http404
     try:
         stored_file = question.image.open("rb")

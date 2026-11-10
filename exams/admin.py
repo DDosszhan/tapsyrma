@@ -882,13 +882,69 @@ class AttemptVisibilityEventInline(admin.TabularInline):
 @admin.register(Attempt)
 class AttemptAdmin(admin.ModelAdmin):
     change_list_template = "admin/exams/attempt/change_list.html"
+    change_form_template = "admin/exams/attempt/change_form.html"
     list_display = ["invitation", "status", "grading_progress", "score", "visibility_count", "started_at", "submitted_at", "graded_at"]
     list_filter = ["status", "invitation__exam"]
     inlines = [AttemptVisibilityEventInline]
     search_fields = ["invitation__student__name", "invitation__student__user__email",
                      "invitation__student__external_id", "invitation__exam__title"]
     actions = ["retry_grading"]
-    readonly_fields = ["invitation", "question_ids", "answers", "grades", "status", "score", "started_at", "submitted_at", "graded_at", "grading_started_at", "error_message"]
+    fields = ["invitation", "status", "score", "started_at", "deadline_at", "submitted_at", "graded_at",
+              "grading_started_at", "error_message"]
+    readonly_fields = ["invitation", "status", "score", "started_at", "submitted_at", "graded_at",
+                       "grading_started_at", "error_message"]
+
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
+        if obj:
+            questions = Question.objects.in_bulk(obj.question_ids)
+            items = []
+            for number, question_id in enumerate(obj.question_ids, 1):
+                question = questions.get(question_id)
+                answer = obj.answers.get(str(question_id), "")
+                grade = obj.grades.get(str(question_id))
+                rows = []
+                answer_text = ""
+
+                def option(index):
+                    if isinstance(index, str) and index.isascii() and index.isdecimal():
+                        position = int(index)
+                        if 0 <= position < len(question.options):
+                            return question.options[position]
+                    return ""
+
+                if not question:
+                    answer_text = ", ".join(str(part) for part in answer) if isinstance(answer, list) else str(answer)
+                elif question.kind == Question.Kind.MCQ:
+                    answer_text = option(answer)
+                elif question.kind == Question.Kind.OPEN:
+                    answer_text = answer
+                elif question.kind == Question.Kind.CLOZE:
+                    values = answer if isinstance(answer, list) else []
+                    count = len(question.interaction.get("answers", []))
+                    rows = [(f"Пропуск {index + 1}", values[index] if index < len(values) else "")
+                            for index in range(count)]
+                elif question.kind == Question.Kind.MATCHING:
+                    values = answer if isinstance(answer, list) else []
+                    rows = [(left, option(values[index]) if index < len(values) else "")
+                            for index, left in enumerate(question.interaction.get("left", []))]
+                elif question.kind == Question.Kind.MULTISELECT:
+                    values = answer if isinstance(answer, list) else []
+                    rows = [("Выбранные варианты", ", ".join(filter(None, (option(value) for value in values))))]
+                elif question.kind == Question.Kind.ORDERING:
+                    values = answer if isinstance(answer, list) else []
+                    rows = [(f"Позиция {index + 1}", option(values[index]) if index < len(values) else "")
+                            for index in range(len(question.options))]
+
+                criteria = []
+                if question and grade:
+                    scores = grade.get("criteria", [])
+                    criteria = [(row["criterion"], scores[index] if index < len(scores) else None, row["points"])
+                                for index, row in enumerate(question.rubric)]
+                items.append({"number": number, "question_id": question_id, "question": question,
+                              "answer_text": answer_text, "answer_rows": rows, "grade": grade,
+                              "criteria": criteria})
+            context["attempt_items"] = items
+        return super().render_change_form(request, context, add, change, form_url, obj)
 
     def has_add_permission(self, request):
         return False
