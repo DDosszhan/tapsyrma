@@ -1,0 +1,9 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p><a href="{{ change_url }}">← Вернуться к тесту</a></p>
+<h2>Вопрос {{ question.slot }} · {{ question.points }} балл(ов)</h2>
+<p style="white-space:pre-wrap">{{ question.stem }}</p>
+<p>ИИ предложит только схему оценивания. Текст вопроса и количество баллов останутся прежними. Проверьте схему перед публикацией.</p>
+{% if error %}<p class="errornote">{{ error }}</p>{% endif %}
+<form method="post">{% csrf_token %}<button type="submit" class="default">Сгенерировать схему</button></form>
+{% endblock %}

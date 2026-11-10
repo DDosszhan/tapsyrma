@@ -85,11 +85,14 @@ class FixedExamFlowTests(TestCase):
         self.assertEqual(attempt.score, 1)
         self.assertTrue(GradeAppeal.objects.filter(attempt=attempt, question=rows[0][1]).exists())
         hidden_result = self.client.get("/exam/result/")
-        self.assertContains(hidden_result, "Results and marking details will appear")
+        self.assertContains(hidden_result, "1 / 4.00 points")
+        self.assertContains(hidden_result, "1 / 1")
         self.assertNotContains(hidden_result, "Correct gate")
-        self.assertNotContains(self.client.get("/history/"), "1 / 4.00 points")
+        self.assertNotContains(hidden_result, "Model answer:")
+        self.assertContains(self.client.get("/history/"), "1 / 4.00 points")
         self.assertEqual(self.client.post(reverse("exam_appeal", args=[attempt.pk, rows[0][0].pk]),
-                                          {"reason": "Please check this answer"}).status_code, 404)
+                                          {"reason": "Please check this answer"}).status_code, 302)
+        self.assertTrue(GradeAppeal.objects.filter(attempt=attempt, question=rows[0][0]).exists())
         self.exam.answers_released = True
         self.exam.save(update_fields=["answers_released"])
         released_result = self.client.get("/exam/result/")

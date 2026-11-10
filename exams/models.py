@@ -96,6 +96,14 @@ class ExamQuestionRule(models.Model):
 
 
 class Question(models.Model):
+    class Kind(models.TextChoices):
+        MCQ = "mcq", "MCQ — one correct answer"
+        OPEN = "open", "Open response"
+        CLOZE = "cloze", "Fill in the blanks"
+        MATCHING = "matching", "Matching"
+        MULTISELECT = "multiselect", "Select several answers"
+        ORDERING = "ordering", "Put in order"
+
     class GradingMode(models.TextChoices):
         AI = "ai", "AI grading"
         MANUAL = "manual", "Teacher grading"
@@ -103,12 +111,13 @@ class Question(models.Model):
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="questions")
     invitation = models.ForeignKey("Invitation", on_delete=models.PROTECT, related_name="questions", null=True, blank=True)
     slot = models.PositiveSmallIntegerField("Position in exam")
-    kind = models.CharField("Type", max_length=20, choices=ExamQuestionRule.Kind.choices)
+    kind = models.CharField("Type", max_length=20, choices=Kind.choices)
     grading_mode = models.CharField("Grading", max_length=8, choices=GradingMode.choices, default=GradingMode.AI)
     points = models.PositiveSmallIntegerField("Points")
     subtopic = models.CharField("Subtopic", max_length=200, blank=True)
     stem = models.TextField("Question")
     options = models.JSONField("Answer options", default=list, blank=True)
+    interaction = models.JSONField("Structured answer key", default=dict, blank=True)
     correct_option = models.PositiveSmallIntegerField("Correct answer number", null=True, blank=True)
     rubric = models.JSONField("Criteria", default=list, blank=True)
     model_answer = models.TextField("Model answer", blank=True)

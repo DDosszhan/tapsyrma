@@ -6,6 +6,9 @@
 .question-stem{white-space:pre-wrap}
 .question-image{display:block;max-width:100%;height:auto;margin:0 0 16px}
 .exam-questions textarea{border:1px solid #aeb9c8;border-radius:8px;resize:vertical}
+.exam-questions input[type=text],.exam-questions select{border:1px solid #aeb9c8;border-radius:8px;padding:8px;max-width:100%}
+.exam-questions .cloze-stem input{width:150px;margin:2px 4px}
+.exam-questions .matching-row{display:block;margin:10px 0}
 .exam-questions input[type=radio]{accent-color:#124ab3}.exam-questions label{padding:6px 0}
 .exam-actions{background:white;border:1px solid #d6dfe9;border-radius:10px;padding:20px;margin-top:20px}
 .exam-actions p{margin-top:0}
@@ -21,11 +24,21 @@
 <div class="exam-layout">
 <form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}
 {% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" tabindex="-1"><span class="points">{{ q.points }} points</span>
-<h2>Question {{ forloop.counter }}</h2><p class="question-stem">{{ q.stem }}</p>
+<h2>Question {{ forloop.counter }}</h2>
+{% if q.kind == "cloze" %}<p class="question-stem cloze-stem">{% for part in q.stem|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
+{% else %}<p class="question-stem">{{ q.stem }}</p>{% endif %}
 {% if q.image %}<img class="question-image" src="{% url 'exam_question_image' q.id %}" alt="Diagram for question {{ forloop.counter }}">{% endif %}
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
-{% endfor %}{% else %}<label for="q_{{ q.id }}">Your answer</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}
+{% endfor %}{% elif q.kind == "multiselect" %}<p>Select all that apply.</p>{% for option in q.options %}
+<label><input type="checkbox" name="q_{{ q.id }}_{{ forloop.counter0 }}" value="1" {% if answers|dict_get:q.id|has_index:forloop.counter0 %}checked{% endif %}> {{ option }}</label>
+{% endfor %}{% elif q.kind == "matching" %}{% for left in q.interaction.left %}
+{% with selected=answers|dict_get:q.id|list_get:forloop.counter0 %}<label class="matching-row">{{ left }}
+<select name="q_{{ q.id }}_{{ forloop.counter0 }}"><option value="">Choose a match</option>{% for option in q.options %}<option value="{{ forloop.counter0 }}" {% if selected == forloop.counter0|stringformat:"s" %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>{% endwith %}
+{% endfor %}{% elif q.kind == "ordering" %}<p>Place the items in the correct order.</p>{% for position in q.options %}
+{% with selected=answers|dict_get:q.id|list_get:forloop.counter0 %}<label class="matching-row">Position {{ forloop.counter }}
+<select name="q_{{ q.id }}_{{ forloop.counter0 }}"><option value="">Choose an item</option>{% for option in q.options %}<option value="{{ forloop.counter0 }}" {% if selected == forloop.counter0|stringformat:"s" %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>{% endwith %}
+{% endfor %}{% elif q.kind == "open" %}<label for="q_{{ q.id }}">Your answer</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}
 </section>{% endfor %}
 <div class="exam-actions"><p id="save-status" class="muted" aria-live="polite">Answers are saved automatically.</p>
 <button type="submit" onclick="return confirm('Submit the exam? You cannot change your answers afterward.')">Submit exam</button></div></form>
@@ -40,7 +53,9 @@ function updateMap(){
   let answered=0;
   for(const link of mapLinks){
     const question=document.getElementById('question-'+link.dataset.question);
-    const filled=!!(question.querySelector('input[type=radio]:checked')||question.querySelector('textarea')?.value.trim());
+    const parts=[...question.querySelectorAll('input[type=text],select')];
+    const checks=[...question.querySelectorAll('input[type=checkbox]')];
+    const filled=checks.length?checks.some(element=>element.checked):parts.length?parts.every(element=>element.value.trim()):!!(question.querySelector('input[type=radio]:checked')||question.querySelector('textarea')?.value.trim());
     link.classList.toggle('answered',filled);
     link.setAttribute('aria-label',`Question ${link.textContent}, ${filled?'answered':'unanswered'}`);
     if(filled)answered++;
@@ -48,7 +63,15 @@ function updateMap(){
   document.getElementById('answered-count').textContent=answered;
 }
 updateMap();
-form.addEventListener('input',()=>{updateMap();clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)});
+function scheduleSave(event){
+  if(event.target.matches('select')&&event.target.value){
+    event.target.closest('.question').querySelectorAll('select').forEach(other=>{
+      if(other!==event.target&&other.value===event.target.value)other.value='';
+    });
+  }
+  updateMap();clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)
+}
+form.addEventListener('input',scheduleSave);form.addEventListener('change',scheduleSave);
 form.addEventListener('submit',()=>{leavingExam=true});
 function eventData(action,id){const data=new FormData();data.append('csrfmiddlewaretoken',form.elements.csrfmiddlewaretoken.value);data.append('action',action);data.append('event_id',id);return data}
 async function confirmReturn(id){

@@ -127,6 +127,11 @@ def _close_expired(attempt):
     return False
 
 
+def _valid_index(value, upper):
+    return (value.isascii() and value.isdigit() and len(value) <= 3
+            and str(int(value)) == value and int(value) < upper)
+
+
 @login_required
 def session(request):
     invitation = _invitation(request)
@@ -160,6 +165,53 @@ def session(request):
 def _read_answers(request, questions):
     answers = {}
     for q in questions:
+        if q.kind == "multiselect":
+            if len(q.options) != 4 or f"q_{q.id}" in request.POST:
+                raise ValueError("Invalid question configuration.")
+            prefix = f"q_{q.id}_"
+            if any(not _valid_index(key[len(prefix):], 4)
+                   for key in request.POST if key.startswith(prefix)):
+                raise ValueError("Invalid answer field.")
+            selected = []
+            for index in range(4):
+                posted = request.POST.getlist(f"{prefix}{index}")
+                if len(posted) > 1 or (posted and posted[0] != "1"):
+                    raise ValueError("Invalid multiple-choice value.")
+                if posted:
+                    selected.append(str(index))
+            answers[str(q.id)] = selected
+            continue
+        if q.kind in ("cloze", "matching", "ordering"):
+            interaction = q.interaction or {}
+            count = len(interaction.get("left", [])) if q.kind == "matching" else len(interaction.get("answers", []))
+            if not 1 <= count <= 100 or f"q_{q.id}" in request.POST:
+                raise ValueError("Invalid question configuration.")
+            if q.kind == "ordering" and len(q.options) != count:
+                raise ValueError("Invalid question configuration.")
+            prefix = f"q_{q.id}_"
+            if any(not _valid_index(key[len(prefix):], count)
+                   for key in request.POST if key.startswith(prefix)):
+                raise ValueError("Invalid answer field.")
+            values = []
+            for index in range(count):
+                posted = request.POST.getlist(f"{prefix}{index}")
+                if len(posted) > 1:
+                    raise ValueError("Invalid answer field.")
+                value = posted[0].strip() if posted else ""
+                if q.kind == "cloze":
+                    if len(value) > 120 or "\n" in value or "\r" in value:
+                        raise ValueError("A blank answer is too long.")
+                elif value and not _valid_index(value, len(q.options)):
+                    raise ValueError("Invalid option.")
+                values.append(value)
+            if q.kind in ("matching", "ordering"):
+                chosen = [value for value in values if value]
+                if len(chosen) != len(set(chosen)):
+                    raise ValueError("Use each option only once.")
+            if sum(map(len, values)) > 5000:
+                raise ValueError("Answer is too long (maximum 5,000 characters).")
+            answers[str(q.id)] = values
+            continue
         answer = request.POST.get(f"q_{q.id}", "").strip()
         if q.kind == "mcq":
             if answer not in ("", "0", "1", "2", "3"):
@@ -262,6 +314,38 @@ def result(request, attempt_id=None):
     items = []
     for q in _questions(attempt):
         grade = attempt.grades.get(str(q.id))
+        answer = attempt.answers.get(str(q.id), "")
+        answer_rows = []
+        correct_rows = []
+        if q.kind in ("cloze", "matching", "multiselect", "ordering"):
+            values = answer if isinstance(answer, list) else []
+            if q.kind == "cloze":
+                for index, alternatives in enumerate(q.interaction.get("answers", [])):
+                    answer_rows.append((f"Blank {index + 1}", values[index] if index < len(values) else ""))
+                    correct_rows.append((f"Blank {index + 1}", ", ".join(alternatives)))
+            elif q.kind == "matching":
+                keys = q.interaction.get("answers", [])
+                for index, left in enumerate(q.interaction.get("left", [])):
+                    choice = values[index] if index < len(values) else ""
+                    chosen = q.options[int(choice)] if isinstance(choice, str) and _valid_index(choice, len(q.options)) else ""
+                    answer_rows.append((left, chosen))
+                    correct = keys[index] if index < len(keys) else None
+                    correct_rows.append((left, q.options[correct] if type(correct) is int and 0 <= correct < len(q.options) else ""))
+            elif q.kind == "multiselect":
+                selected = [q.options[int(value)] for value in values
+                            if isinstance(value, str) and _valid_index(value, len(q.options))]
+                answer_rows.append(("Selected options", ", ".join(selected)))
+                correct = [q.options[index] for index in q.interaction.get("answers", [])
+                           if type(index) is int and 0 <= index < len(q.options)]
+                correct_rows.append(("Correct options", ", ".join(correct)))
+            else:
+                keys = q.interaction.get("answers", [])
+                for index in range(len(q.options)):
+                    choice = values[index] if index < len(values) else ""
+                    chosen = q.options[int(choice)] if isinstance(choice, str) and _valid_index(choice, len(q.options)) else ""
+                    answer_rows.append((f"Position {index + 1}", chosen))
+                    correct = keys[index] if index < len(keys) else None
+                    correct_rows.append((f"Position {index + 1}", q.options[correct] if type(correct) is int and 0 <= correct < len(q.options) else ""))
         question_appeal = appeals.get(q.id)
         auto_pending = _auto_review_pending(question_appeal, grade)
         if question_appeal and question_appeal.status == GradeAppeal.Status.PENDING:
@@ -272,7 +356,8 @@ def result(request, attempt_id=None):
             map_status, map_label = "correct", "full marks"
         else:
             map_status, map_label = "wrong", "points lost"
-        items.append({"question": q, "answer": attempt.answers.get(str(q.id), ""),
+        items.append({"question": q, "answer": answer, "answer_rows": answer_rows,
+                      "correct_rows": correct_rows,
                       "grade": grade, "criteria": zip(q.rubric, grade["criteria"]) if grade else [],
                       "appeal": question_appeal,
                       "map_status": map_status, "map_label": map_label,
@@ -281,6 +366,8 @@ def result(request, attempt_id=None):
                                       and not question_appeal.student_note})
     return render(request, "exams/result.html", {"attempt": attempt, "items": items,
                                                   "exam": invitation.exam,
+                                                  "show_marking_details": (invitation.exam.mode != Exam.Mode.FIXED
+                                                                           or invitation.exam.answers_released),
                                                   "visibility_count": attempt.visibility_events.count(),
                                                   "pending_review_count": pending_review_count})
 
@@ -294,8 +381,6 @@ def appeal(request, attempt_id, question_id):
     with transaction.atomic():
         attempt = get_object_or_404(Attempt.objects.select_for_update(), pk=attempt_id,
                                     invitation__student__user=request.user, status=Attempt.Status.DONE)
-        if attempt.invitation.exam.mode == Exam.Mode.FIXED and not attempt.invitation.exam.answers_released:
-            raise Http404
         question = get_object_or_404(Question, pk=question_id)
         if question_id not in attempt.question_ids or str(question_id) not in attempt.grades:
             raise Http404

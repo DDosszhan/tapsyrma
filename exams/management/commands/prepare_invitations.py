@@ -54,7 +54,7 @@ class Command(BaseCommand):
                             raise ValidationError("The uploaded question set does not match the exam totals.")
                         if locked.questions.exists():
                             raise ValidationError("This invitation already has a question set.")
-                        fields = ("slot", "kind", "points", "subtopic", "stem", "options", "correct_option",
+                        fields = ("slot", "kind", "points", "subtopic", "stem", "options", "interaction", "correct_option",
                                   "rubric", "model_answer", "subtopic_explanation", "answer_explanation", "image",
                                   "grading_mode", "requires_image")
                         Question.objects.bulk_create([

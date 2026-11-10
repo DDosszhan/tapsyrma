@@ -11,29 +11,35 @@
 </style>{% endblock %}
 {% block content %}
 <h1>Result: {{ exam.title }}</h1>
-{% if exam.mode == "fixed" and not exam.answers_released %}
-<p>Your answers have been submitted. Results and marking details will appear after the teacher closes the assessment.</p>
-{% else %}
 {% if visibility_count %}<p class="muted">The exam page was hidden {{ visibility_count }} time(s). {% if exam.grade == 0 %}The exam administrator{% else %}Your teacher{% endif %} can see when this happened.</p>{% endif %}
 {% if attempt.status == "done" %}
 <p class="score">{% if pending_review_count %}Provisional score: {% endif %}{{ attempt.score }} / {{ exam.total_points }} points</p>
 {% if pending_review_count %}<p>Questions awaiting {% if exam.grade == 0 %}manual{% else %}teacher{% endif %} review: {{ pending_review_count }}. The displayed score may change.</p>{% endif %}
-<p class="muted">Open responses were graded by AI or sent for teacher review. {% if exam.grade == 0 %}An examiner can review your work and adjust the score.{% else %}Your teacher can review your work and decide the EduPage grade.{% endif %}</p>
+{% if not show_marking_details %}<p>Detailed marking will appear after the teacher closes the assessment.</p>{% endif %}
+{% if exam.mode == "fixed" %}<p class="muted">You can ask your teacher to review any score below.</p>
+{% else %}<p class="muted">Open responses were graded by AI or sent for teacher review. {% if exam.grade == 0 %}An examiner can review your work and adjust the score.{% else %}Your teacher can review your work and decide the EduPage grade.{% endif %}</p>{% endif %}
 {% elif attempt.status == "error" %}<p>Automatic grading failed. {% if exam.grade == 0 %}The exam administrator{% else %}Your teacher{% endif %} can see your work and retry grading.</p>
 {% else %}<p>Your answers were submitted and saved. Grading is in progress.</p><script>setTimeout(()=>location.reload(),5000)</script>{% endif %}
+{% if exam.mode != "fixed" or attempt.status == "done" %}
 <div class="exam-layout result-layout"><div class="exam-questions">
 {% for item in items %}<section class="question" id="question-{{ item.question.pk }}">{% if item.auto_pending %}<span class="points">Awaiting {% if exam.grade == 0 %}review{% else %}teacher{% endif %}</span>{% elif item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
 <h2>Question {{ forloop.counter }}</h2><p class="question-stem">{{ item.question.stem }}</p>
 {% if item.question.image %}<img class="question-image" src="{% url 'exam_question_image' item.question.id %}" alt="Diagram for question {{ forloop.counter }}">{% endif %}
-<p><strong>Your answer:</strong> {% if item.question.kind == "mcq" %}{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}{% else %}{{ item.answer|default:"No answer given"|linebreaksbr }}{% endif %}</p>
-{% if item.grade %}<p><strong>Grading:</strong> {{ item.grade.explanation }}</p>{% endif %}
-{% if item.appeal %}<p><strong>Appeal:</strong> {{ item.appeal.get_status_display }}.{% if item.appeal.reviewed_at %} {{ item.appeal.teacher_note }}{% endif %}</p>
+<p><strong>Your answer:</strong></p>
+{% if item.answer_rows %}<ul>{% for label, value in item.answer_rows %}<li>{{ label }}: {{ value|default:"No answer given" }}</li>{% endfor %}</ul>
+{% elif item.question.kind == "mcq" %}<p>{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}</p>
+{% else %}<p>{{ item.answer|default:"No answer given"|linebreaksbr }}</p>{% endif %}
+{% if item.grade and show_marking_details %}<p><strong>Grading:</strong> {{ item.grade.explanation }}</p>{% endif %}
+{% if item.appeal %}<p><strong>Appeal:</strong> {{ item.appeal.get_status_display }}.{% if item.appeal.reviewed_at and show_marking_details %} {{ item.appeal.teacher_note }}{% endif %}</p>
 {% if item.appeal.student_note %}<p><strong>Your note to the {% if exam.grade == 0 %}examiner{% else %}teacher{% endif %}:</strong> {{ item.appeal.student_note|linebreaksbr }}</p>{% endif %}
 {% if item.can_add_note %}<form method="post" action="{% url 'exam_appeal' attempt.pk item.question.pk %}">{% csrf_token %}<label>This answer has been sent to your {% if exam.grade == 0 %}examiner{% else %}teacher{% endif %}. Add a note if needed:<textarea name="reason" minlength="10" maxlength="2000" required></textarea></label><button type="submit">Add a note for the {% if exam.grade == 0 %}examiner{% else %}teacher{% endif %}</button></form>{% endif %}
 {% elif attempt.status == "done" %}<form method="post" action="{% url 'exam_appeal' attempt.pk item.question.pk %}">{% csrf_token %}<label>Think there is a grading error? Explain what should be reviewed:<textarea name="reason" minlength="10" maxlength="2000" required></textarea></label><button type="submit">Send to {% if exam.grade == 0 %}examiner{% else %}teacher{% endif %}</button></form>{% endif %}
+{% if show_marking_details %}
+{% if item.correct_rows %}<h3>Correct answers</h3><ul>{% for label, value in item.correct_rows %}<li>{{ label }}: {{ value }}</li>{% endfor %}</ul>{% endif %}
 <h3>Marking criteria</h3><ul>{% if item.grade and not item.auto_pending %}{% for criterion, earned in item.criteria %}<li>{{ criterion.criterion }} — {{ earned }} / {{ criterion.points }}</li>{% endfor %}{% else %}{% for criterion in item.question.rubric %}<li>{{ criterion.criterion }} — up to {{ criterion.points }} points</li>{% endfor %}{% endif %}</ul>
 <details><summary>Subtopic explanation: {{ item.question.subtopic }}</summary><p>{{ item.question.subtopic_explanation|linebreaksbr }}</p></details>
 <details><summary>Answer explanation</summary><p>{{ item.question.answer_explanation|linebreaksbr }}</p><p><strong>Model answer:</strong> {{ item.question.model_answer|linebreaksbr }}</p></details>
+{% endif %}
 </section>{% endfor %}
 </div><aside class="question-map" aria-label="Result map"><h2>Result map</h2><p>Select a number to jump to a question.</p>
 <div class="question-grid">{% for item in items %}<a href="#question-{{ item.question.pk }}" class="{{ item.map_status }}" aria-label="Question {{ forloop.counter }}, {{ item.map_label }}">{{ forloop.counter }}</a>{% endfor %}</div>

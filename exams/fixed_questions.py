@@ -1,5 +1,6 @@
 """Parse teacher-authored fixed exam questions without rewriting their wording."""
 from pathlib import Path
+from random import SystemRandom
 import re
 
 from django.core.exceptions import ValidationError
@@ -8,11 +9,12 @@ from .syllabus import extract_syllabus_text
 
 
 XLSX_COLUMNS = (
-    "number", "kind", "grading_mode", "points", "topic", "question", "requires_image", "option_1", "option_2",
+    "number", "kind", "grading_mode", "points", "topic", "question", "answer_items", "requires_image", "option_1", "option_2",
     "option_3", "option_4", "correct_option", "criteria", "model_answer",
     "topic_explanation", "answer_explanation",
 )
 MAX_QUESTIONS = 1000
+MAX_STRUCTURED_ITEMS = 100
 MAX_FILE_BYTES = 10 * 1024 * 1024
 QUESTION_HEADER = re.compile(r"(?im)^[ \t]*(?:Question|Вопрос)[ \t]+(\d+)\b[^\r\n]*")
 MARKS = re.compile(r"(?i)[\[(][ \t]*(\d+)[ \t]*(?:marks?|балл(?:а|ов)?)[ \t]*[\])]")
@@ -61,13 +63,137 @@ def _criteria(value, points, reference):
     return normalized
 
 
+def _key(value):
+    return " ".join(value.casefold().split())
+
+
+def _structured_answer(kind, stem, points, value, reference, options_hint=None):
+    if points > MAX_STRUCTURED_ITEMS:
+        raise ValidationError(f"{reference}: use no more than {MAX_STRUCTURED_ITEMS} answer items.")
+    lines = [_text(line) for line in _text(value).splitlines() if _text(line)]
+    if len(lines) != points:
+        raise ValidationError(f"{reference}: answer_items needs exactly {points} lines, one per answer.")
+    if kind == "cloze":
+        markers = re.findall(r"\[\[([^\[\]]*)\]\]", stem)
+        if markers != [str(index) for index in range(1, points + 1)]:
+            raise ValidationError(f"{reference}: use [[1]] through [[{points}]] once each in order.")
+        answers = []
+        for index, line in enumerate(lines, 1):
+            alternatives = [_text(part) for part in line.split("|")]
+            if (any(not part or len(part) > 120 for part in alternatives)
+                    or len({_key(part) for part in alternatives}) != len(alternatives)):
+                raise ValidationError(f"{reference}: blank {index} needs different answers up to 120 characters, separated by |.")
+            answers.append(alternatives)
+        rubric = [{"criterion": f"Blank {index}: {choices[0]}", "points": 1}
+                  for index, choices in enumerate(answers, 1)]
+        model_answer = "\n".join(f"{index}. {choices[0]}" for index, choices in enumerate(answers, 1))
+        return {"answers": answers}, [], rubric, model_answer
+
+    if kind == "ordering":
+        if points < 3:
+            raise ValidationError(f"{reference}: ordering needs at least three items and three points.")
+        if len({_key(item) for item in lines}) != points:
+            raise ValidationError(f"{reference}: ordering needs different nonempty items.")
+        if (isinstance(options_hint, list) and len(options_hint) == points
+                and all(isinstance(item, str) for item in options_hint)
+                and set(options_hint) == set(lines)):
+            options = list(options_hint)
+        else:
+            options = list(lines)
+            SystemRandom().shuffle(options)
+            if options == lines:
+                options = options[1:] + options[:1]
+        answers = [options.index(item) for item in lines]
+        rubric = [{"criterion": f"Position {index}: {item}", "points": 1}
+                  for index, item in enumerate(lines, 1)]
+        model_answer = "\n".join(f"{index}. {item}" for index, item in enumerate(lines, 1))
+        return {"answers": answers}, options, rubric, model_answer
+
+    if points < 2:
+        raise ValidationError(f"{reference}: matching needs at least two pairs and two points.")
+    pairs = []
+    for index, line in enumerate(lines, 1):
+        if "=>" not in line:
+            raise ValidationError(f"{reference}: pair {index} must use 'left => right'.")
+        left, right = [_text(part) for part in line.split("=>", 1)]
+        if not left or not right:
+            raise ValidationError(f"{reference}: pair {index} needs both sides.")
+        pairs.append((left, right))
+    left_items = [left for left, _ in pairs]
+    right_items = [right for _, right in pairs]
+    if (len({_key(item) for item in left_items}) != points
+            or len({_key(item) for item in right_items}) != points):
+        raise ValidationError(f"{reference}: matching needs unique items on each side.")
+    if (isinstance(options_hint, list) and len(options_hint) == points
+            and set(options_hint) == set(right_items)):
+        options = list(options_hint)
+    else:
+        options = list(right_items)
+        SystemRandom().shuffle(options)
+    answers = [options.index(right) for right in right_items]
+    rubric = [{"criterion": f"{left} → {right}", "points": 1} for left, right in pairs]
+    model_answer = "\n".join(f"{left} → {right}" for left, right in pairs)
+    return {"left": left_items, "answers": answers}, options, rubric, model_answer
+
+
+def _multiselect_answer(options, points, value, reference):
+    if (len(options) != 4 or any(not option for option in options)
+            or len({_key(option) for option in options}) != 4):
+        raise ValidationError(f"{reference}: multiselect needs four different, nonempty options.")
+    parts = [_text(part) for part in _text(value).split(",")]
+    if (len(parts) not in (2, 3) or any(part not in ("1", "2", "3", "4") for part in parts)
+            or len(set(parts)) != len(parts)):
+        raise ValidationError(f"{reference}: list two or three different correct option numbers, e.g. 1,3.")
+    if points != len(parts):
+        raise ValidationError(f"{reference}: points must equal the number of correct options ({len(parts)}).")
+    answers = sorted(int(part) - 1 for part in parts)
+    rubric = [{"criterion": "Correct choices minus incorrect choices (minimum 0)", "points": points}]
+    model_answer = "\n".join(f"{index + 1}. {options[index]}" for index in answers)
+    return {"answers": answers}, rubric, model_answer
+
+
+def answer_items_from_question(question):
+    """Show the stored key in the draft editor and revalidate it before publication."""
+    if not isinstance(question.interaction, dict):
+        raise ValidationError(f"Question {question.slot}: invalid saved answer key.")
+    if question.kind == "cloze":
+        answers = question.interaction.get("answers", [])
+        if not isinstance(answers, list) or any(not isinstance(row, list) for row in answers):
+            raise ValidationError(f"Question {question.slot}: invalid saved blank answers.")
+        return "\n".join("|".join(map(str, row)) for row in answers)
+    if question.kind == "matching":
+        left = question.interaction.get("left", [])
+        answers = question.interaction.get("answers", [])
+        if (not isinstance(left, list) or not isinstance(answers, list)
+                or len(left) != len(answers) or not isinstance(question.options, list)):
+            raise ValidationError(f"Question {question.slot}: invalid saved matching pairs.")
+        try:
+            return "\n".join(f"{item} => {question.options[index]}" for item, index in zip(left, answers))
+        except (IndexError, TypeError) as exc:
+            raise ValidationError(f"Question {question.slot}: invalid saved matching pairs.") from exc
+    if question.kind == "multiselect":
+        answers = question.interaction.get("answers", [])
+        if not isinstance(answers, list) or any(type(index) is not int for index in answers):
+            raise ValidationError(f"Question {question.slot}: invalid saved selected answers.")
+        return ",".join(str(index + 1) for index in answers)
+    if question.kind == "ordering":
+        answers = question.interaction.get("answers", [])
+        if not isinstance(answers, list) or not isinstance(question.options, list):
+            raise ValidationError(f"Question {question.slot}: invalid saved ordering key.")
+        try:
+            return "\n".join(question.options[index] for index in answers)
+        except (IndexError, TypeError) as exc:
+            raise ValidationError(f"Question {question.slot}: invalid saved ordering key.") from exc
+    return ""
+
+
 def normalize_question(data, *, reference="Question"):
     """Return model fields from manual or spreadsheet input (1-based answer key)."""
     slot = _positive_int(data.get("slot"), "Position", reference)
     points = _positive_int(data.get("points"), "Points", reference)
     kind = _text(data.get("kind") or "open").lower()
-    if kind not in ("open", "mcq"):
-        raise ValidationError(f"{reference}: type must be 'open' or 'mcq'.")
+    if kind not in ("open", "mcq", "cloze", "matching", "multiselect", "ordering"):
+        raise ValidationError(f"{reference}: unsupported question type.")
     grading_mode = _text(data.get("grading_mode") or "ai").lower()
     if grading_mode not in ("ai", "manual"):
         raise ValidationError(f"{reference}: grading mode must be 'ai' or 'manual'.")
@@ -77,9 +203,29 @@ def normalize_question(data, *, reference="Question"):
     subtopic = _text(data.get("subtopic"))
     if len(subtopic) > 200:
         raise ValidationError(f"{reference}: topic is longer than 200 characters.")
-    options = [_text(value) for value in data.get("options", [])]
-    model_answer = _text(data.get("model_answer"))
-    rubric = _criteria(data.get("rubric"), points, reference)
+    interaction = {}
+    if kind in ("cloze", "matching", "ordering"):
+        if grading_mode == "manual":
+            raise ValidationError(f"{reference}: structured questions use automatic grading.")
+        interaction, options, rubric, model_answer = _structured_answer(
+            kind, stem, points, data.get("answer_items"), reference,
+            data.get("options_hint") if kind == "ordering" else data.get("options"))
+        correct_option = 0
+    elif kind == "multiselect":
+        if grading_mode == "manual":
+            raise ValidationError(f"{reference}: multiselect uses automatic grading.")
+        if _text(data.get("correct_option_number")) not in ("", "0"):
+            raise ValidationError(f"{reference}: use answer_items for all correct options.")
+        options = [_text(value) for value in data.get("options", [])]
+        interaction, rubric, model_answer = _multiselect_answer(
+            options, points, data.get("answer_items"), reference)
+        correct_option = 0
+    else:
+        if _text(data.get("answer_items")):
+            raise ValidationError(f"{reference}: set a structured type when using answer_items.")
+        options = [_text(value) for value in data.get("options", [])]
+        model_answer = _text(data.get("model_answer"))
+        rubric = _criteria(data.get("rubric"), points, reference)
     if kind == "mcq":
         if grading_mode == "manual":
             raise ValidationError(f"{reference}: multiple-choice questions use automatic grading; choose AI grading.")
@@ -96,7 +242,7 @@ def normalize_question(data, *, reference="Question"):
             rubric = [{"criterion": "Correct answer", "points": points}]
         elif len(rubric) != 1:
             raise ValidationError(f"{reference}: multiple-choice questions need exactly one marking criterion.")
-    else:
+    elif kind == "open":
         if any(options) or _text(data.get("correct_option_number")) not in ("", "0"):
             raise ValidationError(f"{reference}: open questions cannot have choice options or a choice key.")
         options = []
@@ -111,7 +257,7 @@ def normalize_question(data, *, reference="Question"):
         image_flag = image_flag in ("1", "yes", "true", "y", "да")
     return {
         "slot": slot, "kind": kind, "grading_mode": grading_mode, "points": points, "subtopic": subtopic, "stem": stem,
-        "options": options, "correct_option": correct_option, "rubric": rubric,
+        "options": options, "interaction": interaction, "correct_option": correct_option, "rubric": rubric,
         "model_answer": model_answer,
         "subtopic_explanation": _text(data.get("subtopic_explanation")),
         "answer_explanation": _text(data.get("answer_explanation")),
@@ -144,13 +290,16 @@ def validate_stored_questions(exam):
             "slot": question.slot, "kind": question.kind, "grading_mode": question.grading_mode,
             "points": question.points,
             "subtopic": question.subtopic, "stem": question.stem, "options": question.options,
+            "options_hint": question.options if question.kind == "ordering" else None,
             "correct_option_number": question.correct_option + 1 if question.kind == "mcq" and question.correct_option is not None else "",
             "rubric": question.rubric, "model_answer": question.model_answer,
+            "answer_items": answer_items_from_question(question),
             "subtopic_explanation": question.subtopic_explanation,
             "answer_explanation": question.answer_explanation,
             "requires_image": question.requires_image,
         }, reference=f"Question {question.slot}")
-        if question.rubric != row["rubric"] or question.model_answer != row["model_answer"]:
+        if (question.rubric != row["rubric"] or question.model_answer != row["model_answer"]
+                or question.options != row["options"] or question.interaction != row["interaction"]):
             raise ValidationError(f"Question {question.slot} has an invalid marking key. Save it in the editor first.")
         if question.requires_image and not question.image:
             raise ValidationError(f"Question {question.slot} refers to a supplied image. Attach its image before publishing.")
@@ -188,6 +337,7 @@ def _read_xlsx(upload):
                 "grading_mode": record.get("grading_mode") or "ai",
                 "points": record.get("points"), "subtopic": record.get("topic"),
                 "stem": record.get("question"), "options": options,
+                "answer_items": record.get("answer_items"),
                 "requires_image": record.get("requires_image"),
                 "correct_option_number": record.get("correct_option"),
                 "rubric": record.get("criteria"), "model_answer": record.get("model_answer"),

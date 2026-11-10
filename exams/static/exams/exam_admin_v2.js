@@ -17,4 +17,44 @@ document.addEventListener('DOMContentLoaded', () => {
   if (automatic) automatic.addEventListener('change', update);
   if (mode) mode.addEventListener('change', update);
   update();
+
+  const generateSchemes = document.getElementById('generate-schemes');
+  if (generateSchemes) generateSchemes.addEventListener('click', async () => {
+    const urls = JSON.parse(generateSchemes.dataset.urls);
+    const progress = document.getElementById('generate-schemes-progress');
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    if (!csrf) return;
+    generateSchemes.disabled = true;
+    let completed = 0;
+    const errors = [];
+    for (let index = 0; index < urls.length; index += 1) {
+      progress.textContent = `Генерация ${index + 1}/${urls.length}…`;
+      try {
+        const response = await fetch(urls[index], {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Ошибка сервера');
+        completed += 1;
+      } catch (error) {
+        errors.push(error.message);
+      }
+    }
+    if (!errors.length) {
+      location.reload();
+      return;
+    }
+    progress.textContent = `Готово ${completed}/${urls.length}. ${errors[0]} Обновите страницу и повторите для оставшихся вопросов.`;
+    generateSchemes.disabled = false;
+  });
+  const examForm = document.getElementById('exam_form');
+  if (generateSchemes && examForm) {
+    const requireSave = () => {
+      generateSchemes.disabled = true;
+      document.getElementById('generate-schemes-progress').textContent = 'Сначала сохраните изменения.';
+    };
+    examForm.addEventListener('input', requireSave);
+    examForm.addEventListener('change', requireSave);
+  }
 });

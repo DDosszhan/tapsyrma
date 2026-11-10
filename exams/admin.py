@@ -1,6 +1,7 @@
 from decimal import Decimal
 import hashlib
 import hmac
+import json
 import secrets
 import uuid
 
@@ -14,13 +15,13 @@ from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from django.db.models import Q
 from django.forms.models import BaseInlineFormSet
-from django.http import HttpResponse, HttpResponseRedirect
-from django.shortcuts import render
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
-from .ai import blueprint
-from .fixed_questions import (XLSX_COLUMNS, normalize_question, read_fixed_questions,
+from .ai import blueprint, suggest_marking_scheme
+from .fixed_questions import (XLSX_COLUMNS, answer_items_from_question, normalize_question, read_fixed_questions,
                               validate_question_image, validate_question_set, validate_stored_questions)
 from .models import Attempt, AttemptVisibilityEvent, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, SharedCode, Student
 from .student_import import read_student_emails
@@ -50,12 +51,24 @@ def automatic_rules(count, total_points):
 
 
 class ExamAdminForm(forms.ModelForm):
+    questions_file = forms.FileField(label="Загрузить вопросы", required=False,
+        help_text="XLSX, TXT, PDF или DOCX. Файл можно добавить сразу или позже в черновик.")
+
     class Meta:
         model = Exam
         fields = "__all__"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            for name, label in (("title", "Название"), ("subject", "Предмет"),
+                                ("grade", "Класс"), ("duration_minutes", "Длительность (минуты)")):
+                if name in self.fields:
+                    self.fields[name].label = label
+            if "questions_file" in self.fields:
+                url = reverse("admin:exams_exam_question_template")
+                self.fields["questions_file"].help_text = format_html(
+                    'XLSX, TXT, PDF или DOCX. <a href="{}">Скачать шаблон XLSX</a>.', url)
         if "mode" in self.fields:
             self.fields["mode"].required = False
         for name in ("question_count", "total_points"):
@@ -64,8 +77,20 @@ class ExamAdminForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        mode = cleaned.get("mode") or self.instance.mode
+        mode = (Exam.Mode.FIXED if not self.instance.pk and "mode" not in self.fields
+                else cleaned.get("mode") or self.instance.mode)
         cleaned["mode"] = mode
+        self.instance.mode = mode
+        self.imported_questions = None
+        upload_questions = cleaned.get("questions_file")
+        if upload_questions:
+            try:
+                rows = read_fixed_questions(upload_questions)
+                if any(row["grading_mode"] == Question.GradingMode.MANUAL for row in rows):
+                    raise ValidationError("В новом тесте используется проверка ИИ. Удалите режим manual из файла.")
+                self.imported_questions = rows
+            except ValidationError as exc:
+                self.add_error("questions_file", exc)
         upload = self.files.get("syllabus_file") if mode == Exam.Mode.GENERATED else None
         if upload:
             try:
@@ -80,9 +105,20 @@ class ExamAdminForm(forms.ModelForm):
             if not self.instance.pk:
                 cleaned["question_count"] = 0
                 cleaned["total_points"] = Decimal("0")
+                self.instance.question_count = 0
+                self.instance.total_points = Decimal("0")
             if cleaned.get("published") and self.instance.pk:
                 try:
                     _, count, points = validate_stored_questions(self.instance)
+                    if (not self.instance.published and self.instance.questions.filter(
+                            invitation__isnull=True, grading_mode=Question.GradingMode.MANUAL).exists()):
+                        raise ValidationError("Перед публикацией переключите вопросы из ручного режима на AI grading.")
+                    if not self.instance.published:
+                        for question in self.instance.questions.filter(invitation__isnull=True, kind="open"):
+                            if (question.image or question.requires_image) and (
+                                    _needs_marking_scheme(question) or not question.model_answer.strip()):
+                                raise ValidationError(
+                                    f"Для вопроса {question.slot} с изображением вручную задайте критерии и образец ответа.")
                     self.instance.question_count = count
                     self.instance.total_points = Decimal(points)
                     if "question_count" in self.fields:
@@ -145,6 +181,9 @@ class QuestionRuleInline(admin.TabularInline):
 
 
 class FixedQuestionForm(forms.ModelForm):
+    answer_items = forms.CharField(
+        label="Ответы по строкам", required=False, widget=forms.Textarea(attrs={"rows": 4}),
+        help_text="Пропуски: ответ на строку, варианты через |. Сопоставление: слева => справа. Несколько вариантов: 1,3. Порядок: один элемент на строку.")
     option_1 = forms.CharField(label="Option 1", required=False)
     option_2 = forms.CharField(label="Option 2", required=False)
     option_3 = forms.CharField(label="Option 3", required=False)
@@ -165,7 +204,17 @@ class FixedQuestionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.grading_mode == Question.GradingMode.MANUAL:
+            self.fields["grading_mode"].help_text = "Старый ручной режим: выберите AI grading для нового сценария."
+        else:
+            self.fields["grading_mode"].choices = [(Question.GradingMode.AI, "AI grading")]
+            self.fields["grading_mode"].widget = forms.HiddenInput()
         if self.instance.pk:
+            if self.instance.kind in (Question.Kind.CLOZE, Question.Kind.MATCHING,
+                                      Question.Kind.MULTISELECT, Question.Kind.ORDERING):
+                self.fields["answer_items"].initial = answer_items_from_question(self.instance)
+                self.fields["criteria_text"].disabled = True
+                self.fields["model_answer"].disabled = True
             for number, option in enumerate(self.instance.options[:4], 1):
                 self.fields[f"option_{number}"].initial = option
             if self.instance.kind == "mcq" and self.instance.correct_option is not None:
@@ -183,14 +232,23 @@ class FixedQuestionForm(forms.ModelForm):
         cleaned = super().clean()
         if any(name not in cleaned for name in ("slot", "kind", "grading_mode", "points", "stem")):
             return cleaned
+        if (self.instance.pk and self.instance.kind in (Question.Kind.CLOZE, Question.Kind.MATCHING,
+                                                       Question.Kind.MULTISELECT, Question.Kind.ORDERING)
+                and cleaned["kind"] != self.instance.kind):
+            raise ValidationError("Для смены типа составного вопроса загрузите его заново с новым ключом.")
         try:
             row = normalize_question({
                 "slot": cleaned["slot"], "kind": cleaned["kind"],
                 "grading_mode": cleaned["grading_mode"], "points": cleaned["points"],
                 "subtopic": cleaned.get("subtopic"), "stem": cleaned["stem"],
-                "options": [cleaned.get(f"option_{number}") for number in range(1, 5)],
+                "options": (self.instance.options if cleaned["kind"] == Question.Kind.MATCHING
+                            and self.instance.kind == Question.Kind.MATCHING else
+                            [cleaned.get(f"option_{number}") for number in range(1, 5)]),
+                "options_hint": (self.instance.options if cleaned["kind"] == Question.Kind.ORDERING
+                                 and self.instance.kind == Question.Kind.ORDERING else None),
                 "correct_option_number": cleaned.get("correct_option_number"),
                 "rubric": cleaned.get("criteria_text"), "model_answer": cleaned.get("model_answer"),
+                "answer_items": cleaned.get("answer_items"),
                 "subtopic_explanation": cleaned.get("subtopic_explanation"),
                 "answer_explanation": cleaned.get("answer_explanation"),
                 "requires_image": cleaned.get("requires_image"),
@@ -198,6 +256,7 @@ class FixedQuestionForm(forms.ModelForm):
         except ValidationError as exc:
             raise ValidationError(exc.messages) from exc
         self.instance.options = row["options"]
+        self.instance.interaction = row["interaction"]
         self.instance.correct_option = row["correct_option"]
         self.instance.rubric = row["rubric"]
         self.instance.requires_image = row["requires_image"]
@@ -215,10 +274,18 @@ class FixedQuestionFormSet(BaseInlineFormSet):
                 if form.cleaned_data and not form.cleaned_data.get("DELETE")]
         _, count, points = validate_question_set(rows, require_questions=self.instance.published)
         if self.instance.published:
+            if any(row["grading_mode"] == Question.GradingMode.MANUAL for row in rows):
+                raise ValidationError("Перед публикацией переключите вопросы из ручного режима на AI grading.")
             for form in self.forms:
                 if form.cleaned_data and not form.cleaned_data.get("DELETE"):
-                    if form.cleaned_data["_fixed"]["requires_image"] and not form.cleaned_data.get("image"):
-                        raise ValidationError(f"Question {form.cleaned_data['_fixed']['slot']} needs its image before publishing.")
+                    row = form.cleaned_data["_fixed"]
+                    if row["requires_image"] and not form.cleaned_data.get("image"):
+                        raise ValidationError(f"Question {row['slot']} needs its image before publishing.")
+                    if row["kind"] == "open" and (form.cleaned_data.get("image") or row["requires_image"]):
+                        if (row["rubric"] == [{"criterion": "Correct and complete answer", "points": row["points"]}]
+                                or not row["model_answer"].strip()):
+                            raise ValidationError(
+                                f"Для вопроса {row['slot']} с изображением вручную задайте критерии и образец ответа.")
         self.instance.question_count = count
         self.instance.total_points = Decimal(points)
 
@@ -227,19 +294,47 @@ class FixedQuestionInline(admin.StackedInline):
     model = Question
     form = FixedQuestionForm
     formset = FixedQuestionFormSet
-    extra = 1
-    fields = [("slot", "kind", "grading_mode", "points"), "subtopic", "stem", ("image", "requires_image"),
-              ("option_1", "option_2"), ("option_3", "option_4"), "correct_option_number",
-              "criteria_text", "model_answer", "subtopic_explanation", "answer_explanation"]
+    extra = 0
+    readonly_fields = ["scheme_link"]
+    fieldsets = [
+        (None, {"fields": [("slot", "kind", "points"), "stem", "answer_items", "criteria_text", "scheme_link"]}),
+        ("Дополнительно", {"classes": ["collapse"], "fields": [
+            "grading_mode", ("image", "requires_image"), ("option_1", "option_2"),
+            ("option_3", "option_4"), "correct_option_number", "model_answer",
+            "subtopic", "subtopic_explanation", "answer_explanation",
+        ]}),
+    ]
     verbose_name = "Fixed question"
     verbose_name_plural = "Fixed questions — exactly the same wording for every student"
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(invitation__isnull=True)
 
+    @admin.display(description="Схема оценивания")
+    def scheme_link(self, obj):
+        if (not obj.pk or obj.kind != ExamQuestionRule.Kind.OPEN
+                or obj.grading_mode != Question.GradingMode.AI
+                or obj.image or obj.requires_image
+                or obj.exam.published or obj.exam.invitation_set.exists()
+                or not _needs_marking_scheme(obj)):
+            return ""
+        url = reverse("admin:exams_exam_generate_scheme", args=[obj.exam_id, obj.pk])
+        return format_html('<a href="{}">Сгенерировать схему оценивания</a> (сначала сохраните изменения)', url)
+
+
+def _needs_marking_scheme(question):
+    return question.rubric == [{"criterion": "Correct and complete answer", "points": question.points}]
+
 
 class FixedQuestionUploadForm(forms.Form):
     file = forms.FileField(label="Question file", help_text="XLSX, TXT, PDF or DOCX; up to 10 MB.")
+
+
+def _legacy_generated_submission(request):
+    if request.method != "POST" or request.POST.get("mode") == Exam.Mode.FIXED:
+        return False
+    return (request.POST.get("mode") == Exam.Mode.GENERATED
+            or "syllabus_text" in request.POST or "question_rules-TOTAL_FORMS" in request.POST)
 
 
 @admin.register(Exam)
@@ -249,7 +344,8 @@ class ExamAdmin(admin.ModelAdmin):
     list_display = ["title", "subject", "grade", "mode", "question_count", "duration_minutes", "total_points", "published", "created_at"]
     list_filter = ["grade", "mode", "subject"]
     search_fields = ["title", "subject", "syllabus_text"]
-    readonly_fields = ["created_by", "created_at", "updated_at", "upload_questions_link"]
+    readonly_fields = ["created_by", "created_at", "updated_at", "upload_questions_link",
+                       "generate_schemes_control"]
     fieldsets = [
         ("Exam", {"fields": ["title", "subject", "grade", "mode"]}),
         ("Syllabus", {"fields": ["syllabus_file", "syllabus_text"], "description": "Upload a TXT, PDF or DOCX file, or paste the text. Check the extracted text after saving."}),
@@ -259,26 +355,58 @@ class ExamAdmin(admin.ModelAdmin):
     ]
 
     def get_fieldsets(self, request, obj=None):
+        if not obj and not _legacy_generated_submission(request):
+            return [("Новый тест", {"fields": ["title", "subject", "grade", "duration_minutes", "questions_file"],
+                "description": "Загрузите вопросы, затем проверьте схемы оценивания и опубликуйте тест."})]
         if obj and obj.mode == Exam.Mode.FIXED:
-            return [
-                ("Exam", {"fields": ["title", "subject", "grade", "mode"]}),
-                ("Fixed questions", {"fields": ["question_count", "total_points", "duration_minutes",
-                                                  "published", "answers_released", "upload_questions_link"],
-                                     "description": "Enter questions below or replace the full set from a file. Save the questions before publishing."}),
-                ("History", {"fields": ["created_by", "created_at", "updated_at"], "classes": ["collapse"]}),
+            groups = [
+                ("Тест", {"fields": ["title", "subject", "grade", "duration_minutes"]}),
+                ("Вопросы", {"fields": ["question_count", "total_points", "upload_questions_link",
+                                         "generate_schemes_control"],
+                              "description": "Проверьте вопросы и схемы оценивания ниже. Сохраните изменения перед публикацией."}),
+                ("Публикация", {"fields": ["published"]}),
             ]
+            if obj.published:
+                groups.append(("После завершения теста", {"fields": ["answers_released"],
+                               "classes": ["collapse"],
+                               "description": "Откройте ученикам ключи и подробный разбор, когда тест закончится."}))
+            return groups
         return super().get_fieldsets(request, obj)
 
     @admin.display(description="Import questions")
     def upload_questions_link(self, obj):
         if not obj or not obj.pk:
-            return "Save the fixed exam draft first."
+            return "Сначала сохраните черновик."
         if obj.mode != Exam.Mode.FIXED:
             return "Available for fixed exams."
         if obj.published or obj.invitation_set.exists():
-            return "Questions are locked after publication or code issue."
+            return "После публикации или выдачи кода вопросы менять нельзя."
         url = reverse("admin:exams_exam_upload_questions", args=[obj.pk])
-        return format_html('<a href="{}">Upload XLSX, TXT, PDF or DOCX</a>', url)
+        return format_html('<a href="{}">Загрузить вопросы из файла</a>', url)
+
+    @admin.display(description="Сгенерировать схемы")
+    def generate_schemes_control(self, obj):
+        if not obj or obj.mode != Exam.Mode.FIXED or obj.published or obj.invitation_set.exists():
+            return ""
+        questions = obj.questions.filter(invitation__isnull=True, kind=ExamQuestionRule.Kind.OPEN,
+                                         grading_mode=Question.GradingMode.AI).order_by("slot")
+        questions = list(questions)
+        urls = [reverse("admin:exams_exam_generate_scheme", args=[obj.pk, question.pk])
+                for question in questions if not question.image and not question.requires_image
+                and _needs_marking_scheme(question)]
+        image_note = "Для вопросов с изображением вручную задайте критерии и образец ответа."
+        incomplete_image = any((question.image or question.requires_image)
+                               and (_needs_marking_scheme(question) or not question.model_answer.strip())
+                               for question in questions)
+        if not urls:
+            if incomplete_image:
+                return image_note
+            return "Все открытые вопросы уже имеют схемы оценивания."
+        return format_html(
+            '<button type="button" id="generate-schemes" data-urls="{}">'
+            'Сгенерировать схемы для текстовых вопросов ({})</button> '
+            '<span id="generate-schemes-progress"></span> {}',
+            json.dumps(urls), len(urls), image_note if incomplete_image else "")
 
     def has_module_permission(self, request):
         return request.user.is_superuser
@@ -302,6 +430,8 @@ class ExamAdmin(admin.ModelAdmin):
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
+        if not change and form.imported_questions:
+            Question.objects.bulk_create([Question(exam=form.instance, **row) for row in form.imported_questions])
         if form.instance.mode == Exam.Mode.FIXED:
             points = list(form.instance.questions.filter(invitation__isnull=True).values_list("points", flat=True))
             form.instance.question_count = len(points)
@@ -325,6 +455,8 @@ class ExamAdmin(admin.ModelAdmin):
         return base
 
     def get_inline_instances(self, request, obj=None):
+        if not obj and not _legacy_generated_submission(request):
+            return []
         instances = super().get_inline_instances(request, obj)
         mode = obj.mode if obj else (request.POST.get("mode") or Exam.Mode.GENERATED if request.method == "POST" else None)
         if obj and (obj.published or obj.invitation_set.exists()):
@@ -339,14 +471,66 @@ class ExamAdmin(admin.ModelAdmin):
             return [inline for inline in instances if isinstance(inline, QuestionRuleInline)]
         return instances
 
+    def response_add(self, request, obj, post_url_continue=None):
+        if obj.mode == Exam.Mode.FIXED and "_addanother" not in request.POST:
+            return HttpResponseRedirect(reverse("admin:exams_exam_change", args=[obj.pk]))
+        return super().response_add(request, obj, post_url_continue)
+
     def get_urls(self):
         custom = [
             path("question-template/", self.admin_site.admin_view(self.question_template_view),
                  name="exams_exam_question_template"),
             path("<int:object_id>/upload-questions/", self.admin_site.admin_view(self.upload_questions_view),
                  name="exams_exam_upload_questions"),
+            path("<int:object_id>/questions/<int:question_id>/generate-scheme/",
+                 self.admin_site.admin_view(self.generate_scheme_view), name="exams_exam_generate_scheme"),
         ]
         return custom + super().get_urls()
+
+    def generate_scheme_view(self, request, object_id, question_id):
+        exam = self.get_object(request, object_id)
+        if not exam or not self.has_change_permission(request, exam):
+            raise PermissionDenied
+        question = get_object_or_404(Question, pk=question_id, exam=exam, invitation__isnull=True)
+        if (exam.mode != Exam.Mode.FIXED or exam.published or exam.invitation_set.exists()
+                or question.kind != ExamQuestionRule.Kind.OPEN
+                or question.grading_mode != Question.GradingMode.AI
+                or question.image or question.requires_image):
+            raise PermissionDenied
+        error = None
+        wants_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        if request.method == "POST":
+            if not _needs_marking_scheme(question):
+                error = "Эта схема уже заполнена. Исправленную вручную схему ИИ не заменяет."
+            else:
+                original = (question.stem, question.points, question.kind, question.grading_mode)
+                try:
+                    rubric = suggest_marking_scheme(question)
+                    with transaction.atomic():
+                        locked_exam = Exam.objects.select_for_update().get(pk=exam.pk)
+                        locked = (Question.objects.select_for_update()
+                                  .filter(pk=question.pk, exam=locked_exam, invitation__isnull=True).first())
+                        if (locked_exam.published or locked_exam.invitation_set.exists()
+                                or not locked
+                                or (locked.stem, locked.points, locked.kind, locked.grading_mode) != original
+                                or not _needs_marking_scheme(locked)):
+                            raise ValidationError("Вопрос изменился во время генерации. Проверьте его и повторите.")
+                        locked.rubric = rubric
+                        locked.save(update_fields=["rubric"])
+                except ValidationError as exc:
+                    error = exc.messages[0]
+                else:
+                    if wants_json:
+                        return JsonResponse({"ok": True})
+                    self.message_user(request, f"Схема для вопроса {question.slot} готова. Проверьте её перед публикацией.")
+                    return HttpResponseRedirect(reverse("admin:exams_exam_change", args=[exam.pk]))
+        if wants_json and request.method == "POST":
+            return JsonResponse({"error": error or "Не удалось сгенерировать схему."}, status=400)
+        context = {**self.admin_site.each_context(request),
+                   "title": f"Схема оценивания: вопрос {question.slot}", "opts": self.model._meta,
+                   "exam": exam, "question": question, "error": error,
+                   "change_url": reverse("admin:exams_exam_change", args=[exam.pk])}
+        return render(request, "admin/exams/exam/generate_scheme.html", context)
 
     def question_template_view(self, request):
         if not self.has_add_permission(request):
@@ -373,6 +557,8 @@ class ExamAdmin(admin.ModelAdmin):
         if request.method == "POST" and form.is_valid():
             try:
                 rows = read_fixed_questions(form.cleaned_data["file"])
+                if any(row["grading_mode"] == Question.GradingMode.MANUAL for row in rows):
+                    raise ValidationError("В новом тесте используется проверка ИИ. Удалите режим manual из файла.")
                 with transaction.atomic():
                     locked = Exam.objects.select_for_update().get(pk=exam.pk)
                     if locked.mode != Exam.Mode.FIXED or locked.published or locked.invitation_set.exists():
@@ -401,7 +587,7 @@ class QuestionAdmin(admin.ModelAdmin):
     list_display = ["exam", "invitation", "slot", "kind", "points", "subtopic", "stem"]
     list_filter = ["exam", "kind", "slot"]
     search_fields = ["stem", "subtopic", "invitation__student__name", "invitation__student__user__email"]
-    readonly_fields = ["exam", "invitation", "slot", "kind", "points", "subtopic", "stem", "options", "correct_option",
+    readonly_fields = ["exam", "invitation", "slot", "kind", "points", "subtopic", "stem", "options", "interaction", "correct_option",
                        "rubric", "model_answer", "subtopic_explanation", "answer_explanation", "created_at"]
     actions = None
 
@@ -791,8 +977,26 @@ class GradeAppealAdmin(admin.ModelAdmin):
     @admin.display(description="Student answer")
     def student_answer(self, obj):
         value = obj.attempt.answers.get(str(obj.question_id), "")
-        if obj.question.kind == "mcq" and value.isdecimal() and int(value) < len(obj.question.options):
+        if obj.question.kind == Question.Kind.MCQ and isinstance(value, str) and value.isdecimal() and int(value) < len(obj.question.options):
             return obj.question.options[int(value)]
+        def chosen(index):
+            if isinstance(index, int) or (isinstance(index, str) and index.isdecimal()):
+                number = int(index)
+                if 0 <= number < len(obj.question.options):
+                    return obj.question.options[number]
+            return "—"
+        if obj.question.kind == Question.Kind.CLOZE and isinstance(value, list):
+            return format_html_join("", "<div>Blank {}: {}</div>",
+                                    ((index, item or "—") for index, item in enumerate(value, 1)))
+        if obj.question.kind == Question.Kind.MATCHING and isinstance(value, list):
+            return format_html_join("", "<div>{} → {}</div>",
+                                    ((left, chosen(index)) for left, index in zip(
+                                        obj.question.interaction.get("left", []), value)))
+        if obj.question.kind == Question.Kind.MULTISELECT and isinstance(value, list):
+            return format_html_join("", "<div>{}</div>", ((chosen(index),) for index in value))
+        if obj.question.kind == Question.Kind.ORDERING and isinstance(value, list):
+            return format_html_join("", "<div>{}. {}</div>",
+                                    ((position, chosen(index)) for position, index in enumerate(value, 1)))
         return value or "No answer given"
 
     @admin.display(description="Criteria")
