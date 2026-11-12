@@ -186,6 +186,8 @@ def _read_answers(request, questions):
                     raise ValueError("Invalid multiple-choice value.")
                 if posted:
                     selected.append(str(index))
+            if len(selected) > q.points:
+                raise ValueError(f"Select no more than {q.points} options.")
             answers[str(q.id)] = selected
             continue
         if q.kind in ("cloze", "matching", "ordering"):

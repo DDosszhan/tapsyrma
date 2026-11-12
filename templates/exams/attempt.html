@@ -26,14 +26,14 @@
 <p id="visibility-warning" class="visibility-warning" role="alert" hidden></p>
 <div class="exam-layout">
 <form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}
-{% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" tabindex="-1"><span class="points">{{ q.points }} points</span>
+{% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% endif %} tabindex="-1"><span class="points">{{ q.points }} points</span>
 <h2>Question {{ forloop.counter }}</h2>
 {% if q.kind == "cloze" %}<p class="question-stem cloze-stem">{% for part in q.stem|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
 {% else %}<p class="question-stem">{{ q.stem }}</p>{% endif %}
 {% if q.image %}<img class="question-image" src="{% url 'exam_question_image' q.id %}" alt="Diagram for question {{ forloop.counter }}">{% endif %}
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
-{% endfor %}{% elif q.kind == "multiselect" %}<p>Select all that apply.</p>{% for option in q.options %}
+{% endfor %}{% elif q.kind == "multiselect" %}<p>Select up to {{ q.points }} options.</p>{% for option in q.options %}
 <label><input type="checkbox" name="q_{{ q.id }}_{{ forloop.counter0 }}" value="1" {% if answers|dict_get:q.id|has_index:forloop.counter0 %}checked{% endif %}> {{ option }}</label>
 {% endfor %}{% elif q.kind == "matching" %}<p>Choose the numbered option for each item:</p>
 <ol class="matching-choices" id="choices-{{ q.id }}">{% for option in q.options %}<li>{{ option }}</li>{% endfor %}</ol>
@@ -54,6 +54,14 @@
 <script>
 const form=document.getElementById('answers'),status=document.getElementById('save-status');let saveTimer,leavingExam=false,awayId=null,pendingReturn=null;
 const warning=document.getElementById('visibility-warning'),mapLinks=[...document.querySelectorAll('.question-grid a')];
+function updateChoiceLimits(){
+  for(const question of form.querySelectorAll('[data-max-choices]')){
+    const boxes=[...question.querySelectorAll('input[type=checkbox]')];
+    const limit=Number(question.dataset.maxChoices);
+    const full=boxes.filter(box=>box.checked).length>=limit;
+    boxes.forEach(box=>{box.disabled=full&&!box.checked});
+  }
+}
 function updateMap(){
   let answered=0;
   for(const link of mapLinks){
@@ -67,14 +75,14 @@ function updateMap(){
   }
   document.getElementById('answered-count').textContent=answered;
 }
-updateMap();
+updateChoiceLimits();updateMap();
 function scheduleSave(event){
   if(event.target.matches('select')&&event.target.value){
     event.target.closest('.question').querySelectorAll('select').forEach(other=>{
       if(other!==event.target&&other.value===event.target.value)other.value='';
     });
   }
-  updateMap();clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)
+  updateChoiceLimits();updateMap();clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)
 }
 form.addEventListener('input',scheduleSave);form.addEventListener('change',scheduleSave);
 form.addEventListener('submit',()=>{leavingExam=true});

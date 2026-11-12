@@ -115,6 +115,7 @@ class StructuredQuestionJourneyTests(TestCase):
         self.assertEqual(self.client.post("/exam/").status_code, 302)
         page = self.client.get("/exam/")
         self.assertContains(page, f'type="checkbox" name="q_{multiple.pk}_0"')
+        self.assertContains(page, 'data-max-choices="2"')
         self.assertContains(page, f'name="q_{ordering.pk}_0"')
         self.assertNotContains(page, "ORDER SECRET")
         self.assertNotContains(page, "All input devices")
@@ -129,6 +130,7 @@ class StructuredQuestionJourneyTests(TestCase):
         self.assertContains(resumed, f'name="q_{multiple.pk}_2" value="1" checked')
         self.assertContains(resumed, 'value="1" selected')
         for bad in ({f"q_{multiple.pk}_4": "1"}, {f"q_{multiple.pk}_0": "on"},
+                    {f"q_{multiple.pk}_0": "1", f"q_{multiple.pk}_1": "1", f"q_{multiple.pk}_2": "1"},
                     {f"q_{ordering.pk}_0": "03"}, {f"q_{ordering.pk}_3": "0"},
                     {f"q_{ordering.pk}_0": "1", f"q_{ordering.pk}_1": "1"},
                     {f"q_{ordering.pk}": "unexpected"}):
