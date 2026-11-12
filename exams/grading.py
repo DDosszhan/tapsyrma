@@ -52,6 +52,7 @@ def grade_attempt(attempt):
             continue
         question = questions[pk]
         answer = attempt.answers.get(str(pk), "")
+        review_reason = ""
         if question.grading_mode == Question.GradingMode.MANUAL and answer:
             grade = {"score": 0, "criteria": [0] * len(question.rubric),
                      "explanation": "This answer is awaiting teacher review.", "review_pending": True}
@@ -82,6 +83,8 @@ def grade_attempt(attempt):
                 locked.score = sum(row["score"] for row in locked.grades.values())
                 locked.save(update_fields=["grades", "score"])
                 if grade.get("review_pending"):
+                    if grade.get("review_reason"):
+                        review_reason = f"{AUTO_REVIEW_REASON} {grade['review_reason']}"[:500]
                     GradeAppeal.objects.get_or_create(
                         attempt=locked, question=question,
                         defaults={"student_reason": review_reason,

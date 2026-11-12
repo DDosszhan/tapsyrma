@@ -743,7 +743,7 @@ class ExamFlowTests(TestCase):
         self.assertContains(result, "Provisional score")
         self.assertContains(result, "Awaiting teacher")
         self.assertContains(result, f'href="#question-{question.pk}" class="review"')
-        self.assertContains(result, "Add a note for the teacher")
+        self.assertContains(result, "<summary>Add a note</summary>", html=True)
         self.assertTrue(result.context["items"][0]["auto_pending"])
         self.assertContains(self.client.get("/history/"), "Provisional score")
         old_grade = dict(attempt.grades[str(question.pk)])
@@ -758,7 +758,7 @@ class ExamFlowTests(TestCase):
         self.assertEqual(appeal.student_note, note)
         self.assertEqual(GradeAppeal.objects.count(), 1)
         self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), note)
-        self.assertNotContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Add a note for the teacher")
+        self.assertNotContains(self.client.get(f"/exam/result/{attempt.pk}/"), "<summary>Add a note</summary>", html=True)
         self.client.post(url, {"reason": "Повторное сообщение учителю."})
         appeal.refresh_from_db()
         self.assertEqual(appeal.student_note, note)
@@ -802,6 +802,13 @@ class ExamFlowTests(TestCase):
             with self.assertRaises(ManualReviewRequired):
                 grade_open(question, "2x=4, x=2")
         with patch("exams.ai.structured_response", return_value={**supported,
+                  "needs_review": True, "review_reason": "Ключ неоднозначен."}):
+            provisional = grade_open(question, "2x=4, x=2")
+        self.assertEqual(provisional["score"], 2)
+        self.assertEqual(provisional["criteria"], [1, 1, 0])
+        self.assertTrue(provisional["review_pending"])
+        self.assertIn("Ключ неоднозначен", provisional["review_reason"])
+        with patch("exams.ai.structured_response", return_value={**invented,
                   "needs_review": True, "review_reason": "Ключ неоднозначен."}):
             with self.assertRaises(ManualReviewRequired):
                 grade_open(question, "2x=4, x=2")
@@ -854,7 +861,8 @@ class ExamFlowTests(TestCase):
             score=0, status=Attempt.Status.DONE)
         url = f"/exam/result/{attempt.pk}/appeal/{question.pk}/"
         self.client.force_login(student_user)
-        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "Send to teacher")
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"),
+                            "<summary>Appeal this grade</summary>", html=True)
         self.assertEqual(self.client.post(url, {"reason": "Мой ответ содержит оба верных шага."}).status_code, 302)
         self.assertEqual(self.client.post(url, {"reason": "Повторное обращение."}).status_code, 302)
         self.assertEqual(GradeAppeal.objects.count(), 1)
