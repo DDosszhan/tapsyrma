@@ -382,7 +382,10 @@ def result(request, attempt_id=None):
             map_status, map_label = "wrong", "points lost"
         items.append({"question": q, "answer": answer, "answer_rows": answer_rows,
                       "correct_rows": correct_rows,
-                      "grade": grade, "criteria": zip(q.rubric, grade["criteria"]) if grade else [],
+                      "grade": grade,
+                      "display_rubric": grade.get("rubric_snapshot", q.rubric) if grade else q.rubric,
+                      "display_model_answer": grade.get("model_answer_snapshot", q.model_answer) if grade else q.model_answer,
+                      "criteria": zip(grade.get("rubric_snapshot", q.rubric), grade["criteria"]) if grade else [],
                       "appeal": question_appeal,
                       "map_status": map_status, "map_label": map_label,
                       "auto_pending": auto_pending,

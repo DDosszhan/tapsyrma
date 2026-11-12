@@ -939,8 +939,9 @@ class AttemptAdmin(admin.ModelAdmin):
                 criteria = []
                 if question and grade:
                     scores = grade.get("criteria", [])
+                    rubric = grade.get("rubric_snapshot", question.rubric)
                     criteria = [(row["criterion"], scores[index] if index < len(scores) else None, row["points"])
-                                for index, row in enumerate(question.rubric)]
+                                for index, row in enumerate(rubric)]
                 items.append({"number": number, "question_id": question_id, "question": question,
                               "answer_text": answer_text, "answer_rows": rows, "grade": grade,
                               "criteria": criteria})
@@ -1106,8 +1107,10 @@ class GradeAppealAdmin(admin.ModelAdmin):
 
     @admin.display(description="Criteria")
     def rubric_details(self, obj):
+        grade = obj.attempt.grades.get(str(obj.question_id), {})
+        rubric = grade.get("rubric_snapshot", obj.question.rubric)
         return format_html_join("", "<div>{} — up to {} points</div>",
-                                ((row["criterion"], row["points"]) for row in obj.question.rubric))
+                                ((row["criterion"], row["points"]) for row in rubric))
 
     def has_add_permission(self, request):
         return False

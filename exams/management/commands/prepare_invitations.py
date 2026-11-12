@@ -43,6 +43,8 @@ class Command(BaseCommand):
             if invitation.exam.mode == Exam.Mode.FIXED:
                 try:
                     with transaction.atomic():
+                        # Serialize copying the template with a reviewed rubric update.
+                        Exam.objects.select_for_update().get(pk=invitation.exam_id)
                         locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
                         if (locked.variant_status != Invitation.VariantStatus.GENERATING
                                 or locked.generation_started_at != claim[0]):

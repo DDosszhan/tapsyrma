@@ -50,9 +50,9 @@
 {% elif attempt.status == "done" %}<details class="appeal-compose"><summary>Appeal this grade</summary><form method="post" action="{% url 'exam_appeal' attempt.pk item.question.pk %}">{% csrf_token %}<label>Think there is a grading error? Explain what should be reviewed:<textarea name="reason" minlength="10" maxlength="2000" required></textarea></label><button type="submit" class="appeal-send" aria-label="Send appeal to {% if exam.grade == 0 %}examiner{% else %}teacher{% endif %}"><span aria-hidden="true">↑</span></button></form></details>{% endif %}
 {% if show_marking_details %}
 {% if item.correct_rows %}<h3>Correct answers</h3><ul>{% for label, value in item.correct_rows %}<li>{{ label }}: {{ value }}</li>{% endfor %}</ul>{% endif %}
-<h3>Marking criteria</h3><ul>{% if item.grade and not item.auto_pending %}{% for criterion, earned in item.criteria %}<li>{{ criterion.criterion }} — {{ earned }} / {{ criterion.points }}</li>{% endfor %}{% else %}{% for criterion in item.question.rubric %}<li>{{ criterion.criterion }} — up to {{ criterion.points }} points</li>{% endfor %}{% endif %}</ul>
+<h3>Marking criteria</h3><ul>{% if item.grade and not item.auto_pending %}{% for criterion, earned in item.criteria %}<li>{{ criterion.criterion }} — {{ earned }} / {{ criterion.points }}</li>{% endfor %}{% else %}{% for criterion in item.display_rubric %}<li>{{ criterion.criterion }} — up to {{ criterion.points }} points</li>{% endfor %}{% endif %}</ul>
 <details><summary>Subtopic explanation: {{ item.question.subtopic }}</summary><p>{{ item.question.subtopic_explanation|linebreaksbr }}</p></details>
-<details><summary>Answer explanation</summary><p>{{ item.question.answer_explanation|linebreaksbr }}</p><p><strong>Model answer:</strong> {{ item.question.model_answer|linebreaksbr }}</p></details>
+<details><summary>Answer explanation</summary><p>{{ item.question.answer_explanation|linebreaksbr }}</p><p><strong>Model answer:</strong> {{ item.display_model_answer|linebreaksbr }}</p></details>
 {% endif %}
 </section>{% endfor %}
 </div><aside class="question-map" aria-label="Result map"><h2>Result map</h2><p>Select a number to jump to a question.</p>
