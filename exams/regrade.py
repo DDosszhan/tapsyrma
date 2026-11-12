@@ -1,6 +1,5 @@
 """Regrade selected attempts without hiding or overwriting their existing results."""
 import time
-from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -10,20 +9,9 @@ from .grading import AUTO_REVIEW_REASON, grade_structured
 from .models import Attempt, Exam, GradeAppeal, Question, RegradeJob
 
 
-def _needs_model(question, answer, old_grade):
-    return (question.kind == Question.Kind.OPEN and question.grading_mode == Question.GradingMode.AI
-            and bool(answer) and (old_grade or {}).get("grading_version")
-            not in ("semantic-v2", "deterministic-binary"))
-
-
-def _has_work(attempt):
-    questions = Question.objects.in_bulk(attempt.question_ids)
-    for pk in attempt.question_ids:
-        old_grade = attempt.grades.get(str(pk))
-        if old_grade is None or (pk in questions and _needs_model(
-                questions[pk], attempt.answers.get(str(pk), ""), old_grade)):
-            return True
-    return False
+def _decided_questions(attempt):
+    return set(GradeAppeal.objects.filter(attempt=attempt).exclude(
+        status=GradeAppeal.Status.PENDING).values_list("question_id", flat=True))
 
 
 @transaction.atomic
@@ -32,12 +20,10 @@ def enqueue_regrade(attempt_id, requested_by):
     attempt = Attempt.objects.select_for_update().get(pk=attempt_id)
     if attempt.status not in (Attempt.Status.DONE, Attempt.Status.ERROR):
         return None
-    if GradeAppeal.objects.filter(attempt=attempt).exclude(status=GradeAppeal.Status.PENDING).exists():
-        return None
     if RegradeJob.objects.filter(attempt=attempt, status__in=(
             RegradeJob.Status.PENDING, RegradeJob.Status.GRADING)).exists():
         return None
-    if not _has_work(attempt):
+    if not attempt.question_ids:
         return None
     return RegradeJob.objects.create(
         attempt=attempt, requested_by=requested_by,
@@ -77,9 +63,7 @@ def _wait_for_live_grading():
 
 def _snapshot_matches(job, attempt):
     return (attempt.status == job.original_status and attempt.grades == job.original_grades
-            and attempt.score == job.original_score
-            and not GradeAppeal.objects.filter(attempt=attempt).exclude(
-                status=GradeAppeal.Status.PENDING).exists())
+            and attempt.score == job.original_score)
 
 
 def process_regrade_job(job):
@@ -99,6 +83,7 @@ def process_regrade_job(job):
             raise ValueError("The attempt or teacher decision changed during regrading.")
         questions = Question.objects.in_bulk(attempt.question_ids)
         candidate = dict(job.candidate_grades)
+        decided_questions = _decided_questions(attempt)
         for pk in attempt.question_ids:
             key = str(pk)
             if key in candidate:
@@ -106,7 +91,9 @@ def process_regrade_job(job):
             question = questions[pk]
             answer = attempt.answers.get(key, "")
             old_grade = job.original_grades.get(key)
-            if old_grade is not None and not _needs_model(question, answer, old_grade):
+            if pk in decided_questions:
+                if old_grade is None:
+                    raise ValueError("A teacher-reviewed question has no saved grade.")
                 grade = old_grade
             else:
                 _wait_for_live_grading()
@@ -119,6 +106,12 @@ def process_regrade_job(job):
             locked_job = RegradeJob.objects.select_for_update().get(pk=job.pk)
             if not _snapshot_matches(locked_job, locked_attempt):
                 raise ValueError("The attempt or teacher decision changed during regrading.")
+            # A teacher may resolve an appeal while the AI is working.
+            for pk in _decided_questions(locked_attempt):
+                key = str(pk)
+                if key not in locked_attempt.grades:
+                    raise ValueError("A teacher-reviewed question has no saved grade.")
+                candidate[key] = locked_attempt.grades[key]
             if set(candidate) != {str(pk) for pk in locked_attempt.question_ids}:
                 raise ValueError("Not all questions have been regraded.")
             locked_attempt.grades = candidate
@@ -137,9 +130,10 @@ def process_regrade_job(job):
                         attempt=locked_attempt, question=questions[pk],
                         defaults={"student_reason": reason[:500], "original_grade": grade})
             locked_job.status = RegradeJob.Status.DONE
+            locked_job.candidate_grades = candidate
             locked_job.error_message = ""
             locked_job.finished_at = timezone.now()
-            locked_job.save(update_fields=["status", "error_message", "finished_at"])
+            locked_job.save(update_fields=["status", "candidate_grades", "error_message", "finished_at"])
         return True
     except Exception as exc:
         RegradeJob.objects.filter(pk=job.pk, status__in=(

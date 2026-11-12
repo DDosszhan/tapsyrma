@@ -889,7 +889,7 @@ class AttemptAdmin(admin.ModelAdmin):
     inlines = [AttemptVisibilityEventInline]
     search_fields = ["invitation__student__name", "invitation__student__user__email",
                      "invitation__student__external_id", "invitation__exam__title"]
-    actions = ["retry_grading", "queue_regrade"]
+    actions = ["queue_regrade"]
     fields = ["invitation", "status", "score", "started_at", "deadline_at", "submitted_at", "graded_at",
               "grading_started_at", "error_message"]
     readonly_fields = ["invitation", "status", "score", "started_at", "submitted_at", "graded_at",
@@ -950,6 +950,9 @@ class AttemptAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     @admin.display(description="Page exits")
     def visibility_count(self, obj):
         return obj.visibility_events.count()
@@ -958,21 +961,13 @@ class AttemptAdmin(admin.ModelAdmin):
     def grading_progress(self, obj):
         return f"{len(obj.grades)}/{len(obj.question_ids)}"
 
-    @admin.action(description="Продолжить прерванную проверку (только ошибки)")
-    def retry_grading(self, request, queryset):
-        active_regrades = RegradeJob.objects.filter(status__in=(
-            RegradeJob.Status.PENDING, RegradeJob.Status.GRADING)).values("attempt_id")
-        count = (queryset.filter(status=Attempt.Status.ERROR).exclude(pk__in=active_regrades)
-                 .update(status=Attempt.Status.PENDING, error_message=""))
-        self.message_user(request, f"Queued for grading retry: {count}. Previously graded questions are kept.")
-
     def get_actions(self, request):
         actions = super().get_actions(request)
         if not request.user.is_superuser:
             actions.pop("queue_regrade", None)
         return actions
 
-    @admin.action(description="Переоценить старые развёрнутые ответы выбранных работ новой версией ИИ")
+    @admin.action(description="Перепроверить работу")
     def queue_regrade(self, request, queryset):
         if not request.user.is_superuser:
             raise PermissionDenied("Only a superuser can request a full regrade.")
@@ -983,7 +978,7 @@ class AttemptAdmin(admin.ModelAdmin):
                 queued += 1
             else:
                 skipped += 1
-        self.message_user(request, f"Queued {queued} regrades; skipped {skipped} already current, in progress, or teacher-reviewed attempts. Existing scores stay visible until each regrade finishes.")
+        self.message_user(request, f"Поставлено на перепроверку: {queued}. Пропущено: {skipped}. Прежние баллы видны до завершения проверки.")
 
 
 @admin.register(RegradeJob)

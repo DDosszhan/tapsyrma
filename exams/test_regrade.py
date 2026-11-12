@@ -1,12 +1,13 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from .models import Attempt, Exam, GradeAppeal, Invitation, Question, RegradeJob, Student
@@ -59,7 +60,7 @@ class RegradeTests(TestCase):
         attempt.save(update_fields=["question_ids", "answers", "grades"])
         return question
 
-    def test_action_queues_only_selected_old_unreviewed_attempts_without_changing_results(self):
+    def test_action_queues_selected_completed_attempts_including_v2_without_changing_results(self):
         done, _ = self.make_attempt("done")
         failed, _ = self.make_attempt("failed", Attempt.Status.ERROR)
         v2, _ = self.make_attempt("v2", grade={**self.old_grade, "grading_version": "semantic-v2"})
@@ -76,7 +77,8 @@ class RegradeTests(TestCase):
             self.queue(done, failed, v2, active, reviewed)
             self.queue(done, failed)
         ai.assert_not_called()
-        self.assertEqual(set(RegradeJob.objects.values_list("attempt_id", flat=True)), {done.pk, failed.pk})
+        self.assertEqual(set(RegradeJob.objects.values_list("attempt_id", flat=True)),
+                         {done.pk, failed.pk, v2.pk, reviewed.pk})
         for attempt in (done, failed, v2, active, reviewed, unselected):
             attempt.refresh_from_db()
             expected = 1 if attempt == reviewed else 0
@@ -104,20 +106,47 @@ class RegradeTests(TestCase):
         self.assertFalse(RegradeJob.objects.filter(attempt=attempt).exists())
         self.assertIn(self.client.get("/admin/exams/regradejob/").status_code, (403, 404))
 
-    def test_old_retry_does_not_claim_an_attempt_with_queued_regrade(self):
-        queued, _ = self.make_attempt("retry-queued", status=Attempt.Status.ERROR)
-        available, _ = self.make_attempt("retry-available", status=Attempt.Status.ERROR)
-        self.queue(queued)
-        response = self.client.post("/admin/exams/attempt/", {
-            "action": "retry_grading",
-            "_selected_action": [str(queued.pk), str(available.pk)],
-        })
-        self.assertEqual(response.status_code, 302)
-        queued.refresh_from_db()
-        available.refresh_from_db()
-        self.assertEqual(queued.status, Attempt.Status.ERROR)
-        self.assertEqual(available.status, Attempt.Status.PENDING)
-        self.assertEqual(RegradeJob.objects.get(attempt=queued).status, RegradeJob.Status.PENDING)
+    def test_admin_offers_one_recheck_action(self):
+        request = RequestFactory().get("/admin/exams/attempt/")
+        request.user = self.admin
+        actions = admin.site._registry[Attempt].get_actions(request)
+        self.assertEqual(set(actions), {"queue_regrade"})
+        self.assertEqual(actions["queue_regrade"][2], "Перепроверить работу")
+        self.make_attempt("action-menu")
+        response = self.client.get("/admin/exams/attempt/")
+        self.assertContains(response, "Перепроверить работу")
+        self.assertNotContains(response, "retry_grading")
+
+    def test_already_semantic_v2_answer_is_checked_again(self):
+        old_grade = {"score": 0, "criteria": [0], "explanation": "Previous AI grade",
+                     "grading_version": "semantic-v2"}
+        attempt, question = self.make_attempt("v2-again", grade=old_grade)
+        self.queue(attempt)
+        new_grade = {"score": 1, "criteria": [1], "explanation": "New AI grade",
+                     "grading_version": "semantic-v2"}
+        with patch("exams.regrade.grade_open", return_value=new_grade) as ai:
+            call_command("regrade_attempts", "--once")
+        ai.assert_called_once()
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.grades[str(question.pk)], new_grade)
+        self.assertEqual(attempt.score, 1)
+        self.assertEqual(RegradeJob.objects.get(attempt=attempt).status, RegradeJob.Status.DONE)
+
+    def test_teacher_final_grade_is_preserved_during_recheck(self):
+        teacher_grade = {"score": 1, "criteria": [1], "explanation": "Teacher decision"}
+        attempt, question = self.make_attempt("teacher-final", grade=teacher_grade)
+        GradeAppeal.objects.create(
+            attempt=attempt, question=question, student_reason="Review fixture",
+            original_grade=self.old_grade, status=GradeAppeal.Status.ACCEPTED,
+            corrected_grade=teacher_grade)
+        self.queue(attempt)
+        with patch("exams.regrade.grade_open") as ai:
+            call_command("regrade_attempts", "--once")
+        ai.assert_not_called()
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.grades[str(question.pk)], teacher_grade)
+        self.assertEqual(attempt.score, 1)
+        self.assertEqual(RegradeJob.objects.get(attempt=attempt).status, RegradeJob.Status.DONE)
 
     def test_regrade_publishes_complete_result_and_keeps_pending_appeal(self):
         attempt, question = self.make_attempt("appeal")
@@ -125,11 +154,11 @@ class RegradeTests(TestCase):
             exam=self.exam, invitation=attempt.invitation, slot=2, kind=Question.Kind.MCQ,
             points=1, stem="Select the correct option.", options=["A", "B", "C", "D"],
             correct_option=0, rubric=[{"criterion": "Correct option", "points": 1}])
-        objective_grade = {"score": 1, "criteria": [1], "explanation": "Correct option."}
+        objective_grade = {"score": 0, "criteria": [0], "explanation": "Old option was incorrect."}
         attempt.question_ids.append(choice.pk)
         attempt.answers[str(choice.pk)] = "0"
         attempt.grades[str(choice.pk)] = objective_grade
-        attempt.score = 1
+        attempt.score = 0
         attempt.save(update_fields=["question_ids", "answers", "grades", "score"])
         appeal = GradeAppeal.objects.create(
             attempt=attempt, question=question, student_reason="Please review this answer",
@@ -137,7 +166,7 @@ class RegradeTests(TestCase):
         self.queue(attempt)
         job = RegradeJob.objects.get(attempt=attempt)
         attempt.refresh_from_db()
-        self.assertEqual((attempt.status, attempt.score), (Attempt.Status.DONE, 1))
+        self.assertEqual((attempt.status, attempt.score), (Attempt.Status.DONE, 0))
         self.assertEqual(attempt.grades[str(question.pk)], self.old_grade)
 
         new_grade = {"score": 1, "criteria": [1], "explanation": "Correct alternative",
@@ -150,7 +179,8 @@ class RegradeTests(TestCase):
         appeal.refresh_from_db()
         self.assertEqual((attempt.status, attempt.score), (Attempt.Status.DONE, 2))
         self.assertEqual(attempt.grades[str(question.pk)], new_grade)
-        self.assertEqual(attempt.grades[str(choice.pk)], objective_grade)
+        self.assertEqual(attempt.grades[str(choice.pk)]["score"], 1)
+        self.assertNotEqual(attempt.grades[str(choice.pk)], objective_grade)
         self.assertEqual(job.original_grades[str(question.pk)], self.old_grade)
         self.assertEqual(job.candidate_grades[str(question.pk)], new_grade)
         self.assertEqual(job.status, RegradeJob.Status.DONE)
@@ -211,7 +241,7 @@ class RegradeTests(TestCase):
         appeal.refresh_from_db()
         self.assertEqual((attempt.score, attempt.grades[str(question.pk)]), (0, self.old_grade))
         self.assertEqual(appeal.status, GradeAppeal.Status.REJECTED)
-        self.assertEqual(RegradeJob.objects.get(attempt=attempt).status, RegradeJob.Status.ERROR)
+        self.assertEqual(RegradeJob.objects.get(attempt=attempt).status, RegradeJob.Status.DONE)
 
     def test_failed_attempt_finishes_missing_grade_with_new_model(self):
         attempt, first = self.make_attempt("missing", status=Attempt.Status.ERROR)
