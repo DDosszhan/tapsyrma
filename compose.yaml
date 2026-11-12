@@ -45,6 +45,17 @@ services:
         condition: service_healthy
     command: python manage.py grade_attempts
 
+  regrader:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python manage.py regrade_attempts
+
   generator:
     build: .
     restart: unless-stopped

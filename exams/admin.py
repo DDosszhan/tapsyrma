@@ -23,7 +23,8 @@ from django.utils.html import format_html, format_html_join
 from .ai import blueprint, suggest_marking_scheme
 from .fixed_questions import (XLSX_COLUMNS, answer_items_from_question, normalize_question, read_fixed_questions,
                               validate_question_image, validate_question_set, validate_stored_questions)
-from .models import Attempt, AttemptVisibilityEvent, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, SharedCode, Student
+from .models import Attempt, AttemptVisibilityEvent, Exam, ExamQuestionRule, GradeAppeal, Invitation, Question, RegradeJob, SharedCode, Student
+from .regrade import enqueue_regrade
 from .student_import import read_student_emails
 from .syllabus import extract_syllabus_text, validate_syllabus_file
 
@@ -888,7 +889,7 @@ class AttemptAdmin(admin.ModelAdmin):
     inlines = [AttemptVisibilityEventInline]
     search_fields = ["invitation__student__name", "invitation__student__user__email",
                      "invitation__student__external_id", "invitation__exam__title"]
-    actions = ["retry_grading"]
+    actions = ["retry_grading", "queue_regrade"]
     fields = ["invitation", "status", "score", "started_at", "deadline_at", "submitted_at", "graded_at",
               "grading_started_at", "error_message"]
     readonly_fields = ["invitation", "status", "score", "started_at", "submitted_at", "graded_at",
@@ -957,10 +958,59 @@ class AttemptAdmin(admin.ModelAdmin):
     def grading_progress(self, obj):
         return f"{len(obj.grades)}/{len(obj.question_ids)}"
 
-    @admin.action(description="Retry automatic grading for selected failed attempts")
+    @admin.action(description="Продолжить прерванную проверку (только ошибки)")
     def retry_grading(self, request, queryset):
-        count = queryset.filter(status=Attempt.Status.ERROR).update(status=Attempt.Status.PENDING, error_message="")
+        active_regrades = RegradeJob.objects.filter(status__in=(
+            RegradeJob.Status.PENDING, RegradeJob.Status.GRADING)).values("attempt_id")
+        count = (queryset.filter(status=Attempt.Status.ERROR).exclude(pk__in=active_regrades)
+                 .update(status=Attempt.Status.PENDING, error_message=""))
         self.message_user(request, f"Queued for grading retry: {count}. Previously graded questions are kept.")
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if not request.user.is_superuser:
+            actions.pop("queue_regrade", None)
+        return actions
+
+    @admin.action(description="Переоценить старые развёрнутые ответы выбранных работ новой версией ИИ")
+    def queue_regrade(self, request, queryset):
+        if not request.user.is_superuser:
+            raise PermissionDenied("Only a superuser can request a full regrade.")
+        queued = 0
+        skipped = 0
+        for attempt_id in queryset.values_list("pk", flat=True).iterator():
+            if enqueue_regrade(attempt_id, request.user):
+                queued += 1
+            else:
+                skipped += 1
+        self.message_user(request, f"Queued {queued} regrades; skipped {skipped} already current, in progress, or teacher-reviewed attempts. Existing scores stay visible until each regrade finishes.")
+
+
+@admin.register(RegradeJob)
+class RegradeJobAdmin(admin.ModelAdmin):
+    list_display = ["id", "attempt", "status", "original_score", "candidate_score", "created_at", "finished_at"]
+    list_filter = ["status", "attempt__invitation__exam"]
+    readonly_fields = ["attempt", "requested_by", "status", "original_score", "original_status", "original_grades",
+                       "candidate_grades", "error_message", "created_at", "started_at", "finished_at"]
+
+    @admin.display(description="Prepared score")
+    def candidate_score(self, obj):
+        return sum(grade.get("score", 0) for grade in obj.candidate_grades.values()) if obj.candidate_grades else None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
 
 
 class GradeAppealReviewForm(forms.ModelForm):
@@ -1008,11 +1058,11 @@ class GradeAppealAdmin(admin.ModelAdmin):
     list_filter = ["status", "attempt__invitation__exam"]
     search_fields = ["attempt__invitation__student__name", "attempt__invitation__student__user__email",
                      "attempt__invitation__exam__title", "question__stem"]
-    readonly_fields = ["attempt", "question_text", "student_answer", "student_reason", "student_note", "original_grade",
+    readonly_fields = ["attempt", "question_text", "student_answer", "student_reason", "student_note", "original_grade", "current_grade",
                        "rubric_details", "status", "reviewed_by", "created_at", "reviewed_at"]
 
     def get_fields(self, request, obj=None):
-        fields = ["attempt", "question_text", "student_answer", "student_reason", "student_note", "original_grade",
+        fields = ["attempt", "question_text", "student_answer", "student_reason", "student_note", "original_grade", "current_grade",
                   "rubric_details", "status"]
         if obj and obj.status == GradeAppeal.Status.PENDING:
             fields += ["decision", "criterion_scores", "teacher_note"]
@@ -1054,6 +1104,10 @@ class GradeAppealAdmin(admin.ModelAdmin):
             return format_html_join("", "<div>{}. {}</div>",
                                     ((position, chosen(index)) for position, index in enumerate(value, 1)))
         return value or "No answer given"
+
+    @admin.display(description="Current grade")
+    def current_grade(self, obj):
+        return obj.attempt.grades.get(str(obj.question_id)) or "Not graded"
 
     @admin.display(description="Criteria")
     def rubric_details(self, obj):

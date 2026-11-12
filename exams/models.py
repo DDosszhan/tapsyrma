@@ -226,6 +226,30 @@ class Attempt(models.Model):
         indexes = [models.Index(fields=["status", "deadline_at"], name="attempt_deadline_idx")]
 
 
+class RegradeJob(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Queued"
+        GRADING = "grading", "Regrading"
+        DONE = "done", "Completed"
+        ERROR = "error", "Failed"
+
+    attempt = models.ForeignKey(Attempt, on_delete=models.PROTECT, related_name="regrade_jobs")
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    original_status = models.CharField(max_length=12, choices=Attempt.Status.choices)
+    original_grades = models.JSONField(default=dict)
+    original_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    candidate_grades = models.JSONField(default=dict)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["status", "created_at"], name="regrade_status_idx")]
+
+
 class AttemptVisibilityEvent(models.Model):
     attempt = models.ForeignKey(Attempt, on_delete=models.PROTECT, related_name="visibility_events")
     event_id = models.UUIDField()
