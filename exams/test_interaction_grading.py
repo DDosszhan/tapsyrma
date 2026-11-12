@@ -21,6 +21,8 @@ class StructuredGradingTests(SimpleTestCase):
             interaction={"left": ["CPU", "RAM"], "answers": [1, 0]},
         )
         self.assertEqual(grade_structured(question, ["1", "1"])["criteria"], [1, 0])
+        self.assertEqual(grade_structured(question, "")["criteria"], [0, 0])
+        self.assertEqual(grade_structured(question, [])["criteria"], [0, 0])
         with self.assertRaises(ValueError):
             grade_structured(question, ["1"])
 

@@ -10,6 +10,9 @@ AUTO_REVIEW_REASON = "Automatic grading sent this answer to the teacher."
 
 def grade_structured(question, answer):
     """Check objective multi-part answers against the stored question key."""
+    if answer == "" or answer == []:
+        return {"score": 0, "criteria": [0] * len(question.rubric),
+                "explanation": "No answer was given."}
     if not isinstance(answer, list):
         raise ValueError("The saved answer does not match the question parts.")
     if question.kind == "multiselect":
