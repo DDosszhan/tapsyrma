@@ -29,6 +29,7 @@ class ResultDisplayTests(SimpleTestCase):
             answer_rows=[("Blank 1", "PC"), ("Blank 2", "MAR")])
         self.assertIn('MAR &lt;- <span aria-label="Blank 1">____</span>', html)
         self.assertIn('MDR &lt;- M[<span aria-label="Blank 2">____</span>]', html)
+        self.assertIn('question-stem--fixed', html)
         self.assertNotIn("[[1]]", html)
         self.assertNotIn("SECRET_KEY", html)
 

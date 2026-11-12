@@ -7,8 +7,11 @@
 .result-layout .question{margin-top:0}
 .result-layout .question-map{top:24px}
 .question-stem{white-space:pre-wrap}
-.question-stem--table{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.question-stem--fixed{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
 .question-image{display:block;max-width:100%;height:auto;margin:0 0 16px}
+.diagram-detail{margin:0 0 18px}.diagram-detail summary{color:#124ab3;cursor:pointer;font-weight:600}.diagram-detail p{margin:8px 0}
+.diagram-pan{max-width:100%;overflow:auto;border:1px solid #d6dfe9;border-radius:8px;background:white}
+.diagram-pan img{display:block;width:900px;max-width:none;height:auto}
 .appeal-compose{margin-top:16px}
 .appeal-compose summary{display:inline-block;list-style:none;cursor:pointer;color:#124ab3;border:1px solid #124ab3;border-radius:8px;padding:8px 12px;font-weight:600}
 .appeal-compose summary::-webkit-details-marker{display:none}
@@ -33,9 +36,9 @@
 <div class="exam-layout result-layout"><div class="exam-questions">
 {% for item in items %}<section class="question" id="question-{{ item.question.pk }}">{% if item.auto_pending %}<span class="points">Awaiting {% if exam.grade == 0 %}review{% else %}teacher{% endif %}</span>{% elif item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
 <h2>Question {{ forloop.counter }}</h2>
-{% if item.question.kind == "cloze" %}<p class="question-stem{% if item.question.stem|has_pipe_table %} question-stem--table{% endif %}">{% for part in item.question.stem|cloze_parts %}{% if part.blank %}<span aria-label="Blank {{ part.number }}">____</span>{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
-{% else %}<p class="question-stem{% if item.question.stem|has_pipe_table %} question-stem--table{% endif %}">{{ item.question.stem }}</p>{% endif %}
-{% if item.question.image %}<img class="question-image" src="{% url 'exam_question_image' item.question.id %}" alt="Diagram for question {{ forloop.counter }}">{% endif %}
+{% if item.question.kind == "cloze" %}<p class="question-stem{% if item.question.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{% for part in item.question.stem|cloze_parts %}{% if part.blank %}<span aria-label="Blank {{ part.number }}">____</span>{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
+{% else %}<p class="question-stem{% if item.question.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{{ item.question.stem }}</p>{% endif %}
+{% if item.question.image %}<img class="question-image" src="{% url 'exam_question_image' item.question.id %}" alt="Diagram for question {{ forloop.counter }}"><details class="diagram-detail"><summary>View larger diagram</summary><p class="muted">Scroll sideways to inspect the diagram.</p><div class="diagram-pan"><img src="{% url 'exam_question_image' item.question.id %}" alt="Enlarged diagram for question {{ forloop.counter }}"></div></details>{% endif %}
 <p><strong>Your answer:</strong></p>
 {% if item.answer_rows %}<ul>{% for label, value in item.answer_rows %}<li>{{ label }}: {{ value|default:"No answer given" }}</li>{% endfor %}</ul>
 {% elif item.question.kind == "mcq" %}{% if item.answer %}<p>{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}</p>{% else %}<p>No answer given</p>{% endif %}

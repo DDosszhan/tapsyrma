@@ -4,12 +4,15 @@
 .exam-heading{margin-bottom:22px}.exam-heading h1{margin:0 0 8px}.exam-heading p{margin:0}
 .exam-questions .question h2{margin:0 0 16px;font-size:1.2em}.exam-questions .question p{margin:0 0 16px}
 .question-stem{white-space:pre-wrap}
-.question-stem--table{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.question-stem--fixed{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
 .question-image{display:block;max-width:100%;height:auto;margin:0 0 16px}
+.diagram-detail{margin:0 0 18px}.diagram-detail summary{color:#124ab3;cursor:pointer;font-weight:600}.diagram-detail p{margin:8px 0}
+.diagram-pan{max-width:100%;overflow:auto;border:1px solid #d6dfe9;border-radius:8px;background:white}
+.diagram-pan img{display:block;width:900px;max-width:none;height:auto}
 .exam-questions textarea{border:1px solid #aeb9c8;border-radius:8px;resize:vertical}
 .exam-questions input[type=text],.exam-questions select{border:1px solid #aeb9c8;border-radius:8px;padding:8px;max-width:100%}
 .exam-questions .cloze-stem input{width:150px;margin:2px 4px}
-.exam-questions .question-stem--table input{width:5ch;padding:4px;text-align:center}
+.exam-questions .question-stem--fixed input{width:5ch;padding:4px;text-align:center}
 .exam-questions .matching-row{display:block;margin:10px 0}
 .exam-questions .matching-choices{margin:0 0 16px;padding-left:32px}
 .exam-questions .matching-choices li{margin:6px 0;overflow-wrap:anywhere}
@@ -29,11 +32,11 @@
 <p id="visibility-warning" class="visibility-warning" role="alert" hidden></p>
 <div class="exam-layout">
 {% if preview %}<div id="answers" class="exam-questions">{% else %}<form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}{% endif %}
-{% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% endif %} tabindex="-1"><span class="points">{{ q.points }} points</span>
+{% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% endif %} tabindex="-1"><span class="points">{{ q.points }} point{{ q.points|pluralize }}</span>
 <h2>Question {{ forloop.counter }}</h2>
-{% if q.kind == "cloze" %}<p class="question-stem cloze-stem{% if q.stem|has_pipe_table %} question-stem--table{% endif %}">{% for part in q.stem|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
-{% else %}<p class="question-stem{% if q.stem|has_pipe_table %} question-stem--table{% endif %}">{{ q.stem }}</p>{% endif %}
-{% if q.image %}<img class="question-image" src="{% url 'exam_question_image' q.id %}" alt="Diagram for question {{ forloop.counter }}">{% endif %}
+{% if q.kind == "cloze" %}<p class="question-stem cloze-stem{% if q.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{% for part in q.stem|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
+{% else %}<p class="question-stem{% if q.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{{ q.stem }}</p>{% endif %}
+{% if q.image %}<img class="question-image" src="{% url 'exam_question_image' q.id %}" alt="Diagram for question {{ forloop.counter }}"><details class="diagram-detail"><summary>View larger diagram</summary><p class="muted">Scroll sideways to inspect the diagram.</p><div class="diagram-pan"><img src="{% url 'exam_question_image' q.id %}" alt="Enlarged diagram for question {{ forloop.counter }}"></div></details>{% endif %}
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
 {% endfor %}{% elif q.kind == "multiselect" %}<p>Select up to {{ q.points }} options.</p>{% for option in q.options %}

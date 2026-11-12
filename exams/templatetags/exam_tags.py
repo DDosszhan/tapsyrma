@@ -21,8 +21,9 @@ def has_index(values, index):
 
 
 @register.filter
-def has_pipe_table(stem):
-    return isinstance(stem, str) and any(line.count("|") >= 2 for line in stem.splitlines())
+def fixed_width_stem(stem):
+    return isinstance(stem, str) and (any(line.count("|") >= 2 for line in stem.splitlines())
+                                      or ("<-" in stem and "[[" in stem))
 
 
 @register.filter
