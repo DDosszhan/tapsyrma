@@ -1,4 +1,4 @@
-{% extends "exams/base.html" %}
+{% extends "exams/base.html" %}{% load exam_tags %}
 {% block main_class %}exam-page{% endblock %}
 {% block extra_head %}<style>
 .question-grid a.correct,.map-legend .correct{background:#0d7356;color:white;border-color:#0d7356}
@@ -7,6 +7,7 @@
 .result-layout .question{margin-top:0}
 .result-layout .question-map{top:24px}
 .question-stem{white-space:pre-wrap}
+.question-stem--table{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
 .question-image{display:block;max-width:100%;height:auto;margin:0 0 16px}
 .appeal-compose{margin-top:16px}
 .appeal-compose summary{display:inline-block;list-style:none;cursor:pointer;color:#124ab3;border:1px solid #124ab3;border-radius:8px;padding:8px 12px;font-weight:600}
@@ -31,11 +32,13 @@
 {% if exam.mode != "fixed" or attempt.status == "done" %}
 <div class="exam-layout result-layout"><div class="exam-questions">
 {% for item in items %}<section class="question" id="question-{{ item.question.pk }}">{% if item.auto_pending %}<span class="points">Awaiting {% if exam.grade == 0 %}review{% else %}teacher{% endif %}</span>{% elif item.grade %}<span class="points">{{ item.grade.score }} / {{ item.question.points }}</span>{% endif %}
-<h2>Question {{ forloop.counter }}</h2><p class="question-stem">{{ item.question.stem }}</p>
+<h2>Question {{ forloop.counter }}</h2>
+{% if item.question.kind == "cloze" %}<p class="question-stem{% if item.question.stem|has_pipe_table %} question-stem--table{% endif %}">{% for part in item.question.stem|cloze_parts %}{% if part.blank %}<span aria-label="Blank {{ part.number }}">____</span>{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
+{% else %}<p class="question-stem{% if item.question.stem|has_pipe_table %} question-stem--table{% endif %}">{{ item.question.stem }}</p>{% endif %}
 {% if item.question.image %}<img class="question-image" src="{% url 'exam_question_image' item.question.id %}" alt="Diagram for question {{ forloop.counter }}">{% endif %}
 <p><strong>Your answer:</strong></p>
 {% if item.answer_rows %}<ul>{% for label, value in item.answer_rows %}<li>{{ label }}: {{ value|default:"No answer given" }}</li>{% endfor %}</ul>
-{% elif item.question.kind == "mcq" %}<p>{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}</p>
+{% elif item.question.kind == "mcq" %}{% if item.answer %}<p>{% for option in item.question.options %}{% if forloop.counter0|stringformat:"s" == item.answer %}{{ option }}{% endif %}{% endfor %}</p>{% else %}<p>No answer given</p>{% endif %}
 {% else %}<p>{{ item.answer|default:"No answer given"|linebreaksbr }}</p>{% endif %}
 {% if item.grade and show_marking_details %}<p><strong>Grading:</strong> {{ item.grade.explanation }}</p>{% endif %}
 {% if item.appeal %}<p><strong>Appeal:</strong> {{ item.appeal.get_status_display }}.{% if item.appeal.reviewed_at and show_marking_details %} {{ item.appeal.teacher_note }}{% endif %}</p>

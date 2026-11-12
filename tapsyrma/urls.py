@@ -46,6 +46,7 @@ urlpatterns = [
          course_views.request_lesson_explanation, name="lesson_explain"),
     path("choose/", exam_views.choose_exam, name="choose_exam"),
     path("exam/", exam_views.session, name="exam_session"),
+    path("exam/preview/<int:exam_id>/", exam_views.preview, name="exam_preview"),
     path("exam/questions/<int:question_id>/image/", exam_views.question_image, name="exam_question_image"),
     path("exam/save/", exam_views.save, name="exam_save"),
     path("exam/visibility/", exam_views.visibility, name="exam_visibility"),

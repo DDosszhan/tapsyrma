@@ -4,10 +4,12 @@
 .exam-heading{margin-bottom:22px}.exam-heading h1{margin:0 0 8px}.exam-heading p{margin:0}
 .exam-questions .question h2{margin:0 0 16px;font-size:1.2em}.exam-questions .question p{margin:0 0 16px}
 .question-stem{white-space:pre-wrap}
+.question-stem--table{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
 .question-image{display:block;max-width:100%;height:auto;margin:0 0 16px}
 .exam-questions textarea{border:1px solid #aeb9c8;border-radius:8px;resize:vertical}
 .exam-questions input[type=text],.exam-questions select{border:1px solid #aeb9c8;border-radius:8px;padding:8px;max-width:100%}
 .exam-questions .cloze-stem input{width:150px;margin:2px 4px}
+.exam-questions .question-stem--table input{width:5ch;padding:4px;text-align:center}
 .exam-questions .matching-row{display:block;margin:10px 0}
 .exam-questions .matching-choices{margin:0 0 16px;padding-left:32px}
 .exam-questions .matching-choices li{margin:6px 0;overflow-wrap:anywhere}
@@ -22,14 +24,15 @@
 </style>{% endblock %}
 {% block content %}
 <header class="exam-heading"><h1>{{ attempt.invitation.exam.title }}</h1><p class="muted">{{ attempt.invitation.student.name }} · {{ attempt.invitation.exam.total_points }} points</p></header>
-{% if attempt.deadline_at %}<p class="score exam-timer" role="timer">Time remaining: <span id="countdown" data-remaining="{{ remaining_seconds }}">{{ remaining_seconds }} s</span></p>{% endif %}
+{% if preview %}<p class="visibility-warning">Student preview. Answers are not saved.</p>{% endif %}
+{% if preview %}<p class="score exam-timer">Time limit: {{ attempt.invitation.exam.duration_minutes }} minutes (preview)</p>{% elif attempt.deadline_at %}<p class="score exam-timer" role="timer">Time remaining: <span id="countdown" data-remaining="{{ remaining_seconds }}">{{ remaining_seconds }} s</span></p>{% endif %}
 <p id="visibility-warning" class="visibility-warning" role="alert" hidden></p>
 <div class="exam-layout">
-<form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}
+{% if preview %}<div id="answers" class="exam-questions">{% else %}<form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}{% endif %}
 {% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% endif %} tabindex="-1"><span class="points">{{ q.points }} points</span>
 <h2>Question {{ forloop.counter }}</h2>
-{% if q.kind == "cloze" %}<p class="question-stem cloze-stem">{% for part in q.stem|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
-{% else %}<p class="question-stem">{{ q.stem }}</p>{% endif %}
+{% if q.kind == "cloze" %}<p class="question-stem cloze-stem{% if q.stem|has_pipe_table %} question-stem--table{% endif %}">{% for part in q.stem|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
+{% else %}<p class="question-stem{% if q.stem|has_pipe_table %} question-stem--table{% endif %}">{{ q.stem }}</p>{% endif %}
 {% if q.image %}<img class="question-image" src="{% url 'exam_question_image' q.id %}" alt="Diagram for question {{ forloop.counter }}">{% endif %}
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
@@ -45,14 +48,14 @@
 <select name="q_{{ q.id }}_{{ forloop.counter0 }}"><option value="">Choose an item</option>{% for option in q.options %}<option value="{{ forloop.counter0 }}" {% if selected == forloop.counter0|stringformat:"s" %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>{% endwith %}
 {% endfor %}{% elif q.kind == "open" %}<label for="q_{{ q.id }}">Your answer</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}
 </section>{% endfor %}
-<div class="exam-actions"><p id="save-status" class="muted" aria-live="polite">Answers are saved automatically.</p>
-<button type="submit" onclick="return confirm('Submit the exam? You cannot change your answers afterward.')">Submit exam</button></div></form>
+<div class="exam-actions"><p id="save-status" class="muted" aria-live="polite">{% if preview %}Preview only. Your answers stay on this page.{% else %}Answers are saved automatically.{% endif %}</p>
+{% if not preview %}<button type="submit" onclick="return confirm('Submit the exam? You cannot change your answers afterward.')">Submit exam</button>{% endif %}</div>{% if preview %}</div>{% else %}</form>{% endif %}
 <aside class="question-map" aria-label="Question map"><h2>Question map</h2><p><strong id="answered-count">0</strong> of {{ questions|length }} answered</p>
 <div class="question-grid">{% for q in questions %}<a href="#question-{{ q.id }}" data-question="{{ q.id }}" aria-label="Question {{ forloop.counter }}, unanswered">{{ forloop.counter }}</a>{% endfor %}</div>
 <div class="map-legend"><span><i></i>Unanswered</span><span><i class="done"></i>Answered</span></div></aside>
 </div>
 <script>
-const form=document.getElementById('answers'),status=document.getElementById('save-status');let saveTimer,leavingExam=false,awayId=null,pendingReturn=null;
+const form=document.getElementById('answers'),status=document.getElementById('save-status'),preview={{ preview|yesno:"true,false" }};let saveTimer,leavingExam=false,awayId=null,pendingReturn=null;
 const warning=document.getElementById('visibility-warning'),mapLinks=[...document.querySelectorAll('.question-grid a')];
 function updateChoiceLimits(){
   for(const question of form.querySelectorAll('[data-max-choices]')){
@@ -82,10 +85,10 @@ function scheduleSave(event){
       if(other!==event.target&&other.value===event.target.value)other.value='';
     });
   }
-  updateChoiceLimits();updateMap();clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)
+  updateChoiceLimits();updateMap();if(preview)return;clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)
 }
 form.addEventListener('input',scheduleSave);form.addEventListener('change',scheduleSave);
-form.addEventListener('submit',()=>{leavingExam=true});
+form.addEventListener('submit',event=>{if(preview)event.preventDefault();else leavingExam=true});
 function eventData(action,id){const data=new FormData();data.append('csrfmiddlewaretoken',form.elements.csrfmiddlewaretoken.value);data.append('action',action);data.append('event_id',id);return data}
 async function confirmReturn(id){
   try{
@@ -97,13 +100,14 @@ async function confirmReturn(id){
   warning.hidden=false;
 }
 document.addEventListener('visibilitychange',()=>{
+  if(preview)return;
   if(document.hidden){
     if(leavingExam||awayId)return;
     awayId=crypto.randomUUID();
     navigator.sendBeacon('{% url "exam_visibility" %}',eventData('hidden',awayId));
   }else if(awayId){const id=awayId;awayId=null;confirmReturn(id)}
 });
-window.addEventListener('online',()=>{if(pendingReturn)confirmReturn(pendingReturn)});
+window.addEventListener('online',()=>{if(!preview&&pendingReturn)confirmReturn(pendingReturn)});
 const countdown=document.getElementById('countdown');
 if(countdown){
   const deadline=Date.now()+Number(countdown.dataset.remaining)*1000;

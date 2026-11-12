@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import mimetypes
 import secrets
+from types import SimpleNamespace
 from uuid import UUID
 from datetime import timedelta
 from django.conf import settings
@@ -13,7 +14,7 @@ from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from .models import Attempt, AttemptVisibilityEvent, Exam, GradeAppeal, Invitation, Question, SharedCode
 from .grading import AUTO_REVIEW_REASON
@@ -95,6 +96,20 @@ def _questions(attempt):
     if len(by_id) != len(attempt.question_ids):
         raise Http404
     return [by_id[pk] for pk in attempt.question_ids]
+
+
+@login_required
+@require_GET
+def preview(request, exam_id):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    exam = get_object_or_404(Exam, pk=exam_id, mode=Exam.Mode.FIXED)
+    questions = list(exam.questions.filter(invitation__isnull=True).order_by("slot"))
+    student = SimpleNamespace(name="Student preview")
+    attempt = SimpleNamespace(invitation=SimpleNamespace(exam=exam, student=student), deadline_at=None)
+    return render(request, "exams/attempt.html", {
+        "attempt": attempt, "questions": questions, "answers": {}, "preview": True,
+    })
 
 
 @login_required

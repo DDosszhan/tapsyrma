@@ -21,6 +21,11 @@ def has_index(values, index):
 
 
 @register.filter
+def has_pipe_table(stem):
+    return isinstance(stem, str) and any(line.count("|") >= 2 for line in stem.splitlines())
+
+
+@register.filter
 def cloze_parts(stem):
     parts = []
     for part in re.split(r"(\[\[\d+\]\])", stem):
