@@ -344,7 +344,8 @@ def result(request, attempt_id=None):
         if q.kind in ("cloze", "matching", "multiselect", "ordering"):
             values = answer if isinstance(answer, list) else []
             if q.kind == "cloze":
-                for index, alternatives in enumerate(q.interaction.get("answers", [])):
+                answer_key = grade.get("interaction_snapshot", q.interaction) if grade else q.interaction
+                for index, alternatives in enumerate(answer_key.get("answers", [])):
                     answer_rows.append((f"Blank {index + 1}", values[index] if index < len(values) else ""))
                     correct_rows.append((f"Blank {index + 1}", ", ".join(alternatives)))
             elif q.kind == "matching":
