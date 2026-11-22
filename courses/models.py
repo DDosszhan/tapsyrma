@@ -284,3 +284,9 @@ class LessonAnswer(models.Model):
 
     def __str__(self):
         return f"{self.student} · {self.question}"
+
+    @property
+    def can_retry(self):
+        return self.status in (self.Status.CORRECT, self.Status.INCORRECT, self.Status.ERROR) and (
+            self.explanation_status not in (self.ExplanationStatus.PENDING, self.ExplanationStatus.GENERATING)
+        )

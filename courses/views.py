@@ -105,12 +105,7 @@ def section_detail(request, course_id, section_id, lesson_id=None):
                 {**row, "earned": scores[index] if index < len(scores) else None}
                 for index, row in enumerate(question.student_marking_rows())
             ] if answer else []
-            question.can_answer = not answer or answer.status not in (
-                LessonAnswer.Status.CORRECT, LessonAnswer.Status.PENDING, LessonAnswer.Status.GRADING,
-                LessonAnswer.Status.REVIEW, LessonAnswer.Status.ERROR)
-            if answer and answer.explanation_status in (LessonAnswer.ExplanationStatus.PENDING,
-                                                        LessonAnswer.ExplanationStatus.GENERATING):
-                question.can_answer = False
+            question.can_answer = not answer or answer.can_retry
             if answer:
                 question.latest_answer_display = (question.options[int(answer.answer) - 1]
                                                   if question.kind == LessonQuestion.Kind.MCQ
@@ -157,11 +152,11 @@ def submit_lesson_answer(request, course_id, section_id, lesson_id, question_id)
             return _lesson_redirect(course_id, section_id, lesson_id, question_id)
         latest = (LessonAnswer.objects.filter(student=student, question=question,
                                               question_revision=question.revision).order_by("-created_at", "-id").first())
-        if latest and (latest.status in (LessonAnswer.Status.CORRECT, LessonAnswer.Status.PENDING,
-                                         LessonAnswer.Status.GRADING, LessonAnswer.Status.REVIEW,
-                                         LessonAnswer.Status.ERROR)
-                       or latest.explanation_status in (LessonAnswer.ExplanationStatus.PENDING,
-                                                        LessonAnswer.ExplanationStatus.GENERATING)):
+        previous_id = str(latest.pk) if latest else "0"
+        if request.POST.get("previous_answer_id", "0") != previous_id:
+            messages.info(request, "An answer was already submitted. Check the latest answer before trying again.")
+            return _lesson_redirect(course_id, section_id, lesson_id, question_id)
+        if latest and not latest.can_retry:
             return _lesson_redirect(course_id, section_id, lesson_id, question_id)
         LessonProgress.objects.get_or_create(student=student, lesson_id=lesson_id)
         answer = LessonAnswer.objects.create(student=student, question=question,

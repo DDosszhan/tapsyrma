@@ -164,7 +164,8 @@ class CourseSkeletonTests(TestCase):
             accepted_answers="Париж\nParis")
         self.client.force_login(self.user)
         url = lambda q: reverse("lesson_answer", args=[self.course.pk, self.section.pk, self.first.pk, q.pk])
-        post = lambda q, value: self.client.post(url(q), {"answer": value, "revision": q.revision})
+        post = lambda q, value, previous=0: self.client.post(
+            url(q), {"answer": value, "revision": q.revision, "previous_answer_id": previous})
         self.assertEqual(post(mcq, "1").status_code, 302)
         wrong = LessonAnswer.objects.get(question=mcq)
         self.assertEqual(wrong.status, LessonAnswer.Status.INCORRECT)
@@ -182,13 +183,45 @@ class CourseSkeletonTests(TestCase):
         self.client.post(explain_url)
         self.assertEqual(LessonAnswer.objects.get(pk=wrong.pk).explanation_status,
                          LessonAnswer.ExplanationStatus.READY)
-        post(mcq, "2")
+        post(mcq, "2", wrong.pk)
         self.assertIsNone(LessonProgress.objects.get(student=self.student, lesson=self.first).completed_at)
         post(short, "  ПАРИЖ  ")
         self.assertIsNotNone(LessonProgress.objects.get(student=self.student, lesson=self.first).completed_at)
         self.client.force_login(self.other_user)
         self.assertEqual(self.client.post(explain_url).status_code, 404)
         self.assertEqual(LessonAnswer.objects.filter(student__user=self.other_user).count(), 0)
+
+    def test_retry_after_correct_answer_keeps_completion_and_rejects_an_old_form(self):
+        question = LessonQuestion.objects.create(
+            lesson=self.first, kind="mcq", prompt="What is the output of the OR gate?",
+            option_a="0", option_b="1", option_c="2", option_d="3", correct_option=2)
+        self.client.force_login(self.user)
+        lesson_url = reverse("lesson_detail", args=[self.course.pk, self.section.pk, self.first.pk])
+        url = reverse("lesson_answer", args=[self.course.pk, self.section.pk, self.first.pk, question.pk])
+        self.client.post(url, {"answer": "2", "revision": question.revision})
+        first = LessonAnswer.objects.get(student=self.student, question=question)
+        progress = LessonProgress.objects.get(student=self.student, lesson=self.first)
+        self.assertIsNotNone(progress.completed_at)
+        response = self.client.get(lesson_url)
+        self.assertContains(response, "Try again")
+        self.assertContains(response, "Multiple choice")
+        self.assertContains(response, "Your answer:")
+        self.assertContains(response, "How marks are awarded")
+        self.assertContains(response, "1/1", count=1)
+
+        retry = {"answer": "1", "revision": question.revision, "previous_answer_id": first.pk}
+        self.client.post(url, retry)
+        latest, previous = LessonAnswer.objects.filter(student=self.student, question=question)
+        self.assertEqual((latest.answer, latest.score, previous.pk, previous.score), ("1", 0, first.pk, 1))
+        progress_after_retry = LessonProgress.objects.get(pk=progress.pk)
+        self.assertEqual(progress_after_retry.completed_at, progress.completed_at)
+
+        # A stale request stays stale even after the answer and its explanation finish.
+        latest.explanation_status = LessonAnswer.ExplanationStatus.READY
+        latest.save(update_fields=["explanation_status"])
+        stale_response = self.client.post(url, retry, follow=True)
+        self.assertContains(stale_response, "Check the latest answer before trying again.")
+        self.assertEqual(LessonAnswer.objects.filter(student=self.student, question=question).count(), 2)
 
     def test_open_answer_is_queued_and_ai_marks_it_without_blocking_request(self):
         question = LessonQuestion.objects.create(lesson=self.first, position=1, kind="open", points=2,
@@ -201,6 +234,9 @@ class CourseSkeletonTests(TestCase):
             ai.assert_not_called()
         answer = LessonAnswer.objects.get(question=question)
         self.assertEqual(answer.status, LessonAnswer.Status.PENDING)
+        self.client.post(url, {"answer": "A different answer.", "revision": question.revision,
+                               "previous_answer_id": answer.pk})
+        self.assertEqual(LessonAnswer.objects.filter(question=question).count(), 1)
         with patch("courses.jobs.grade_open", return_value={"score": 2}) as ai:
             check_answer(answer)
         ai.assert_called_once()
@@ -232,6 +268,7 @@ class CourseSkeletonTests(TestCase):
         self.assertEqual(answer.explanation_status, LessonAnswer.ExplanationStatus.READY)
         self.client.force_login(self.user)
         page = self.client.get(reverse("lesson_detail", args=[self.course.pk, self.section.pk, self.first.pk]))
+        self.assertContains(page, "Open-ended")
         self.assertContains(page, "1/1")
         self.assertContains(page, "0/1")
         self.assertContains(page, "8 + 2 equals 10, not 11.")
@@ -279,7 +316,7 @@ class CourseSkeletonTests(TestCase):
         self.assertEqual(question.revision, 2)
         self.assertIsNone(LessonProgress.objects.get(student=self.student, lesson=self.first).completed_at)
         self.assertNotContains(self.client.get(reverse("lesson_detail", args=[self.course.pk, self.section.pk,
-                                                                             self.first.pk])), "Correct ·")
+                                                                             self.first.pk])), "Your answer:")
         self.client.post(url, {"answer": "four", "revision": 1})
         self.assertEqual(LessonAnswer.objects.filter(question=question).count(), 1)
         self.client.post(url, {"answer": "four", "revision": question.revision})
