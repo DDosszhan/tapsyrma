@@ -1,0 +1,21 @@
+<div class="auth-field">
+  <label for="{{ field.id_for_label }}">{{ label|default:field.label }}</label>
+  {% if field.widget_type == "password" %}
+    <div class="auth-password">
+      {{ field }}
+      <button type="button" class="auth-toggle" aria-controls="{{ field.id_for_label }}" hidden>
+        <span>Show</span><span class="auth-sr-only"> {{ field.label|lower }}</span>
+      </button>
+    </div>
+  {% else %}
+    {{ field }}
+  {% endif %}
+  {% if show_validation %}
+    {{ field.errors }}
+    {% if field.help_text %}
+      <div class="auth-help" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</div>
+    {% endif %}
+  {% elif field.errors %}
+    <span class="auth-sr-only" id="{{ field.auto_id }}_error">{{ error_message }}</span>
+  {% endif %}
+</div>

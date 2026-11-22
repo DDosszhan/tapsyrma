@@ -1,8 +1,18 @@
-{% extends "exams/base.html" %}{% block content %}
-<h1>Sign in to Tapsyrma</h1>
-<p class="muted">Enter your school email and password.</p>
-{% if form.errors %}<p class="error" role="alert">Invalid email or password.</p>{% endif %}
-<form method="post">{% csrf_token %}{{ form.as_p }}
-<input type="hidden" name="next" value="{{ next }}"><button type="submit">Sign in</button></form>
-<p><a href="{% url 'admin:index' %}">Administrator sign in</a></p>
+{% extends "auth/base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block auth_content %}
+  <h1 id="auth-title">Sign in</h1>
+  <p class="auth-lead">Use your school email and password.</p>
+  {% with login_error="Invalid email or password." %}
+    <form method="post" class="auth-form" aria-labelledby="auth-title"{% if form.errors %} aria-describedby="auth-error"{% endif %}>
+      {% csrf_token %}
+      {% include "auth/field.html" with field=form.username label="School email" error_message=login_error only %}
+      {% include "auth/field.html" with field=form.password error_message=login_error only %}
+      {% if form.errors %}<p class="auth-error" id="auth-error" role="alert">{{ login_error }}</p>{% endif %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <button class="auth-submit" type="submit" data-pending="Signing in…"><span>Sign in</span><span aria-hidden="true">→</span></button>
+    </form>
+  {% endwith %}
+  <p class="auth-help">First sign-in? You’ll set a new password after you sign in.</p>
+  <div class="auth-footer"><a href="{% url 'admin:index' %}">Administrator sign in <span aria-hidden="true">↗</span></a></div>
 {% endblock %}

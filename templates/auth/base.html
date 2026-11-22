@@ -1,0 +1,58 @@
+{% load static %}
+<!doctype html>
+<html lang="en" class="auth-page">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · Tapsyrma</title>
+  <link rel="stylesheet" href="{% static 'exams/auth.css' %}">
+  <script src="{% static 'exams/auth.js' %}" defer></script>
+</head>
+<body class="auth">
+  <header class="auth-header">
+    <p class="auth-brand"><span>IQanat</span><strong>Tapsyrma</strong></p>
+    <span class="auth-portal">Student portal</span>
+  </header>
+  <main class="auth-layout">
+    <section class="auth-content" aria-labelledby="auth-title">
+      {% block auth_content %}{% endblock %}
+    </section>
+    <aside class="auth-cover" aria-labelledby="auth-route-title">
+      <h2 id="auth-route-title">Your exam route<span>.</span></h2>
+      <div>
+        <div class="auth-route">
+          <svg viewBox="0 0 480 240" aria-hidden="true" focusable="false">
+            <defs>
+              <pattern id="route-dots" width="18" height="18" patternUnits="userSpaceOnUse">
+                <circle cx="1" cy="1" r="1" fill="#fff" opacity=".19"/>
+              </pattern>
+            </defs>
+            <rect width="480" height="240" fill="url(#route-dots)"/>
+            <g fill="none" stroke="#6688ad" opacity=".37">
+              <path d="M-50 220 Q60 132 130 166 T270 106 T530 24"/>
+              <path d="M-50 232 Q60 144 130 178 T270 118 T530 36"/>
+              <path d="M-50 244 Q60 156 130 190 T270 130 T530 48"/>
+              <path d="M-50 256 Q60 168 130 202 T270 142 T530 60"/>
+              <path d="M-50 268 Q60 180 130 214 T270 154 T530 72"/>
+              <path d="M-50 280 Q60 192 130 226 T270 166 T530 84"/>
+            </g>
+            <path d="M52 179 H134 L205 108 H287 L368 27 H425" fill="none" stroke="#d1e2f4" stroke-width="3"/>
+            <circle cx="52" cy="179" r="13" fill="#ffce57"/>
+            <circle cx="52" cy="179" r="5" fill="#17375e"/>
+            <g fill="#17375e" stroke="#d1e2f4" stroke-width="3">
+              <circle cx="223" cy="108" r="8"/>
+              <circle cx="406" cy="27" r="8"/>
+            </g>
+          </svg>
+          <ol>
+            <li aria-current="step">{% block auth_step %}Sign in{% endblock %}</li>
+            <li>Enter code</li>
+            <li>Start exam</li>
+          </ol>
+        </div>
+        <p class="auth-caption">A code from your teacher opens your exam.</p>
+      </div>
+    </aside>
+  </main>
+</body>
+</html>
