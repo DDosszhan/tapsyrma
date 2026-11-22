@@ -1,0 +1,59 @@
+.course-list-page .course-list-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.course-list-page .course-list-card {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  min-width: 0;
+  color: var(--ink);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.course-list-page .course-list-card:hover {
+  border-color: var(--blue);
+}
+
+.course-list-page .course-list-card h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  line-height: 1.25;
+}
+
+.course-list-page .course-list-description {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.course-list-page .course-list-progress {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.course-list-page .course-list-progress .portal-progress {
+  margin-block: 8px;
+}
+
+.course-list-page .course-list-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--muted);
+  font-size: .875rem;
+}
+
+.course-list-page .course-list-action { margin-top: 16px; }
+.course-list-page .course-list-empty { margin-top: 24px; }
+
+@media (max-width: 759px) {
+  .course-list-page .course-list-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}

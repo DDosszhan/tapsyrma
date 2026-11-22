@@ -1,6 +1,7 @@
 {% extends "portal/base.html" %}
 {% load static %}
 {% block page_class %}auth{% endblock %}
+{% block header_nav %}<span class="portal-meta">Student portal</span>{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{% static 'exams/auth.css' %}">
   <script src="{% static 'exams/auth.js' %}" defer></script>

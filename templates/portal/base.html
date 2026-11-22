@@ -11,7 +11,23 @@
 <body class="portal {% block page_class %}{% endblock %}">
   <header class="portal-header">
     <p class="portal-brand"><span>IQanat</span><strong>Tapsyrma</strong></p>
-    {% block header_nav %}<span class="portal-meta">Student portal</span>{% endblock %}
+    {% block header_nav %}
+      {% if request.user.is_authenticated %}
+        {% with current=request.resolver_match.url_name %}
+          <nav class="portal-nav" aria-label="Main navigation">
+            <a href="{% url 'enter' %}"{% if current == "enter" %} aria-current="page"{% endif %}>Home</a>
+            {% if request.user.student_profile %}
+              <a href="{% url 'course_list' %}"{% if current == "course_list" %} aria-current="page"{% endif %}>My courses</a>
+              <a href="{% url 'history' %}"{% if current == "history" %} aria-current="page"{% elif current == "exam_result" or current == "exam_result_history" %} aria-current="location"{% endif %}>My work</a>
+              {% if request.user.is_staff %}<a href="{% url 'admin:index' %}">Administration</a>{% endif %}
+            {% endif %}
+            <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Log out</button></form>
+          </nav>
+        {% endwith %}
+      {% else %}
+        <span class="portal-meta">Student portal</span>
+      {% endif %}
+    {% endblock %}
   </header>
   {% block main %}{% endblock %}
 </body>

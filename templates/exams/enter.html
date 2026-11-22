@@ -4,26 +4,10 @@
 {% block head %}<link rel="stylesheet" href="{% static 'exams/home.css' %}">{% endblock %}
 {% block page_class %}home{% endblock %}
 
-{% block header_nav %}
-  {% if request.user.is_authenticated %}
-    <nav class="home-nav" aria-label="Main navigation">
-      <a href="{% url 'enter' %}" aria-current="page">Home</a>
-      {% if student %}
-        <a href="{% url 'course_list' %}">My courses</a>
-        <a href="{% url 'history' %}">My work</a>
-      {% endif %}
-      {% if request.user.is_staff and student %}<a href="{% url 'admin:index' %}">Administration</a>{% endif %}
-      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Log out</button></form>
-    </nav>
-  {% else %}
-    <span class="portal-meta">Student portal</span>
-  {% endif %}
-{% endblock %}
-
 {% block main %}
-  <main class="home-main">
+  <main class="portal-content">
     <div class="home-heading">
-      <h1>{% if student %}Welcome, {{ student.name }}{% else %}Welcome to Tapsyrma{% endif %}<span>.</span></h1>
+      <h1 class="portal-title">{% if student %}Welcome, {{ student.name }}{% else %}Welcome to Tapsyrma{% endif %}<span>.</span></h1>
       {% if student %}<span class="portal-meta">{% if student.grade %}Grade {{ student.grade }}{% else %}Employee{% endif %}</span>{% endif %}
     </div>
     <section class="home-exam" aria-labelledby="exam-heading">
@@ -79,21 +63,21 @@
 
     {% if student %}
       <div class="home-cards">
-        <section class="home-card" aria-labelledby="courses-title">
+        <section class="portal-card home-card" aria-labelledby="courses-title">
           <h2 id="courses-title">My courses</h2>
           {% for course in courses %}
             <div class="home-course">
               <a href="{% url 'course_detail' course.pk %}">{{ course.title }}</a>
               {% if course.lesson_count %}
                 <p id="progress-{{ course.pk }}">{{ course.opened_count }} of {{ course.lesson_count }} lesson{{ course.lesson_count|pluralize }} opened</p>
-                <progress value="{{ course.opened_count }}" max="{{ course.lesson_count }}" aria-labelledby="progress-{{ course.pk }}"></progress>
+                <progress class="portal-progress" value="{{ course.opened_count }}" max="{{ course.lesson_count }}" aria-labelledby="progress-{{ course.pk }}"></progress>
               {% else %}
                 <p>No lessons yet.</p>
               {% endif %}
             </div>
           {% empty %}<p>No courses are available for your grade yet.</p>{% endfor %}
         </section>
-        <section class="home-card" aria-labelledby="work-title">
+        <section class="portal-card home-card" aria-labelledby="work-title">
           <h2 id="work-title">Latest work</h2>
           {% if latest_work %}
             <a href="{% url 'exam_result_history' latest_work.pk %}">{{ latest_work.invitation.exam.title }}</a>
@@ -104,11 +88,7 @@
             {% if latest_work.pending_appeal_count %}<p>Appeal pending</p>
             {% elif latest_work.pending_review_count %}<p>Awaiting teacher review</p>
             {% elif latest_work.appeal_count %}<p>Appeal reviewed</p>{% endif %}
-            <ol class="home-track" aria-label="Grading progress">
-              <li class="reached">Submitted</li>
-              <li{% if latest_work.status != "pending" %} class="reached"{% endif %}>Grading</li>
-              <li{% if latest_work.status == "done" %} class="reached"{% endif %}>Graded</li>
-            </ol>
+            {% include "portal/grading_steps.html" with status=latest_work.status only %}
           {% else %}<p>Your submitted work will appear here.</p>{% endif %}
         </section>
       </div>

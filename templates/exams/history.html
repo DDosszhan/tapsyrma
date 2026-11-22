@@ -1,10 +1,31 @@
-{% extends "exams/base.html" %}{% block content %}
-<h1>My attempts</h1>
-{% if attempts %}<ul>
-{% for attempt in attempts %}<li>
-  <a href="{% url 'exam_result_history' attempt.pk %}">{{ attempt.invitation.exam.title }}</a>
-  · {{ attempt.started_at|date:"d.m.Y H:i" }} · {{ attempt.get_status_display }}
-  {% if attempt.status == "done" and attempt.score is not None %} · {% if attempt.pending_review_count %}Provisional score: {% endif %}{{ attempt.score }} / {{ attempt.invitation.exam.total_points }} points{% endif %}
-</li>{% endfor %}
-</ul>{% else %}<p>You have no exam attempts yet.</p>{% endif %}
+{% extends "portal/base.html" %}
+{% load static %}
+{% block title %}My work{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'exams/history.css' %}">{% endblock %}
+
+{% block main %}
+  <main class="portal-content work-history">
+    <h1 class="portal-title">My work</h1>
+    {% if attempts %}
+      <ul class="work-list" role="list">
+        {% for attempt in attempts %}
+          <li class="portal-card work-item">
+            <div>
+              <h2><a href="{% url 'exam_result_history' attempt.pk %}">{{ attempt.invitation.exam.title }}</a></h2>
+              <p class="portal-meta">Started <time datetime="{{ attempt.started_at|date:'c' }}">{{ attempt.started_at|date:"j M Y, H:i" }}</time></p>
+            </div>
+            <div class="work-status">
+              <p class="work-state">{{ attempt.get_status_display }}</p>
+              {% if attempt.status == "done" and attempt.score is not None %}
+                <p class="work-score">{% if attempt.pending_review_count %}Provisional score: {% endif %}{{ attempt.score }} / {{ attempt.invitation.exam.total_points }} points</p>
+              {% endif %}
+              {% include "portal/grading_steps.html" with status=attempt.status only %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="portal-card work-empty">You have no exam attempts yet.</p>
+    {% endif %}
+  </main>
 {% endblock %}

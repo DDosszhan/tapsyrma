@@ -1,14 +1,38 @@
-{% extends "courses/base.html" %}{% block content %}
-<span class="course-kicker">Learning</span><h1>My courses</h1>
-<p class="course-lead">Open lessons in order and track your progress in each section.</p>
-{% if courses %}<div class="course-grid">
-{% for course in courses %}<a class="course-card" href="{% url 'course_detail' course.pk %}">
-  <div class="course-meta"><span class="course-chip">{{ course.subject }}</span><span class="course-chip">Grade {{ course.grade }}</span></div>
-  <h2>{{ course.title }}</h2><p>{{ course.description|default:"Course sections and lessons"|truncatechars:150 }}</p>
-  <div class="course-stats"><span>{{ course.section_count }} section{{ course.section_count|pluralize }}</span><span><strong>{{ course.opened_count }}</strong> of {{ course.lesson_count }} lesson{{ course.lesson_count|pluralize }} opened</span></div>
-  {% if course.lesson_count %}<progress value="{{ course.opened_count }}" max="{{ course.lesson_count }}" aria-label="Lessons opened: {{ course.opened_count }} of {{ course.lesson_count }}"></progress>{% endif %}
-  <div class="course-stats"><span>Remaining to open: {{ course.remaining_count }}</span><span>Practice completed: {{ course.completed_count }}</span></div>
-  <div class="course-arrow">Open course →</div>
-</a>{% endfor %}</div>
-{% else %}<div class="course-empty">There are no published courses for your grade yet.</div>{% endif %}
+{% extends "portal/base.html" %}
+{% load static %}
+{% block title %}My courses{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'courses/list.css' %}">{% endblock %}
+{% block page_class %}course-list-page{% endblock %}
+
+{% block main %}
+  <main class="portal-content">
+    <h1 class="portal-title">My courses</h1>
+    {% if courses %}
+      <div class="course-list-grid">
+        {% for course in courses %}
+          <a class="portal-card course-list-card" href="{% url 'course_detail' course.pk %}"
+             aria-labelledby="open-{{ course.pk }} title-{{ course.pk }}">
+            <p class="portal-meta">{{ course.subject }} · Grade {{ course.grade }}</p>
+            <h2 id="title-{{ course.pk }}">{{ course.title }}</h2>
+            {% if course.description %}<p class="course-list-description">{{ course.description|truncatechars:150 }}</p>{% endif %}
+            <div class="course-list-progress">
+              <p class="portal-meta">{{ course.section_count }} section{{ course.section_count|pluralize }}</p>
+              <p id="opened-{{ course.pk }}"><strong>{{ course.opened_count }}</strong> of {{ course.lesson_count }} lesson{{ course.lesson_count|pluralize }} opened</p>
+              {% if course.lesson_count %}
+                <progress class="portal-progress" value="{{ course.opened_count }}" max="{{ course.lesson_count }}"
+                          aria-labelledby="opened-{{ course.pk }}"></progress>
+              {% endif %}
+              <div class="course-list-counts">
+                <p>Remaining to open: {{ course.remaining_count }}</p>
+                <p>Practice completed: {{ course.completed_count }}</p>
+              </div>
+            </div>
+            <span class="portal-button course-list-action" id="open-{{ course.pk }}">Open course <span aria-hidden="true">→</span></span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="portal-card course-list-empty"><p>No courses are available for your grade yet.</p></div>
+    {% endif %}
+  </main>
 {% endblock %}

@@ -1,0 +1,7 @@
+{% if status != "active" %}
+  <ol class="portal-steps" role="list" aria-label="Grading progress">
+    <li class="reached"{% if status == "pending" %} aria-current="step"{% endif %}>Submitted</li>
+    <li{% if status != "pending" %} class="reached"{% endif %}{% if status == "grading" or status == "error" %} aria-current="step"{% endif %}>Grading</li>
+    <li{% if status == "done" %} class="reached" aria-current="step"{% endif %}>Graded</li>
+  </ol>
+{% endif %}
