@@ -5,12 +5,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{% endblock %} · Tapsyrma</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'exams/tapsyrma-icon.svg' %}">
   <link rel="stylesheet" href="{% static 'exams/portal.css' %}">
   {% block head %}{% endblock %}
 </head>
 <body class="portal {% block page_class %}{% endblock %}">
   <header class="portal-header">
-    <p class="portal-brand"><span>IQanat</span><strong>{% include "portal/brand_mark.html" %}Tapsyrma</strong></p>
+    <p class="portal-brand"><span>IQanat</span><strong>Tapsyrma</strong></p>
     {% block header_nav %}
       {% if request.user.is_authenticated %}
         {% with current=request.resolver_match.url_name %}
