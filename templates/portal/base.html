@@ -10,7 +10,7 @@
 </head>
 <body class="portal {% block page_class %}{% endblock %}">
   <header class="portal-header">
-    <p class="portal-brand"><span>IQanat</span><strong>Tapsyrma</strong></p>
+    <p class="portal-brand"><span>IQanat</span><strong>{% include "portal/brand_mark.html" %}Tapsyrma</strong></p>
     {% block header_nav %}
       {% if request.user.is_authenticated %}
         {% with current=request.resolver_match.url_name %}
