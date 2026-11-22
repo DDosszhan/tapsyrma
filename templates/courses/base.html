@@ -19,7 +19,20 @@ main.course-page{max-width:1080px;background:transparent;box-shadow:none;padding
 .course-header,.section-header,.lesson-panel,.course-progress{background:#fff;border:1px solid #dce2ea;border-radius:16px;padding:24px}
 .course-header p,.section-header p{color:#566275;margin-bottom:0}
 .course-progress{margin:18px 0 8px;padding:16px 20px}
-.section-grid{margin-top:18px}.section-number{display:inline-grid;place-items:center;width:36px;height:36px;background:#e4f2ed;border-radius:10px;color:#176b52;font-weight:800}
+.section-grid{margin-top:18px}
+.section-number{
+  display:inline-grid;
+  place-items:center;
+  box-sizing:border-box;
+  min-width:36px;
+  min-height:36px;
+  padding:0 10px;
+  white-space:nowrap;
+  background:#e4f2ed;
+  border-radius:10px;
+  color:#176b52;
+  font-weight:800;
+}
 .lesson-menu{display:grid;grid-template-columns:repeat(auto-fill,44px);gap:8px;margin:18px 0 10px;padding:4px 2px;border:0}
 .lesson-tab{position:relative;display:grid;place-items:center;width:44px;height:44px;background:#fff;border:1px solid #cbd4df;border-radius:8px;color:#344255!important;text-decoration:none;font-weight:700}
 .lesson-tab:hover{border-color:#176b52}.lesson-tab.is-opened{background:#e7f5ee;border-color:#8bc7a7;color:#176b52!important}.lesson-tab.is-completed{background:#cdebd9;border-color:#429966;color:#14583d!important}.lesson-tab.is-completed::after{content:"✓";position:absolute;top:2px;right:4px;font-size:.65rem}.lesson-tab.is-current{box-shadow:0 0 0 2px #176b52}
