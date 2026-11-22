@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tapsyrma by IQanat · Design preview</title>
+  <link rel="stylesheet" href="tapsyrma-ui.css">
+</head>
+<body>
+  <aside class="preview" aria-label="Prototype settings">
+    <strong>Design preview</strong>
+    <button type="button" data-open="login" aria-pressed="true">Sign-in screen</button>
+    <button type="button" data-open="home" aria-pressed="false">Student home</button>
+    <label for="scenario">Example</label>
+    <select id="scenario"></select>
+  </aside>
+
+  <main>
+    <section class="screen" data-screen="login" aria-label="Sign-in screen">
+      <header class="mast">
+        <div class="brand" aria-label="Tapsyrma by IQanat"><span>IQanat</span><i aria-hidden="true"></i><b>Tapsyrma</b></div>
+        <span class="mast-meta">Student portal</span>
+      </header>
+      <div class="login-layout">
+        <section class="cover">
+          <h2>Your exam <br>route<span class="yellow">.</span></h2>
+          <figure class="route-art" aria-label="Exam entry in three steps">
+            <svg viewBox="0 0 480 250" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#ffffff" opacity=".19"/></pattern>
+              </defs>
+              <rect width="480" height="250" fill="url(#dots)"/>
+              <g fill="none" stroke="#6688ad" opacity=".37" stroke-width="1">
+                <path d="M-50 220 Q60 132 130 166 T270 106 T530 24"/>
+                <path d="M-50 232 Q60 144 130 178 T270 118 T530 36"/>
+                <path d="M-50 244 Q60 156 130 190 T270 130 T530 48"/>
+                <path d="M-50 256 Q60 168 130 202 T270 142 T530 60"/>
+                <path d="M-50 268 Q60 180 130 214 T270 154 T530 72"/>
+                <path d="M-50 280 Q60 192 130 226 T270 166 T530 84"/>
+              </g>
+              <path d="M52 179 H134 L205 108 H287 L368 27 H425" fill="none" stroke="#d1e2f4" stroke-width="3"/>
+              <circle cx="52" cy="179" r="13" fill="#ffce57"/><circle cx="52" cy="179" r="5" fill="#17375e"/>
+              <g fill="#17375e" stroke="#d1e2f4" stroke-width="3"><circle cx="223" cy="108" r="8"/><circle cx="406" cy="27" r="8"/></g>
+              <g fill="#fff" font-family="system-ui,sans-serif" font-size="16" font-weight="600">
+                <text x="34" y="214">Sign in</text><text x="199" y="145">Enter code</text><text x="365" y="64">Start exam</text>
+              </g>
+            </svg>
+            <figcaption>A code from your teacher opens your exam.</figcaption>
+          </figure>
+        </section>
+        <div class="login-form">
+          <h1>Sign in</h1>
+          <p class="lead">Use your school email and password.</p>
+          <form id="sign-in">
+            <label for="email">School email</label>
+            <input type="email" id="email" value="student@example.invalid" readonly>
+            <label for="password">Password</label>
+            <div class="password-wrap">
+              <input id="password" type="password" value="demo-only" readonly>
+              <button type="button" id="reveal" aria-controls="password" aria-pressed="false">Show</button>
+            </div>
+            <p id="login-error" class="error" role="alert" hidden>Invalid email or password.</p>
+            <button class="primary form-submit" type="submit">Sign in <span aria-hidden="true">→</span></button>
+          </form>
+          <p class="help">First sign-in? You’ll set a new password after you sign in.</p>
+          <div class="form-footer"><span class="text-link">Administrator sign in <span aria-hidden="true">↗</span></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="home" aria-label="Student home" hidden>
+      <header class="mast">
+        <div class="brand" aria-label="Tapsyrma by IQanat"><span>IQanat</span><i aria-hidden="true"></i><b>Tapsyrma</b></div>
+        <nav aria-label="Student navigation"><a href="#home-title" aria-current="page">Home</a><a href="#courses">My courses</a><a href="#work">My work</a></nav>
+      </header>
+      <div class="home-body">
+        <div class="home-heading"><h1 id="home-title">Welcome, Alex<span>.</span></h1><span class="mast-meta">Grade 10</span></div>
+        <section class="exam-card">
+          <div class="exam-content">
+            <h2 id="exam-title">Enter an exam</h2>
+            <p id="exam-lead">Use the code from your teacher.</p>
+            <div id="code-entry">
+              <label for="code">Exam code</label>
+              <div class="input-row"><input id="code" placeholder="Enter code" maxlength="12" autocomplete="off"><button type="button" id="try-code" class="accent">Continue <span aria-hidden="true">→</span></button></div>
+              <p id="code-note" aria-live="polite" hidden></p>
+            </div>
+            <span id="resume" class="accent sample-action" hidden>Continue exam <span aria-hidden="true">→</span></span>
+          </div>
+          <svg class="home-route" viewBox="0 0 310 106" aria-hidden="true">
+            <g fill="none" stroke="#83a5c7" opacity=".32"><path d="M0 94 H72 L127 39 H202 L237 4 H310"/><path d="M0 104 H78 L133 49 H208 L243 14 H310"/><path d="M0 114 H84 L139 59 H214 L249 24 H310"/></g>
+            <path d="M8 74 H60 L115 19 H190 L225 -16" fill="none" stroke="#d1e2f4" stroke-width="2"/>
+            <circle cx="26" cy="74" r="9" fill="#ffce57"/><circle cx="26" cy="74" r="3.5" fill="#17375e"/><circle cx="145" cy="19" r="6" stroke="#d1e2f4" stroke-width="2.5" fill="#17375e"/>
+          </svg>
+        </section>
+        <div class="card-row">
+          <section id="courses" class="info-card">
+            <h2>My courses</h2>
+            <div id="course-detail"><p class="item-title">Computer Science</p><p class="card-copy">3 of 6 lessons opened</p>
+              <div class="lesson-track" role="img" aria-label="3 of 6 lessons opened"><i class="opened"></i><i class="opened"></i><i class="opened"></i><i></i><i></i><i></i></div>
+            </div>
+            <p class="card-copy" id="no-courses" hidden>No courses are available for your grade yet.</p>
+          </section>
+          <section id="work" class="info-card">
+            <h2>Latest work</h2>
+            <div id="work-detail">
+              <div class="item-title">Data representation</div>
+              <p class="card-copy" id="score">Score: 16 / 20</p>
+              <ol class="work-track" aria-label="Work status"><li class="done">Submitted</li><li class="done">Grading</li><li class="done" id="graded-step">Graded</li></ol>
+            </div>
+            <p class="card-copy" id="no-work" hidden>Your submitted work will appear here.</p>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const screens = document.querySelectorAll('[data-screen]');
+    const tabs = document.querySelectorAll('[data-open]');
+    const examples = {
+      login: [['default', 'Default'], ['invalid', 'Sign-in error']],
+      home: [['default', 'Exam code'], ['active', 'Exam in progress'], ['pending', 'Awaiting grading'], ['appeal', 'Appeal pending'], ['empty', 'First visit']]
+    };
+    const byId = id => document.getElementById(id);
+    const scenario = byId('scenario');
+    function selectScreen(name) {
+      for (const screen of screens) screen.hidden = screen.dataset.screen !== name;
+      for (const tab of tabs) tab.setAttribute('aria-pressed', String(tab.dataset.open === name));
+      scenario.replaceChildren(...examples[name].map(([value, label]) => new Option(label, value)));
+      update();
+    }
+    function update() {
+      const state = scenario.value;
+      const active = state === 'active';
+      byId('login-error').hidden = state !== 'invalid';
+      for (const id of ['email', 'password']) byId(id).setAttribute('aria-invalid', String(state === 'invalid'));
+      byId('exam-title').textContent = active ? 'Computer Science exam' : 'Enter an exam';
+      byId('exam-lead').textContent = active ? 'Your attempt is in progress.' : 'Use the code from your teacher.';
+      byId('code-entry').hidden = active;
+      byId('code-note').hidden = true;
+      byId('resume').hidden = !active;
+      for (const id of ['course-detail', 'work-detail']) byId(id).hidden = state === 'empty';
+      for (const id of ['no-courses', 'no-work']) byId(id).hidden = state !== 'empty';
+      byId('score').textContent = state === 'pending' ? 'Awaiting grading' : state === 'appeal' ? 'Provisional score: 16 / 20 · Appeal pending' : 'Score: 16 / 20';
+      for (const [index, stop] of [...document.querySelectorAll('.work-track li')].entries()) {
+        stop.classList.toggle('done', state !== 'pending' || index === 0);
+      }
+    }
+    for (const tab of tabs) tab.addEventListener('click', () => selectScreen(tab.dataset.open));
+    scenario.addEventListener('change', update);
+    byId('sign-in').addEventListener('submit', event => { event.preventDefault(); selectScreen('home'); });
+    byId('try-code').addEventListener('click', () => {
+      byId('code-note').hidden = false;
+      byId('code-note').textContent = 'Preview only. Exam codes are checked on the live platform.';
+    });
+    byId('reveal').addEventListener('click', () => {
+      const visible = byId('password').type === 'password';
+      byId('password').type = visible ? 'text' : 'password';
+      byId('reveal').textContent = visible ? 'Hide' : 'Show';
+      byId('reveal').setAttribute('aria-pressed', String(visible));
+    });
+    selectScreen(location.hash === '#home' ? 'home' : 'login');
+  </script>
+</body>
+</html>
