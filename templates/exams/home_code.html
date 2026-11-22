@@ -1,0 +1,11 @@
+<form class="home-code" method="post" action="{% url 'enter' %}">
+  {% csrf_token %}
+  <label for="code">Exam code</label>
+  <div class="home-code-row">
+    <input type="text" id="code" name="code" maxlength="12" autocomplete="one-time-code"
+           autocapitalize="characters" spellcheck="false" placeholder="Enter code" required
+           {% if error %}aria-invalid="true" aria-describedby="code-error"{% endif %}>
+    <button class="home-button" type="submit">Continue <span aria-hidden="true">→</span></button>
+  </div>
+  {% if error %}<p class="home-error" id="code-error" role="alert">{{ error }}</p>{% endif %}
+</form>

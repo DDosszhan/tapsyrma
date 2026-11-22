@@ -31,7 +31,8 @@
 {% if preview %}<p class="score exam-timer">Time limit: {{ attempt.invitation.exam.duration_minutes }} minutes (preview)</p>{% elif attempt.deadline_at %}<p class="score exam-timer" role="timer">Time remaining: <span id="countdown" data-remaining="{{ remaining_seconds }}">{{ remaining_seconds }} s</span></p>{% endif %}
 <p id="visibility-warning" class="visibility-warning" role="alert" hidden></p>
 <div class="exam-layout">
-{% if preview %}<div id="answers" class="exam-questions">{% else %}<form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}">{% csrf_token %}{% endif %}
+{% if preview %}<div id="answers" class="exam-questions">{% else %}<form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}" data-result-url="{% url 'exam_result_history' attempt.pk %}">{% csrf_token %}
+<input type="hidden" name="attempt_id" value="{{ attempt.pk }}">{% endif %}
 {% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% endif %} tabindex="-1"><span class="points">{{ q.points }} point{{ q.points|pluralize }}</span>
 <h2>Question {{ forloop.counter }}</h2>
 {% if q.kind == "cloze" %}<p class="question-stem cloze-stem{% if q.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{% for part in q.stem|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
@@ -88,11 +89,18 @@ function scheduleSave(event){
       if(other!==event.target&&other.value===event.target.value)other.value='';
     });
   }
-  updateChoiceLimits();updateMap();if(preview)return;clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace('{% url "exam_result" %}');return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)
+  updateChoiceLimits();updateMap();if(preview)return;clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace(form.dataset.resultUrl);return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)
 }
 form.addEventListener('input',scheduleSave);form.addEventListener('change',scheduleSave);
 form.addEventListener('submit',event=>{if(preview)event.preventDefault();else leavingExam=true});
-function eventData(action,id){const data=new FormData();data.append('csrfmiddlewaretoken',form.elements.csrfmiddlewaretoken.value);data.append('action',action);data.append('event_id',id);return data}
+function eventData(action,id){
+  const data=new FormData();
+  data.append('csrfmiddlewaretoken',form.elements.csrfmiddlewaretoken.value);
+  data.append('attempt_id',form.elements.attempt_id.value);
+  data.append('action',action);
+  data.append('event_id',id);
+  return data;
+}
 async function confirmReturn(id){
   try{
     const response=await fetch('{% url "exam_visibility" %}',{method:'POST',body:eventData('returned',id)});
@@ -118,7 +126,7 @@ if(countdown){
     const left=Math.max(0,Math.ceil((deadline-Date.now())/1000));
     const hours=Math.floor(left/3600),minutes=Math.floor(left%3600/60),seconds=left%60;
     countdown.textContent=(hours?String(hours).padStart(2,'0')+':':'')+String(minutes).padStart(2,'0')+':'+String(seconds).padStart(2,'0');
-    if(left===0){leavingExam=true;status.textContent='Time is up. Saved answers have been submitted.';location.replace('{% url "exam_session" %}')}
+    if(left===0){leavingExam=true;status.textContent='Time is up. Saved answers have been submitted.';location.replace(form.dataset.resultUrl)}
   }
   tick();setInterval(tick,1000);
 }

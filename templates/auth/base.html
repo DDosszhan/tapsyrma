@@ -1,18 +1,11 @@
+{% extends "portal/base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="en" class="auth-page">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{% endblock %} · Tapsyrma</title>
+{% block page_class %}auth{% endblock %}
+{% block head %}
   <link rel="stylesheet" href="{% static 'exams/auth.css' %}">
   <script src="{% static 'exams/auth.js' %}" defer></script>
-</head>
-<body class="auth">
-  <header class="auth-header">
-    <p class="auth-brand"><span>IQanat</span><strong>Tapsyrma</strong></p>
-    <span class="auth-portal">Student portal</span>
-  </header>
+{% endblock %}
+{% block main %}
   <main class="auth-layout">
     <section class="auth-content" aria-labelledby="auth-title">
       {% block auth_content %}{% endblock %}
@@ -54,5 +47,4 @@
       </div>
     </aside>
   </main>
-</body>
-</html>
+{% endblock %}

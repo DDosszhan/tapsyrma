@@ -11,24 +11,69 @@ from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, Q
+from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
+from courses.models import Course
+
 from .models import Attempt, AttemptVisibilityEvent, Exam, GradeAppeal, Invitation, Question, SharedCode
 from .grading import AUTO_REVIEW_REASON
 
 
+def _resumable_attempts(user):
+    return Attempt.objects.filter(
+        Q(deadline_at__gt=timezone.now()) | Q(deadline_at__isnull=True),
+        status=Attempt.Status.ACTIVE, invitation__student__user=user, invitation__exam__published=True,
+    )
+
+
+def _latest_work(student):
+    work = (Attempt.objects.filter(invitation__student=student).exclude(status=Attempt.Status.ACTIVE)
+            .select_related("invitation__exam")
+            .only("status", "score", "submitted_at", "started_at", "invitation__exam__title",
+                  "invitation__exam__total_points")
+            .order_by(Coalesce("submitted_at", "started_at").desc(), "-pk").first())
+    if work and work.status == Attempt.Status.DONE:
+        # Automatic referrals and appeals share a table. Only show "Appeal pending"
+        # for a student request or a student note added to a referral.
+        work.appeal_count = work.pending_appeal_count = work.pending_review_count = 0
+        for status, reason, note, referred in work.appeals.values_list(
+                "status", "student_reason", "student_note", "original_grade__review_pending"):
+            is_appeal = bool(note) or not (referred or reason.startswith(AUTO_REVIEW_REASON))
+            work.appeal_count += int(is_appeal)
+            if status == GradeAppeal.Status.PENDING:
+                work.pending_review_count += 1
+                work.pending_appeal_count += int(is_appeal)
+    return work
+
+
+def _render_home(request, error=None):
+    student = getattr(request.user, "student_profile", None)
+    exams = Exam.objects.filter(published=True).only(
+        "title", "subject", "grade", "question_count", "duration_minutes", "total_points"
+    ).order_by("grade", "subject", "title")
+    context = {"student": student, "error": error, "exams": exams}
+    if student:
+        context.update(
+            exams=exams.filter(grade=student.grade),
+            active_attempts=_resumable_attempts(request.user).select_related("invitation__exam").only(
+                "started_at", "deadline_at", "invitation__exam__title").order_by("-started_at", "-pk"),
+            courses=Course.for_student_with_progress(student),
+            latest_work=_latest_work(student),
+        )
+    return render(request, "exams/enter.html", context)
+
+
 def enter(request):
-    exams = Exam.objects.filter(published=True).order_by("grade", "subject", "title")
     if request.method == "POST":
         if not request.user.is_authenticated:
             return redirect_to_login(request.path)
         student = getattr(request.user, "student_profile", None)
         if not student:
-            return render(request, "exams/enter.html", {
-                "error": "Shared codes are for students only. Sign in with a student account.", "exams": exams})
+            return _render_home(request, "Shared codes are for students only. Sign in with a student account.")
         code = request.POST.get("code", "").strip().upper().replace("-", "")
         digest = hmac.new(settings.SECRET_KEY.encode(), code.encode(), hashlib.sha256).hexdigest()
         invitation = Invitation.objects.filter(code_hash=digest).select_related("exam", "student").first()
@@ -46,8 +91,16 @@ def enter(request):
             if shared.is_active and shared.expires_at >= timezone.now():
                 request.session["shared_code_id"] = shared.id
                 return redirect("choose_exam")
-        return render(request, "exams/enter.html", {"error": "The code is invalid or its start deadline has passed.", "exams": exams})
-    return render(request, "exams/enter.html", {"exams": exams})
+        return _render_home(request, "The code is invalid or its start deadline has passed.")
+    return _render_home(request)
+
+
+@login_required
+@require_POST
+def resume(request, attempt_id):
+    attempt = get_object_or_404(_resumable_attempts(request.user).only("invitation_id"), pk=attempt_id)
+    request.session["invitation_id"] = attempt.invitation_id
+    return redirect("exam_attempt", attempt_id=attempt.pk)
 
 
 @login_required
@@ -154,20 +207,34 @@ def _valid_index(value, upper):
             and str(int(value)) == value and int(value) < upper)
 
 
+def _show_attempt(request, attempt, *, scoped):
+    if attempt.status == Attempt.Status.ACTIVE and attempt.deadline_at and timezone.now() >= attempt.deadline_at:
+        with transaction.atomic():
+            attempt = Attempt.objects.select_for_update().get(pk=attempt.pk)
+            _close_expired(attempt)
+    if attempt.status != Attempt.Status.ACTIVE:
+        if scoped:
+            return redirect("exam_result_history", attempt_id=attempt.pk)
+        return redirect("exam_result")
+    remaining_seconds = max(0, int((attempt.deadline_at - timezone.now()).total_seconds())) if attempt.deadline_at else None
+    return render(request, "exams/attempt.html", {"attempt": attempt, "questions": _questions(attempt),
+                                                  "answers": attempt.answers, "remaining_seconds": remaining_seconds})
+
+
+@login_required
+@require_GET
+def exam_attempt(request, attempt_id):
+    attempt = get_object_or_404(Attempt, pk=attempt_id, invitation__student__user=request.user,
+                                invitation__exam__published=True)
+    return _show_attempt(request, attempt, scoped=True)
+
+
 @login_required
 def session(request):
     invitation = _invitation(request)
     attempt = Attempt.objects.filter(invitation=invitation).first()
     if attempt:
-        if attempt.status == Attempt.Status.ACTIVE and attempt.deadline_at and timezone.now() >= attempt.deadline_at:
-            with transaction.atomic():
-                attempt = Attempt.objects.select_for_update().get(pk=attempt.pk)
-                _close_expired(attempt)
-        if attempt.status != Attempt.Status.ACTIVE:
-            return redirect("exam_result")
-        remaining_seconds = max(0, int((attempt.deadline_at - timezone.now()).total_seconds())) if attempt.deadline_at else None
-        return render(request, "exams/attempt.html", {"attempt": attempt, "questions": _questions(attempt),
-                                                       "answers": attempt.answers, "remaining_seconds": remaining_seconds})
+        return _show_attempt(request, attempt, scoped=False)
     if request.method == "POST":
         with transaction.atomic():
             locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
@@ -246,13 +313,34 @@ def _read_answers(request, questions):
     return answers
 
 
+def _locked_page_attempt(request):
+    """A student's open exam tabs may belong to different invitations."""
+    attempts = Attempt.objects.select_for_update(of=("self",))
+    attempt_id = request.POST.get("attempt_id")
+    if attempt_id is None:  # Forms rendered before attempt IDs were included.
+        attempt = attempts.filter(invitation=_invitation(request)).first()
+        if attempt:
+            question_ids = {key.split("_", 2)[1] for key in request.POST if key.startswith("q_")}
+            if question_ids:
+                if not question_ids.issubset(map(str, attempt.question_ids)):
+                    raise Http404("Reopen the intended exam from Home.")
+            elif _resumable_attempts(request.user).exclude(pk=attempt.pk).exists():
+                raise Http404("Choose the intended exam from Home.")
+        return attempt
+    if not (attempt_id.isascii() and attempt_id.isdecimal() and len(attempt_id) <= 19):
+        raise Http404
+    return get_object_or_404(attempts, pk=int(attempt_id), invitation__student__user=request.user,
+                             invitation__exam__published=True)
+
+
 @login_required
 @require_POST
 def save(request):
-    invitation = _invitation(request)
     with transaction.atomic():
-        attempt = Attempt.objects.select_for_update().filter(invitation=invitation).first()
+        attempt = _locked_page_attempt(request)
         if not attempt or attempt.status != Attempt.Status.ACTIVE:
+            if attempt and "attempt_id" in request.POST:
+                return JsonResponse({"error": "This attempt is closed."}, status=409)
             return HttpResponseBadRequest("This attempt is closed.")
         if _close_expired(attempt):
             return JsonResponse({"expired": True}, status=409)
@@ -276,9 +364,9 @@ def visibility(request):
     except (ValueError, AttributeError):
         return HttpResponseBadRequest("Invalid event ID.")
     with transaction.atomic():
-        attempt = get_object_or_404(Attempt.objects.select_for_update(),
-                                    invitation_id=request.session.get("invitation_id"),
-                                    invitation__student__user=request.user)
+        attempt = _locked_page_attempt(request)
+        if not attempt:
+            raise Http404
         _close_expired(attempt)
         event = AttemptVisibilityEvent.objects.filter(attempt=attempt, event_id=event_id).first()
         if event is None:
@@ -295,21 +383,19 @@ def visibility(request):
 @login_required
 @require_POST
 def submit(request):
-    invitation = _invitation(request)
     with transaction.atomic():
-        attempt = Attempt.objects.select_for_update().filter(invitation=invitation).first()
-        if not attempt or attempt.status != Attempt.Status.ACTIVE:
-            return redirect("exam_result")
-        if _close_expired(attempt):
-            return redirect("exam_result")
-        try:
-            answers = _read_answers(request, _questions(attempt))
-        except ValueError as exc:
-            return HttpResponseBadRequest(str(exc))
-        attempt.answers = answers
-        attempt.status = Attempt.Status.PENDING
-        attempt.submitted_at = timezone.now()
-        attempt.save(update_fields=["answers", "status", "submitted_at"])
+        attempt = _locked_page_attempt(request)
+        if attempt and attempt.status == Attempt.Status.ACTIVE and not _close_expired(attempt):
+            try:
+                answers = _read_answers(request, _questions(attempt))
+            except ValueError as exc:
+                return HttpResponseBadRequest(str(exc))
+            attempt.answers = answers
+            attempt.status = Attempt.Status.PENDING
+            attempt.submitted_at = timezone.now()
+            attempt.save(update_fields=["answers", "status", "submitted_at"])
+    if "attempt_id" in request.POST:
+        return redirect("exam_result_history", attempt_id=attempt.pk)
     return redirect("exam_result")
 
 
@@ -331,7 +417,8 @@ def result(request, attempt_id=None):
     if not attempt:
         return redirect("exam_session")
     if attempt.status == Attempt.Status.ACTIVE:
-        request.session["invitation_id"] = invitation.pk
+        if attempt_id is not None:
+            return redirect("exam_attempt", attempt_id=attempt.pk)
         return redirect("exam_session")
     appeals = {appeal.question_id: appeal for appeal in attempt.appeals.all()}
     pending_review_count = sum(appeal.status == GradeAppeal.Status.PENDING for appeal in appeals.values())

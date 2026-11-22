@@ -1,0 +1,18 @@
+{% load static %}
+<!doctype html>
+<html lang="en" class="portal-page">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · Tapsyrma</title>
+  <link rel="stylesheet" href="{% static 'exams/portal.css' %}">
+  {% block head %}{% endblock %}
+</head>
+<body class="portal {% block page_class %}{% endblock %}">
+  <header class="portal-header">
+    <p class="portal-brand"><span>IQanat</span><strong>Tapsyrma</strong></p>
+    {% block header_nav %}<span class="portal-meta">Student portal</span>{% endblock %}
+  </header>
+  {% block main %}{% endblock %}
+</body>
+</html>

@@ -23,11 +23,8 @@ def _student(request):
 @require_GET
 def course_list(request):
     student = _student(request)
-    courses = list(Course.objects.filter(published=True, grade=student.grade).annotate(
+    courses = list(Course.for_student_with_progress(student).annotate(
         section_count=Count("sections", filter=Q(sections__parent__isnull=True), distinct=True),
-        lesson_count=Count("sections__lessons", distinct=True),
-        opened_count=Count("sections__lessons__progress", filter=Q(
-            sections__lessons__progress__student=student), distinct=True),
         completed_count=Count("sections__lessons__progress", filter=Q(
             sections__lessons__progress__student=student,
             sections__lessons__progress__completed_at__isnull=False), distinct=True),

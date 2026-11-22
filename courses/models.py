@@ -28,6 +28,14 @@ class Course(models.Model):
     def __str__(self):
         return f"{self.title} · Grade {self.grade}"
 
+    @classmethod
+    def for_student_with_progress(cls, student):
+        return cls.objects.filter(published=True, grade=student.grade).annotate(
+            lesson_count=models.Count("sections__lessons", distinct=True),
+            opened_count=models.Count("sections__lessons__progress", filter=models.Q(
+                sections__lessons__progress__student=student), distinct=True),
+        )
+
 
 class Section(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="sections", verbose_name="Course")

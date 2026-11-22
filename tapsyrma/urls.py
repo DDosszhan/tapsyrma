@@ -1,14 +1,13 @@
 from pathlib import PurePosixPath
 
 from django.contrib import admin
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LogoutView
 from django.core.exceptions import PermissionDenied
 from django.core.files.storage import default_storage
 from django.db import connection
 from django.http import FileResponse, Http404, JsonResponse
 from django.urls import path
-from django.views.generic import TemplateView
+from django.views.generic import RedirectView
 from exams import views as exam_views
 from exams.accounts import StudentLoginView, StudentPasswordChangeView
 from courses import views as course_views
@@ -46,6 +45,8 @@ urlpatterns = [
          course_views.request_lesson_explanation, name="lesson_explain"),
     path("choose/", exam_views.choose_exam, name="choose_exam"),
     path("exam/", exam_views.session, name="exam_session"),
+    path("exam/<int:attempt_id>/", exam_views.exam_attempt, name="exam_attempt"),
+    path("exam/<int:attempt_id>/resume/", exam_views.resume, name="exam_resume"),
     path("exam/preview/<int:exam_id>/", exam_views.preview, name="exam_preview"),
     path("exam/questions/<int:question_id>/image/", exam_views.question_image, name="exam_question_image"),
     path("exam/save/", exam_views.save, name="exam_save"),
@@ -55,7 +56,7 @@ urlpatterns = [
     path("exam/result/<int:attempt_id>/", exam_views.result, name="exam_result_history"),
     path("exam/result/<int:attempt_id>/appeal/<int:question_id>/", exam_views.appeal, name="exam_appeal"),
     path("history/", exam_views.history, name="history"),
-    path("dashboard/", login_required(TemplateView.as_view(template_name="home.html")), name="home"),
+    path("dashboard/", RedirectView.as_view(pattern_name="enter"), name="home"),
     path("login/", StudentLoginView.as_view(), name="login"),
     path("password/change/", StudentPasswordChangeView.as_view(), name="password_change"),
     path("logout/", LogoutView.as_view(), name="logout"),

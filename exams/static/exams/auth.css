@@ -1,53 +1,4 @@
-.auth {
-  --paper: #f6f6f1;
-  --ink: #182b40;
-  --muted: #526373;
-  --line: #d2d8d7;
-  --input-line: #7c8993;
-  --navy: #17375e;
-  --blue: #174d90;
-  --gold: #ffce57;
-  --error: #a12b36;
-  --focus: #245bb3;
-  box-sizing: border-box;
-  max-width: 1280px;
-  margin: auto;
-  min-height: 100vh;
-  padding: 0 clamp(20px, 4vw, 64px) 48px;
-  background: var(--paper);
-  color: var(--ink);
-  font: 1rem/1.5 system-ui, "Segoe UI", sans-serif;
-}
-
-.auth-page { background: #f6f6f1; }
-.auth *, .auth *::before, .auth *::after { box-sizing: inherit; }
-.auth h1, .auth h2, .auth p { margin: 0; }
-.auth input, .auth button { font: inherit; }
-.auth button { cursor: pointer; }
-.auth [hidden] { display: none; }
-.auth :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
-
-.auth-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  min-height: 84px;
-  padding-block: 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-.auth-brand { display: flex; align-items: center; gap: 14px; white-space: nowrap; }
-.auth-brand span { font-size: 1.125rem; font-weight: 650; }
-.auth-brand strong {
-  border-inline-start: 1px solid var(--input-line);
-  padding-inline-start: 14px;
-  font-size: 1.375rem;
-  line-height: 1.1;
-  letter-spacing: -.04em;
-}
-.auth-portal, .auth .auth-help { color: var(--muted); font-size: .875rem; }
+.auth .auth-help { color: var(--muted); font-size: .875rem; }
 
 .auth-layout {
   display: grid;
@@ -183,8 +134,6 @@
 }
 
 @media (max-width: 759px) {
-  .auth { padding-bottom: 28px; }
-  .auth-header { min-height: 64px; }
   .auth-layout {
     grid-template-areas: "form" "cover";
     grid-template-columns: minmax(0, 1fr);
