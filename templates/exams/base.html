@@ -3,6 +3,8 @@
 <title>Tapsyrma</title>
 <style>
 body{font:17px/1.5 system-ui,sans-serif;color:#172033;background:#f4f6fa;margin:0}
+.exam-brand{display:flex;align-items:center;gap:14px;max-width:1180px;margin:0 auto;padding:18px 32px 0;color:#182b40}
+.exam-brand span{font-size:1.125rem;font-weight:650}.exam-brand strong{border-left:1px solid #7c8993;padding-left:14px;font-size:1.375rem;line-height:1.1;letter-spacing:-.04em}
 main{max-width:800px;margin:40px auto;padding:24px;background:white;border-radius:14px;box-shadow:0 5px 24px #17203312}
 h1{line-height:1.2}.muted{color:#566275}.error{color:#9d1d1d}.question{border:1px solid #dce2ea;border-radius:10px;padding:18px;margin:20px 0}
 .points{float:right;color:#42577a}.exam-timer{position:sticky;top:0;z-index:1;background:white;border:1px solid #dce2ea;border-radius:8px;padding:8px 12px}label{display:block;margin:12px 0}textarea,input[type=text],input[type=email],input[type=password]{box-sizing:border-box;width:100%;padding:10px;font:inherit}textarea{min-height:130px}
@@ -19,7 +21,7 @@ main.exam-page{max-width:1180px;padding:32px;background:#f9fbfd}
 .question-grid a:hover,.question-grid a:focus-visible{outline:3px solid #86aaff;outline-offset:2px}
 .map-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;font-size:.8em;color:#566275}
 .map-legend span{display:flex;align-items:center;gap:5px}.map-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;background:#e8edf3;border:1px solid #cbd4df}
-@media(max-width:760px){main.exam-page{margin:0;padding:18px;border-radius:0}.exam-layout{display:flex;flex-direction:column}.question-map{position:static;order:-1;width:100%;box-sizing:border-box}.exam-questions{width:100%}.question-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.exam-questions .question{padding:18px}}
-</style>{% block extra_head %}{% endblock %}</head><body><main class="{% block main_class %}{% endblock %}">{% block content %}{% endblock %}
+@media(max-width:760px){.exam-brand{padding:16px 18px}main.exam-page{margin:0;padding:18px;border-radius:0}.exam-layout{display:flex;flex-direction:column}.question-map{position:static;order:-1;width:100%;box-sizing:border-box}.exam-questions{width:100%}.question-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.exam-questions .question{padding:18px}}
+</style>{% block extra_head %}{% endblock %}</head><body><header class="exam-brand"><span>IQanat</span><strong>Tapsyrma</strong></header><main class="{% block main_class %}{% endblock %}">{% block content %}{% endblock %}
 {% if request.user.is_authenticated %}<nav><a href="{% url 'enter' %}">Home</a>{% if request.user.student_profile %}<a href="{% url 'course_list' %}">My courses</a><a href="{% url 'history' %}">My work</a>{% endif %}<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Log out</button></form></nav>{% endif %}
 </main></body></html>
