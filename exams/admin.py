@@ -250,6 +250,8 @@ class FixedQuestionForm(forms.ModelForm):
                 "correct_option_number": cleaned.get("correct_option_number"),
                 "rubric": cleaned.get("criteria_text"), "model_answer": cleaned.get("model_answer"),
                 "answer_items": cleaned.get("answer_items"),
+                "selection_rule": (self.instance.interaction or {}).get("selection_rule", "")
+                if cleaned["kind"] == Question.Kind.MULTISELECT else "",
                 "subtopic_explanation": cleaned.get("subtopic_explanation"),
                 "answer_explanation": cleaned.get("answer_explanation"),
                 "requires_image": cleaned.get("requires_image"),

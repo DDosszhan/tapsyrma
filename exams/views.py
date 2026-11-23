@@ -251,7 +251,7 @@ def session(request):
                                                  "expired": invitation.expires_at < timezone.now()})
 
 
-def _read_answers(request, questions):
+def _read_answers(request, questions, *, final=False):
     answers = {}
     for q in questions:
         if q.kind == "multiselect":
@@ -270,6 +270,9 @@ def _read_answers(request, questions):
                     selected.append(str(index))
             if len(selected) > q.points:
                 raise ValueError(f"Select no more than {q.points} options.")
+            if (final and (q.interaction or {}).get("selection_rule") == "exact_correct_only"
+                    and 0 < len(selected) < q.points):
+                raise ValueError(f"Select exactly {q.points} options or leave the question unanswered.")
             answers[str(q.id)] = selected
             continue
         if q.kind in ("cloze", "matching", "ordering"):
@@ -387,7 +390,7 @@ def submit(request):
         attempt = _locked_page_attempt(request)
         if attempt and attempt.status == Attempt.Status.ACTIVE and not _close_expired(attempt):
             try:
-                answers = _read_answers(request, _questions(attempt))
+                answers = _read_answers(request, _questions(attempt), final=True)
             except ValueError as exc:
                 return HttpResponseBadRequest(str(exc))
             attempt.answers = answers

@@ -33,14 +33,14 @@
 <div class="exam-layout">
 {% if preview %}<div id="answers" class="exam-questions">{% else %}<form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}" data-result-url="{% url 'exam_result_history' attempt.pk %}">{% csrf_token %}
 <input type="hidden" name="attempt_id" value="{{ attempt.pk }}">{% endif %}
-{% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% endif %} tabindex="-1"><span class="points">{{ q.points }} point{{ q.points|pluralize }}</span>
+{% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% if q.interaction.selection_rule == "exact_correct_only" %} data-exact-choices="{{ q.points }}"{% endif %}{% endif %} tabindex="-1"><span class="points">{{ q.points }} point{{ q.points|pluralize }}</span>
 <h2>Question {{ forloop.counter }}</h2>
 {% if q.kind == "cloze" %}<p class="question-stem cloze-stem{% if q.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{% for part in q.stem|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
 {% else %}<p class="question-stem{% if q.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{{ q.stem }}</p>{% endif %}
 {% if q.image %}<img class="question-image" src="{% url 'exam_question_image' q.id %}" alt="Diagram for question {{ forloop.counter }}"><details class="diagram-detail"><summary>View larger diagram</summary><p class="muted">Scroll sideways to inspect the diagram.</p><div class="diagram-pan"><img src="{% url 'exam_question_image' q.id %}" alt="Enlarged diagram for question {{ forloop.counter }}"></div></details>{% endif %}
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
-{% endfor %}{% elif q.kind == "multiselect" %}<p>Select up to {{ q.points }} options.</p>{% for option in q.options %}
+{% endfor %}{% elif q.kind == "multiselect" %}<p>{% if q.interaction.selection_rule == "exact_correct_only" %}Select exactly{% else %}Select up to{% endif %} {{ q.points }} options.</p>{% for option in q.options %}
 <label><input type="checkbox" name="q_{{ q.id }}_{{ forloop.counter0 }}" value="1" {% if answers|dict_get:q.id|has_index:forloop.counter0 %}checked{% endif %}> {{ option }}</label>
 {% endfor %}{% elif q.kind == "matching" %}<p>Choose the numbered option for each item:</p>
 <ol class="matching-choices" id="choices-{{ q.id }}">{% for option in q.options %}<li>{{ option }}</li>{% endfor %}</ol>
@@ -53,7 +53,7 @@
 {% endfor %}{% elif q.kind == "open" %}<label for="q_{{ q.id }}">Your answer</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}
 </section>{% endfor %}
 <div class="exam-actions"><p id="save-status" class="muted" aria-live="polite">{% if preview %}Preview only. Your answers stay on this page.{% else %}Answers are saved automatically.{% endif %}</p>
-{% if not preview %}<button type="submit" onclick="return confirm('Submit the exam? You cannot change your answers afterward.')">Submit exam</button>{% endif %}</div>{% if preview %}</div>{% else %}</form>{% endif %}
+{% if not preview %}<button type="submit">Submit exam</button>{% endif %}</div>{% if preview %}</div>{% else %}</form>{% endif %}
 <aside class="question-map" aria-label="Question map"><h2>Question map</h2><p><strong id="answered-count">0</strong> of {{ questions|length }} answered</p>
 <div class="question-grid">{% for q in questions %}<a href="#question-{{ q.id }}" data-question="{{ q.id }}" aria-label="Question {{ forloop.counter }}, unanswered">{{ forloop.counter }}</a>{% endfor %}</div>
 <div class="map-legend"><span><i></i>Unanswered</span><span><i class="done"></i>Answered</span></div></aside>
@@ -75,7 +75,7 @@ function updateMap(){
     const question=document.getElementById('question-'+link.dataset.question);
     const parts=[...question.querySelectorAll('input[type=text],select')];
     const checks=[...question.querySelectorAll('input[type=checkbox]')];
-    const filled=checks.length?checks.some(element=>element.checked):parts.length?parts.every(element=>element.value.trim()):!!(question.querySelector('input[type=radio]:checked')||question.querySelector('textarea')?.value.trim());
+    const filled=checks.length?(question.dataset.exactChoices?checks.filter(element=>element.checked).length===Number(question.dataset.exactChoices):checks.some(element=>element.checked)):parts.length?parts.every(element=>element.value.trim()):!!(question.querySelector('input[type=radio]:checked')||question.querySelector('textarea')?.value.trim());
     link.classList.toggle('answered',filled);
     link.setAttribute('aria-label',`Question ${link.textContent}, ${filled?'answered':'unanswered'}`);
     if(filled)answered++;
@@ -92,7 +92,22 @@ function scheduleSave(event){
   updateChoiceLimits();updateMap();if(preview)return;clearTimeout(saveTimer);status.textContent='Saving…';saveTimer=setTimeout(async()=>{try{const r=await fetch('{% url "exam_save" %}',{method:'POST',body:new FormData(form)});if(r.status===409){leavingExam=true;location.replace(form.dataset.resultUrl);return}status.textContent=r.ok?'Answers saved.':'Could not save. Submitting will send your current answers.'}catch{status.textContent='Connection lost. Submitting will send your current answers.'}},700)
 }
 form.addEventListener('input',scheduleSave);form.addEventListener('change',scheduleSave);
-form.addEventListener('submit',event=>{if(preview)event.preventDefault();else leavingExam=true});
+form.addEventListener('submit',event=>{
+  if(preview){event.preventDefault();return}
+  const incomplete=[...form.querySelectorAll('[data-exact-choices]')].find(question=>{
+    const selected=question.querySelectorAll('input[type=checkbox]:checked').length;
+    return selected>0&&selected<Number(question.dataset.exactChoices);
+  });
+  if(incomplete){
+    event.preventDefault();
+    const number=incomplete.querySelector('h2').textContent;
+    status.textContent=`${number}: select exactly ${incomplete.dataset.exactChoices} options or clear the answer.`;
+    incomplete.scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
+  if(!confirm('Submit the exam? You cannot change your answers afterward.')){event.preventDefault();return}
+  leavingExam=true;
+});
 function eventData(action,id){
   const data=new FormData();
   data.append('csrfmiddlewaretoken',form.elements.csrfmiddlewaretoken.value);

@@ -136,7 +136,7 @@ def _structured_answer(kind, stem, points, value, reference, options_hint=None):
     return {"left": left_items, "answers": answers}, options, rubric, model_answer
 
 
-def _multiselect_answer(options, points, value, reference):
+def _multiselect_answer(options, points, value, reference, selection_rule=""):
     if (len(options) != 4 or any(not option for option in options)
             or len({_key(option) for option in options}) != 4):
         raise ValidationError(f"{reference}: multiselect needs four different, nonempty options.")
@@ -147,9 +147,17 @@ def _multiselect_answer(options, points, value, reference):
     if points != len(parts):
         raise ValidationError(f"{reference}: points must equal the number of correct options ({len(parts)}).")
     answers = sorted(int(part) - 1 for part in parts)
-    rubric = [{"criterion": "Correct choices minus incorrect choices (minimum 0)", "points": points}]
+    if selection_rule not in ("", "exact_correct_only"):
+        raise ValidationError(f"{reference}: unsupported multiple-selection rule.")
+    rubric = [{"criterion": (
+        f"Select exactly {points} options; 1 point per correct choice, no penalty for incorrect choices"
+        if selection_rule == "exact_correct_only" else
+        "Correct choices minus incorrect choices (minimum 0)"), "points": points}]
     model_answer = "\n".join(f"{index + 1}. {options[index]}" for index in answers)
-    return {"answers": answers}, rubric, model_answer
+    interaction = {"answers": answers}
+    if selection_rule:
+        interaction["selection_rule"] = selection_rule
+    return interaction, rubric, model_answer
 
 
 def answer_items_from_question(question):
@@ -194,6 +202,9 @@ def normalize_question(data, *, reference="Question"):
     kind = _text(data.get("kind") or "open").lower()
     if kind not in ("open", "mcq", "cloze", "matching", "multiselect", "ordering"):
         raise ValidationError(f"{reference}: unsupported question type.")
+    selection_rule = _text(data.get("selection_rule"))
+    if kind != "multiselect" and selection_rule:
+        raise ValidationError(f"{reference}: selection rule requires a multiselect question.")
     grading_mode = _text(data.get("grading_mode") or "ai").lower()
     if grading_mode not in ("ai", "manual"):
         raise ValidationError(f"{reference}: grading mode must be 'ai' or 'manual'.")
@@ -218,7 +229,7 @@ def normalize_question(data, *, reference="Question"):
             raise ValidationError(f"{reference}: use answer_items for all correct options.")
         options = [_text(value) for value in data.get("options", [])]
         interaction, rubric, model_answer = _multiselect_answer(
-            options, points, data.get("answer_items"), reference)
+            options, points, data.get("answer_items"), reference, selection_rule)
         correct_option = 0
     else:
         if _text(data.get("answer_items")):
@@ -294,6 +305,7 @@ def validate_stored_questions(exam):
             "correct_option_number": question.correct_option + 1 if question.kind == "mcq" and question.correct_option is not None else "",
             "rubric": question.rubric, "model_answer": question.model_answer,
             "answer_items": answer_items_from_question(question),
+            "selection_rule": (question.interaction or {}).get("selection_rule", ""),
             "subtopic_explanation": question.subtopic_explanation,
             "answer_explanation": question.answer_explanation,
             "requires_image": question.requires_image,

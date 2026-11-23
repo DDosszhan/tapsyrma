@@ -23,7 +23,18 @@ def grade_structured(question, answer):
                 or len(answer) != len(set(answer))):
             raise ValueError("The multiple-selection key or answer is invalid.")
         selected = {int(value) for value in answer}
-        score = max(0, len(selected & set(expected)) - len(selected - set(expected)))
+        rule = question.interaction.get("selection_rule", "")
+        if rule == "exact_correct_only":
+            if len(selected) > question.points:
+                raise ValueError("The multiple-selection answer has too many options.")
+            if len(selected) < question.points:
+                return {"score": 0, "criteria": [0],
+                        "explanation": f"Select exactly {question.points} options. An incomplete answer earns 0 points."}
+            score = len(selected & set(expected))
+        elif not rule:
+            score = max(0, len(selected & set(expected)) - len(selected - set(expected)))
+        else:
+            raise ValueError("The multiple-selection rule is invalid.")
         return {"score": score, "criteria": [score],
                 "explanation": f"{score} of {question.points} points for the selected options."}
     if len(answer) != len(question.rubric):
