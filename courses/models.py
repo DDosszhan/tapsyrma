@@ -13,6 +13,7 @@ class Course(models.Model):
     grade = models.PositiveSmallIntegerField("Grade", choices=[
         (Exam.Grade.NINE, Exam.Grade.NINE.label),
         (Exam.Grade.TEN, Exam.Grade.TEN.label),
+        (Exam.Grade.ELEVEN, Exam.Grade.ELEVEN.label),
     ])
     description = models.TextField("Description", blank=True)
     published = models.BooleanField("Published", default=False)
@@ -23,7 +24,7 @@ class Course(models.Model):
         verbose_name = "Course"
         verbose_name_plural = "Courses"
         ordering = ["grade", "subject", "title"]
-        constraints = [models.CheckConstraint(condition=models.Q(grade__in=[9, 10]), name="course_grade_9_or_10")]
+        constraints = [models.CheckConstraint(condition=models.Q(grade__in=[9, 10, 11]), name="course_grade_9_10_or_11")]
 
     def __str__(self):
         return f"{self.title} · Grade {self.grade}"

@@ -59,6 +59,24 @@ class CourseSkeletonTests(TestCase):
         self.assertContains(self.client.get(reverse("course_list")), "Курс 10")
         self.assertEqual(self.client.get(reverse("section_detail", args=[self.course.pk, self.section.pk])).status_code, 404)
 
+    def test_grade_eleven_student_sees_grade_eleven_course_only(self):
+        user = get_user_model().objects.create_user(
+            "eleven@example.invalid", "eleven@example.invalid", "password")
+        Student.objects.create(user=user, name="Grade 11 student", grade=11, password_change_required=False)
+        grade_eleven_course = Course.objects.create(
+            title="Grade 11 computing", subject="Computer Science", grade=11,
+            published=True, created_by=self.teacher)
+        grade_eleven_course.full_clean()
+
+        self.client.force_login(user)
+        listing = self.client.get(reverse("course_list"))
+        self.assertContains(listing, grade_eleven_course.title)
+        self.assertNotContains(listing, self.course.title)
+        self.assertNotContains(listing, self.ten_course.title)
+
+        self.client.force_login(self.user)
+        self.assertNotContains(self.client.get(reverse("course_list")), grade_eleven_course.title)
+
     def test_hardware_topic_is_nested_and_progress_rolls_up(self):
         chapter = Section.objects.create(course=self.course, position=3, title="3. Hardware")
         topic = Section.objects.create(course=self.course, parent=chapter, position=1,
