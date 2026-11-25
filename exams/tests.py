@@ -450,7 +450,7 @@ class ExamFlowTests(TestCase):
         page = self.client.get("/exam/")
         self.assertContains(page, "Question map")
         self.assertContains(page, f'href="#question-{question.pk}"')
-        self.assertContains(page, "The exam page was hidden. This event was recorded.")
+        self.assertContains(page, "The exam page lost focus or was hidden. This event was recorded.")
         url = "/exam/visibility/"
         event_id = str(uuid.uuid4())
         self.assertEqual(self.client.post(url, {"action": "hidden", "event_id": "bad"}).status_code, 400)
@@ -478,7 +478,7 @@ class ExamFlowTests(TestCase):
         session.save()
         attempt.status = Attempt.Status.PENDING
         attempt.save(update_fields=["status"])
-        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "was hidden 1 time(s)")
+        self.assertContains(self.client.get(f"/exam/result/{attempt.pk}/"), "lost focus or was hidden 1 time.")
         self.assertEqual(self.client.post(url, {"action": "hidden", "event_id": str(uuid.uuid4())}).status_code, 409)
         self.assertEqual(self.client.post(url, {"action": "returned", "event_id": event_id}).json()["count"], 1)
         self.client.force_login(self.teacher)

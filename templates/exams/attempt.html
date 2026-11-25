@@ -59,7 +59,7 @@
 <div class="map-legend"><span><i></i>Unanswered</span><span><i class="done"></i>Answered</span></div></aside>
 </div>
 <script>
-const form=document.getElementById('answers'),status=document.getElementById('save-status'),preview={{ preview|yesno:"true,false" }};let saveTimer,leavingExam=false,awayId=null,pendingReturn=null;
+const form=document.getElementById('answers'),status=document.getElementById('save-status'),preview={{ preview|yesno:"true,false" }};let saveTimer,leavingExam=false;
 const warning=document.getElementById('visibility-warning'),mapLinks=[...document.querySelectorAll('.question-grid a')];
 function updateChoiceLimits(){
   for(const question of form.querySelectorAll('[data-max-choices]')){
@@ -105,35 +105,114 @@ form.addEventListener('submit',event=>{
     incomplete.scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
-  if(!confirm('Submit the exam? You cannot change your answers afterward.')){event.preventDefault();return}
   leavingExam=true;
+  if(!confirm('Submit the exam? You cannot change your answers afterward.')){
+    leavingExam=false;
+    event.preventDefault();
+  }
 });
-function eventData(action,id){
-  const data=new FormData();
-  data.append('csrfmiddlewaretoken',form.elements.csrfmiddlewaretoken.value);
-  data.append('attempt_id',form.elements.attempt_id.value);
-  data.append('action',action);
-  data.append('event_id',id);
-  return data;
+
+function trackExamFocus() {
+  const url = '{% url "exam_visibility" %}';
+  const storageKey = `exam-focus:${form.elements.attempt_id.value}`;
+  const pendingReturns = new Set();
+  let awayId = null;
+  let reporting = false;
+
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(storageKey));
+    awayId = saved?.awayId ?? null;
+    saved?.returns?.forEach(id => pendingReturns.add(id));
+  } catch {
+    // Storage can be unavailable. Tracking still works within the current page.
+  }
+
+  function saveTrackingState() {
+    try {
+      if (awayId || pendingReturns.size) {
+        sessionStorage.setItem(storageKey, JSON.stringify({awayId, returns: [...pendingReturns]}));
+      } else {
+        sessionStorage.removeItem(storageKey);
+      }
+    } catch {
+      // Retain the in-memory state if storage is unavailable.
+    }
+  }
+
+  function eventData(action, id) {
+    const data = new FormData();
+    data.append('csrfmiddlewaretoken', form.elements.csrfmiddlewaretoken.value);
+    data.append('attempt_id', form.elements.attempt_id.value);
+    data.append('action', action);
+    data.append('event_id', id);
+    return data;
+  }
+
+  function markAway() {
+    if (leavingExam || awayId) return;
+    awayId = crypto.randomUUID();
+    saveTrackingState();
+    const body = eventData('hidden', awayId);
+    try {
+      if (navigator.sendBeacon?.(url, body)) return;
+    } catch {
+      // Try keepalive fetch when the browser rejects a beacon.
+    }
+    fetch(url, {method: 'POST', body, keepalive: true}).catch(() => {});
+  }
+
+  async function reportReturns() {
+    if (reporting || !pendingReturns.size) return;
+    reporting = true;
+    try {
+      for (const id of pendingReturns) {
+        const response = await fetch(url, {method: 'POST', body: eventData('returned', id), keepalive: true});
+        if (response.status === 409) {
+          pendingReturns.clear();
+          saveTrackingState();
+          return;
+        }
+        if (!response.ok) throw Error('Not saved');
+        const {count} = await response.json();
+        pendingReturns.delete(id);
+        saveTrackingState();
+        warning.textContent = `The exam page lost focus or was hidden. This event was recorded. Total: ${count}.`;
+        warning.hidden = false;
+      }
+    } catch {
+      warning.textContent = 'The exam page lost focus or was hidden. The event could not be confirmed yet.';
+      warning.hidden = false;
+    } finally {
+      reporting = false;
+    }
+  }
+
+  function markReturn() {
+    if (leavingExam || document.hidden || !document.hasFocus()) return;
+    if (awayId) {
+      pendingReturns.add(awayId);
+      awayId = null;
+      saveTrackingState();
+    }
+    reportReturns();
+  }
+
+  // Alt+Tab can blur a window without changing page visibility.
+  window.addEventListener('blur', markAway);
+  window.addEventListener('focus', markReturn);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) markAway();
+    else markReturn();
+  });
+  window.addEventListener('pagehide', markAway);
+  window.addEventListener('pageshow', markReturn);
+  document.addEventListener('freeze', markAway);
+  document.addEventListener('resume', markReturn);
+  window.addEventListener('online', markReturn);
+  markReturn();
 }
-async function confirmReturn(id){
-  try{
-    const response=await fetch('{% url "exam_visibility" %}',{method:'POST',body:eventData('returned',id)});
-    if(!response.ok)throw Error('Not saved');
-    const data=await response.json();pendingReturn=null;
-    warning.textContent=`The exam page was hidden. This event was recorded. Total: ${data.count}.`;
-  }catch{pendingReturn=id;warning.textContent='The exam page was hidden. The event could not be confirmed yet. Check your connection.'}
-  warning.hidden=false;
-}
-document.addEventListener('visibilitychange',()=>{
-  if(preview)return;
-  if(document.hidden){
-    if(leavingExam||awayId)return;
-    awayId=crypto.randomUUID();
-    navigator.sendBeacon('{% url "exam_visibility" %}',eventData('hidden',awayId));
-  }else if(awayId){const id=awayId;awayId=null;confirmReturn(id)}
-});
-window.addEventListener('online',()=>{if(!preview&&pendingReturn)confirmReturn(pendingReturn)});
+
+if (!preview) trackExamFocus();
 const countdown=document.getElementById('countdown');
 if(countdown){
   const deadline=Date.now()+Number(countdown.dataset.remaining)*1000;

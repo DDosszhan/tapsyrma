@@ -34,7 +34,7 @@
         <script>setTimeout(() => location.reload(), 5000);</script>
       {% endif %}
       {% if visibility_count %}
-        <p class="portal-meta">The exam page was hidden {{ visibility_count }} time(s). {% if exam.grade == 0 %}The exam administrator{% else %}Your teacher{% endif %} can see when this happened.</p>
+        <p class="portal-meta">The exam page lost focus or was hidden {{ visibility_count }} time{{ visibility_count|pluralize }}. {% if exam.grade == 0 %}The exam administrator{% else %}Your teacher{% endif %} can see when this happened.</p>
       {% endif %}
     </div>
     <div class="result-progress">
