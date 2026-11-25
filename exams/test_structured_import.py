@@ -161,6 +161,10 @@ class StructuredAdminRoundTripTests(TestCase):
         self.assertEqual(validate_stored_questions(exam)[1:], (1, 3))
         preview = self.client.get(f"/exam/preview/{exam.pk}/")
         self.assertContains(preview, "Position 4")
+        self.assertContains(preview, f'id="choices-{question.pk}"')
+        self.assertContains(preview, "<li>A. Backoff</li>", html=True)
+        self.assertContains(preview, ">A</option>")
+        self.assertNotContains(preview, ">A. Backoff</option>")
 
     def test_ordering_draft_allows_correcting_an_item(self):
         admin = get_user_model().objects.create_superuser("admin", "admin@example.invalid", "password")

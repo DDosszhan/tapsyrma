@@ -61,9 +61,11 @@
 {% for left in q.interaction.left %}
 {% with selected=answers|dict_get:q.id|list_get:forloop.counter0 %}<label class="matching-row">{{ left }}
 <select class="matching-select" name="q_{{ q.id }}_{{ forloop.counter0 }}" aria-describedby="choices-{{ q.id }}"><option value="">Choose a match</option>{% for option in q.options %}<option value="{{ forloop.counter0 }}" {% if selected == forloop.counter0|stringformat:"s" %}selected{% endif %}>{% if q.options|lettered_matching %}{{ option|first }}{% else %}Option {{ forloop.counter }}{% endif %}</option>{% endfor %}</select></label>{% endwith %}
-{% endfor %}{% elif q.kind == "ordering" %}<p>Place the items in the correct order.</p>{% for position in q.options %}
+{% endfor %}{% elif q.kind == "ordering" %}<p>Place the items in the correct order. Choose the {% if q.options|lettered_matching %}letter{% else %}item number{% endif %} for each position:</p>
+<ol class="matching-choices{% if q.options|lettered_matching %} matching-choices--lettered{% endif %}" role="list" id="choices-{{ q.id }}">{% for option in q.options %}<li>{{ option }}</li>{% endfor %}</ol>
+{% for position in q.options %}
 {% with selected=answers|dict_get:q.id|list_get:forloop.counter0 %}<label class="matching-row">Position {{ forloop.counter }}
-<select name="q_{{ q.id }}_{{ forloop.counter0 }}"><option value="">Choose an item</option>{% for option in q.options %}<option value="{{ forloop.counter0 }}" {% if selected == forloop.counter0|stringformat:"s" %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>{% endwith %}
+<select class="matching-select" name="q_{{ q.id }}_{{ forloop.counter0 }}" aria-describedby="choices-{{ q.id }}"><option value="">Choose an item</option>{% for option in q.options %}<option value="{{ forloop.counter0 }}" {% if selected == forloop.counter0|stringformat:"s" %}selected{% endif %}>{% if q.options|lettered_matching %}{{ option|first }}{% else %}Item {{ forloop.counter }}{% endif %}</option>{% endfor %}</select></label>{% endwith %}
 {% endfor %}{% elif q.kind == "open" %}<label for="q_{{ q.id }}">Your answer</label><textarea id="q_{{ q.id }}" name="q_{{ q.id }}" maxlength="5000">{{ answers|dict_get:q.id }}</textarea>{% endif %}
 </section>{% endfor %}
 <div class="exam-actions"><p id="save-status" class="muted" aria-live="polite">{% if preview %}Preview only. Your answers stay on this page.{% else %}Answers are saved automatically.{% endif %}</p>

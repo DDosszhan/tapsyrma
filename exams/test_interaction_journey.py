@@ -117,6 +117,9 @@ class StructuredQuestionJourneyTests(TestCase):
         self.assertContains(page, f'type="checkbox" name="q_{multiple.pk}_0"')
         self.assertContains(page, 'data-max-choices="2"')
         self.assertContains(page, f'name="q_{ordering.pk}_0"')
+        self.assertContains(page, f'id="choices-{ordering.pk}"')
+        self.assertContains(page, "<li>Third</li>", html=True)
+        self.assertContains(page, ">Item 1</option>")
         self.assertNotContains(page, "ORDER SECRET")
         self.assertNotContains(page, "All input devices")
 
