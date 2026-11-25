@@ -26,11 +26,15 @@ from .grading import AUTO_REVIEW_REASON
 EXAM_CLOSED_MESSAGE = "This exam is not open for new attempts."
 
 
-def _resumable_attempts(user):
+def _running_attempts():
     return Attempt.objects.filter(
         Q(deadline_at__gt=timezone.now()) | Q(deadline_at__isnull=True),
-        status=Attempt.Status.ACTIVE, invitation__student__user=user,
+        status=Attempt.Status.ACTIVE,
     )
+
+
+def _resumable_attempts(user):
+    return _running_attempts().filter(invitation__student__user=user)
 
 
 def _latest_work(student):
@@ -496,12 +500,22 @@ def result(request, attempt_id=None):
                       "auto_pending": auto_pending,
                       "can_add_note": attempt.status == Attempt.Status.DONE and auto_pending
                                       and not question_appeal.student_note})
-    return render(request, "exams/result.html", {"attempt": attempt, "items": items,
-                                                  "exam": invitation.exam,
-                                                  "show_marking_details": (invitation.exam.mode != Exam.Mode.FIXED
-                                                                           or invitation.exam.answers_released),
-                                                  "visibility_count": attempt.visibility_events.count(),
-                                                  "pending_review_count": pending_review_count})
+    exam = invitation.exam
+    show_marking_details = exam.mode != Exam.Mode.FIXED or exam.answers_released
+    # Rubrics and grading explanations can reveal the answers to a shared exam.
+    show_grading_feedback = show_marking_details or (
+        attempt.status == Attempt.Status.DONE and not exam.published
+        and not _running_attempts().filter(invitation__exam=exam).exists()
+    )
+    return render(request, "exams/result.html", {
+        "attempt": attempt,
+        "items": items,
+        "exam": exam,
+        "show_marking_details": show_marking_details,
+        "show_grading_feedback": show_grading_feedback,
+        "visibility_count": attempt.visibility_events.count(),
+        "pending_review_count": pending_review_count,
+    })
 
 
 @login_required

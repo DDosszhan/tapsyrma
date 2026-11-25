@@ -376,7 +376,10 @@ class ExamAdmin(admin.ModelAdmin):
             if obj.published or obj.invitation_set.exists():
                 groups.append(("После завершения теста", {"fields": ["answers_released"],
                                "classes": ["collapse"],
-                               "description": "Откройте ученикам ключи и подробный разбор, когда тест закончится."}))
+                               "description": (
+                                   "Пояснения и критерии появятся после снятия теста с публикации "
+                                   "и окончания активных попыток. Галочка открывает также ключи и образцы ответов."
+                               )}))
             return groups
         return super().get_fieldsets(request, obj)
 

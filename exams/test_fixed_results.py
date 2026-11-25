@@ -62,6 +62,60 @@ class FixedResultTests(TestCase):
                     "SECRET_GRADING", "SECRET_TEACHER"):
             self.assertContains(released, key)
 
+    def test_closed_fixed_exam_releases_grading_feedback_after_all_live_attempts_finish(self):
+        grade = {
+            "score": 1,
+            "criteria": [1],
+            "explanation": "Stored grading explanation",
+            "rubric_snapshot": [{"criterion": "Stored marking criterion", "points": 2}],
+            "model_answer_snapshot": "Stored private model answer",
+        }
+        attempt = Attempt.objects.create(
+            invitation=self.invitation, question_ids=[self.question.pk],
+            answers={str(self.question.pk): "My response"}, grades={str(self.question.pk): grade},
+            score=1, status=Attempt.Status.DONE)
+        GradeAppeal.objects.create(
+            attempt=attempt, question=self.question, student_reason="Please check my score.",
+            original_grade=grade, status=GradeAppeal.Status.REJECTED,
+            teacher_note="Private teacher appeal note", reviewed_at=timezone.now())
+        peer = Student.objects.create(name="Sample peer", grade=9)
+        peer_invitation = Invitation.objects.create(
+            exam=self.exam, student=peer, code_hash="fixed-results-peer",
+            expires_at=timezone.now() + timedelta(hours=1), created_by=self.exam.created_by)
+        self.client.force_login(self.user)
+        url = f"/exam/result/{attempt.pk}/"
+
+        def assert_feedback_hidden():
+            result = self.client.get(url)
+            self.assertNotContains(result, "Stored grading explanation")
+            self.assertNotContains(result, "Stored marking criterion")
+
+        assert_feedback_hidden()
+        self.exam.published = False
+        self.exam.save(update_fields=["published"])
+        peer_attempt = Attempt.objects.create(
+            invitation=peer_invitation, deadline_at=timezone.now() + timedelta(minutes=5))
+        assert_feedback_hidden()
+        peer_attempt.deadline_at = None
+        peer_attempt.save(update_fields=["deadline_at"])
+        assert_feedback_hidden()
+
+        peer_attempt.deadline_at = timezone.now() - timedelta(seconds=1)
+        peer_attempt.save(update_fields=["deadline_at"])
+        result = self.client.get(url)
+        self.assertContains(result, "Stored grading explanation")
+        self.assertContains(result, "Stored marking criterion")
+        self.assertNotContains(result, "SECRET_RUBRIC")
+        for key in ("Stored private model answer", "SECRET_MODEL", "SECRET_TOPIC", "SECRET_ANSWER",
+                    "Private teacher appeal note"):
+            self.assertNotContains(result, key)
+
+        self.exam.answers_released = True
+        self.exam.save(update_fields=["answers_released"])
+        result = self.client.get(url)
+        self.assertContains(result, "Stored private model answer")
+        self.assertContains(result, "Private teacher appeal note")
+
     def test_uncertain_ai_grade_waits_for_retry_without_a_fake_zero_or_ticket(self):
         attempt = Attempt.objects.create(
             invitation=self.invitation, question_ids=[self.question.pk],
