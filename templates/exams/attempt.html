@@ -5,6 +5,16 @@
 .exam-questions .question h2{margin:0 0 16px;font-size:1.2em}.exam-questions .question p{margin:0 0 16px}
 .question-stem{white-space:pre-wrap}
 .question-stem--fixed{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.live-exam .question {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.live-exam :is(input[type="text"], textarea) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
 .question-image{display:block;max-width:100%;height:auto;margin:0 0 16px}
 .diagram-detail{margin:0 0 18px}.diagram-detail summary{color:#124ab3;cursor:pointer;font-weight:600}.diagram-detail p{margin:8px 0}
 .diagram-pan{max-width:100%;overflow:auto;border:1px solid #d6dfe9;border-radius:8px;background:white}
@@ -31,7 +41,7 @@
 {% if preview %}<p class="score exam-timer">Time limit: {{ attempt.invitation.exam.duration_minutes }} minutes (preview)</p>{% elif attempt.deadline_at %}<p class="score exam-timer" role="timer">Time remaining: <span id="countdown" data-remaining="{{ remaining_seconds }}">{{ remaining_seconds }} s</span></p>{% endif %}
 <p id="visibility-warning" class="visibility-warning" role="alert" hidden></p>
 <div class="exam-layout">
-{% if preview %}<div id="answers" class="exam-questions">{% else %}<form id="answers" class="exam-questions" method="post" action="{% url 'exam_submit' %}" data-result-url="{% url 'exam_result_history' attempt.pk %}">{% csrf_token %}
+{% if preview %}<div id="answers" class="exam-questions">{% else %}<form id="answers" class="exam-questions live-exam" method="post" action="{% url 'exam_submit' %}" data-result-url="{% url 'exam_result_history' attempt.pk %}">{% csrf_token %}
 <input type="hidden" name="attempt_id" value="{{ attempt.pk }}">{% endif %}
 {% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% if q.interaction.selection_rule == "exact_correct_only" %} data-exact-choices="{{ q.points }}"{% endif %}{% endif %} tabindex="-1"><span class="points">{{ q.points }} point{{ q.points|pluralize }}</span>
 <h2>Question {{ forloop.counter }}</h2>
@@ -114,6 +124,7 @@ form.addEventListener('submit',event=>{
 
 function trackExamFocus() {
   const url = '{% url "exam_visibility" %}';
+  const touchPrimary = window.matchMedia('(pointer: coarse)');
   const storageKey = `exam-focus:${form.elements.attempt_id.value}`;
   const pendingReturns = new Set();
   let awayId = null;
@@ -188,7 +199,7 @@ function trackExamFocus() {
   }
 
   function markReturn() {
-    if (leavingExam || document.hidden || !document.hasFocus()) return;
+    if (leavingExam || document.hidden || (!touchPrimary.matches && !document.hasFocus())) return;
     if (awayId) {
       pendingReturns.add(awayId);
       awayId = null;
@@ -197,8 +208,10 @@ function trackExamFocus() {
     reportReturns();
   }
 
-  // Alt+Tab can blur a window without changing page visibility.
-  window.addEventListener('blur', markAway);
+  // A touch keyboard can blur a visible page. Touch-first devices use lifecycle events instead.
+  window.addEventListener('blur', () => {
+    if (!touchPrimary.matches) markAway();
+  });
   window.addEventListener('focus', markReturn);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) markAway();
@@ -212,7 +225,22 @@ function trackExamFocus() {
   markReturn();
 }
 
-if (!preview) trackExamFocus();
+if (!preview) {
+  trackExamFocus();
+  const questions = [...form.querySelectorAll('.question')];
+  document.addEventListener('copy', event => {
+    if (event.target.matches?.('input[type="text"], textarea')) return;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return;
+    for (let index = 0; index < selection.rangeCount; index++) {
+      const range = selection.getRangeAt(index);
+      if (questions.some(question => range.intersectsNode(question))) {
+        event.preventDefault();
+        return;
+      }
+    }
+  });
+}
 const countdown=document.getElementById('countdown');
 if(countdown){
   const deadline=Date.now()+Number(countdown.dataset.remaining)*1000;
