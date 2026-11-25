@@ -256,6 +256,8 @@ class FixedQuestionForm(forms.ModelForm):
                 "answer_items": cleaned.get("answer_items"),
                 "selection_rule": (self.instance.interaction or {}).get("selection_rule", "")
                 if cleaned["kind"] == Question.Kind.MULTISELECT else "",
+                "ordering_rule": (self.instance.interaction or {}).get("scoring_rule", "")
+                if cleaned["kind"] == Question.Kind.ORDERING else "",
                 "subtopic_explanation": cleaned.get("subtopic_explanation"),
                 "answer_explanation": cleaned.get("answer_explanation"),
                 "requires_image": cleaned.get("requires_image"),

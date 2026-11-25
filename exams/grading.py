@@ -37,6 +37,17 @@ def grade_structured(question, answer):
             raise ValueError("The multiple-selection rule is invalid.")
         return {"score": score, "criteria": [score],
                 "explanation": f"{score} of {question.points} points for the selected options."}
+    if question.kind == "ordering":
+        rule = question.interaction.get("scoring_rule", "")
+        if rule not in ("", "exact_only"):
+            raise ValueError("The ordering scoring rule is invalid.")
+        if rule == "exact_only":
+            expected = question.interaction["answers"]
+            if len(answer) != len(expected) or len(question.rubric) != 1:
+                raise ValueError("The ordering key or answer is invalid.")
+            score = question.points if answer == [str(index) for index in expected] else 0
+            return {"score": score, "criteria": [score],
+                    "explanation": "Correct complete order." if score else "The complete order is incorrect."}
     if len(answer) != len(question.rubric):
         raise ValueError("The saved answer does not match the question parts.")
     if question.kind == "cloze":

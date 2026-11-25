@@ -11,7 +11,7 @@ from .syllabus import extract_syllabus_text
 XLSX_COLUMNS = (
     "number", "kind", "grading_mode", "points", "topic", "question", "answer_items", "requires_image", "option_1", "option_2",
     "option_3", "option_4", "correct_option", "criteria", "model_answer",
-    "topic_explanation", "answer_explanation",
+    "topic_explanation", "answer_explanation", "ordering_rule",
 )
 MAX_QUESTIONS = 1000
 MAX_STRUCTURED_ITEMS = 100
@@ -67,12 +67,17 @@ def _key(value):
     return " ".join(value.casefold().split())
 
 
-def _structured_answer(kind, stem, points, value, reference, options_hint=None):
+def _structured_answer(kind, stem, points, value, reference, options_hint=None, ordering_rule=""):
     if points > MAX_STRUCTURED_ITEMS:
         raise ValidationError(f"{reference}: use no more than {MAX_STRUCTURED_ITEMS} answer items.")
     lines = [_text(line) for line in _text(value).splitlines() if _text(line)]
-    if len(lines) != points:
+    if ordering_rule == "exact_only" and kind == "ordering":
+        if not 3 <= len(lines) <= MAX_STRUCTURED_ITEMS:
+            raise ValidationError(f"{reference}: exact-only ordering needs 3 to {MAX_STRUCTURED_ITEMS} items.")
+    elif len(lines) != points:
         raise ValidationError(f"{reference}: answer_items needs exactly {points} lines, one per answer.")
+    options_hint = ([_text(item) for item in options_hint if _text(item)]
+                    if isinstance(options_hint, list) else [])
     if kind == "cloze":
         markers = re.findall(r"\[\[([^\[\]]*)\]\]", stem)
         if markers != [str(index) for index in range(1, points + 1)]:
@@ -92,11 +97,9 @@ def _structured_answer(kind, stem, points, value, reference, options_hint=None):
     if kind == "ordering":
         if points < 3:
             raise ValidationError(f"{reference}: ordering needs at least three items and three points.")
-        if len({_key(item) for item in lines}) != points:
+        if len({_key(item) for item in lines}) != len(lines):
             raise ValidationError(f"{reference}: ordering needs different nonempty items.")
-        if (isinstance(options_hint, list) and len(options_hint) == points
-                and all(isinstance(item, str) for item in options_hint)
-                and set(options_hint) == set(lines)):
+        if len(options_hint) == len(lines) and set(options_hint) == set(lines):
             options = list(options_hint)
         else:
             options = list(lines)
@@ -104,10 +107,15 @@ def _structured_answer(kind, stem, points, value, reference, options_hint=None):
             if options == lines:
                 options = options[1:] + options[:1]
         answers = [options.index(item) for item in lines]
-        rubric = [{"criterion": f"Position {index}: {item}", "points": 1}
-                  for index, item in enumerate(lines, 1)]
+        rubric = ([{"criterion": "All items in the correct order", "points": points}]
+                  if ordering_rule == "exact_only" else
+                  [{"criterion": f"Position {index}: {item}", "points": 1}
+                   for index, item in enumerate(lines, 1)])
         model_answer = "\n".join(f"{index}. {item}" for index, item in enumerate(lines, 1))
-        return {"answers": answers}, options, rubric, model_answer
+        interaction = {"answers": answers}
+        if ordering_rule:
+            interaction["scoring_rule"] = ordering_rule
+        return interaction, options, rubric, model_answer
 
     if points < 2:
         raise ValidationError(f"{reference}: matching needs at least two pairs and two points.")
@@ -124,8 +132,7 @@ def _structured_answer(kind, stem, points, value, reference, options_hint=None):
     if (len({_key(item) for item in left_items}) != points
             or len({_key(item) for item in right_items}) != points):
         raise ValidationError(f"{reference}: matching needs unique items on each side.")
-    if (isinstance(options_hint, list) and len(options_hint) == points
-            and set(options_hint) == set(right_items)):
+    if len(options_hint) == points and set(options_hint) == set(right_items):
         options = list(options_hint)
     else:
         options = list(right_items)
@@ -205,6 +212,9 @@ def normalize_question(data, *, reference="Question"):
     selection_rule = _text(data.get("selection_rule"))
     if kind != "multiselect" and selection_rule:
         raise ValidationError(f"{reference}: selection rule requires a multiselect question.")
+    ordering_rule = _text(data.get("ordering_rule"))
+    if ordering_rule and (kind != "ordering" or ordering_rule != "exact_only"):
+        raise ValidationError(f"{reference}: unsupported ordering rule.")
     grading_mode = _text(data.get("grading_mode") or "ai").lower()
     if grading_mode not in ("ai", "manual"):
         raise ValidationError(f"{reference}: grading mode must be 'ai' or 'manual'.")
@@ -220,7 +230,8 @@ def normalize_question(data, *, reference="Question"):
             raise ValidationError(f"{reference}: structured questions use automatic grading.")
         interaction, options, rubric, model_answer = _structured_answer(
             kind, stem, points, data.get("answer_items"), reference,
-            data.get("options_hint") if kind == "ordering" else data.get("options"))
+            (data.get("options_hint") or data.get("options")) if kind == "ordering" else data.get("options"),
+            ordering_rule)
         correct_option = 0
     elif kind == "multiselect":
         if grading_mode == "manual":
@@ -306,6 +317,7 @@ def validate_stored_questions(exam):
             "rubric": question.rubric, "model_answer": question.model_answer,
             "answer_items": answer_items_from_question(question),
             "selection_rule": (question.interaction or {}).get("selection_rule", ""),
+            "ordering_rule": (question.interaction or {}).get("scoring_rule", ""),
             "subtopic_explanation": question.subtopic_explanation,
             "answer_explanation": question.answer_explanation,
             "requires_image": question.requires_image,
@@ -350,6 +362,7 @@ def _read_xlsx(upload):
                 "points": record.get("points"), "subtopic": record.get("topic"),
                 "stem": record.get("question"), "options": options,
                 "answer_items": record.get("answer_items"),
+                "ordering_rule": record.get("ordering_rule"),
                 "requires_image": record.get("requires_image"),
                 "correct_option_number": record.get("correct_option"),
                 "rubric": record.get("criteria"), "model_answer": record.get("model_answer"),

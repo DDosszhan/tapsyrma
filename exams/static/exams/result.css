@@ -162,6 +162,9 @@
 .result-page .result-question ul { margin: 0; padding-inline-start: 22px; }
 .result-page .question-stem { white-space: pre-wrap; }
 .result-page .question-stem--fixed { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.result-page .question-table-scroll { box-sizing: border-box; max-width: 100%; overflow-x: auto; white-space: pre; margin: 0 0 16px; padding: 12px; border: 1px solid #d6dfe9; border-radius: 8px; font: 1em/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.result-page .question-table-hint { display: none; }
+@media (max-width: 600px) { .result-page .question-table-hint { display: block; margin: -8px 0 16px; color: var(--muted); font-size: .85em; } }
 .result-page .question-image { display: block; max-width: 100%; height: auto; margin-top: 12px; }
 
 .result-page .result-answer {

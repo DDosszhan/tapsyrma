@@ -8,6 +8,7 @@ from django.test import SimpleTestCase, TestCase
 from openpyxl import Workbook
 
 from .fixed_questions import normalize_question, read_fixed_questions, validate_stored_questions
+from .grading import grade_structured
 from .models import Exam, Question
 
 
@@ -106,8 +107,61 @@ class StructuredImportTests(SimpleTestCase):
         with self.assertRaisesMessage(ValidationError, "set a structured type"):
             normalize_question({"slot": 1, "points": 1, "stem": "Fill [[1]].", "answer_items": "CPU"})
 
+    def test_xlsx_keeps_matching_labels_and_exact_only_four_item_order(self):
+        book = Workbook()
+        sheet = book.active
+        sheet.append(["number", "kind", "points", "question", "answer_items", "ordering_rule",
+                      "option_1", "option_2", "option_3", "option_4"])
+        sheet.append([1, "matching", 3, "Match the terms.",
+                      "DNS => B. Resolution\nPublic IP => C. Internet\nPrivate IP => A. Local",
+                      "", "A. Local", "B. Resolution", "C. Internet", ""])
+        sheet.append([2, "ordering", 3, "Order the events.",
+                      "B. Collision\nC. Stop\nA. Backoff\nD. Retry", "exact_only",
+                      "A. Backoff", "B. Collision", "C. Stop", "D. Retry"])
+        stream = BytesIO()
+        book.save(stream)
+        rows = read_fixed_questions(SimpleUploadedFile("questions.xlsx", stream.getvalue()))
+        self.assertEqual(rows[0]["options"], ["A. Local", "B. Resolution", "C. Internet"])
+        self.assertEqual(rows[0]["interaction"]["answers"], [1, 2, 0])
+        order = Question(**rows[1])
+        self.assertEqual(order.options, ["A. Backoff", "B. Collision", "C. Stop", "D. Retry"])
+        self.assertEqual(order.interaction, {"answers": [1, 2, 0, 3], "scoring_rule": "exact_only"})
+        self.assertEqual(order.rubric, [{"criterion": "All items in the correct order", "points": 3}])
+        self.assertEqual(grade_structured(order, ["1", "2", "0", "3"])["score"], 3)
+        self.assertEqual(grade_structured(order, ["1", "2", "3", "0"])["score"], 0)
+        with self.assertRaisesMessage(ValidationError, "answer_items needs exactly 3 lines"):
+            normalize_question({"slot": 1, "kind": "ordering", "points": 3,
+                                "stem": "Order the events.", "answer_items": "A\nB\nC\nD"})
+
 
 class StructuredAdminRoundTripTests(TestCase):
+    def test_exact_only_ordering_survives_draft_editor_and_preview(self):
+        admin = get_user_model().objects.create_superuser("admin", "admin@example.invalid", "password")
+        self.client.force_login(admin)
+        exam = Exam.objects.create(title="Events", subject="Science", grade=9, mode=Exam.Mode.FIXED,
+                                   question_count=1, total_points=3, created_by=admin)
+        question = Question.objects.create(exam=exam, **normalize_question({
+            "slot": 1, "kind": "ordering", "points": 3, "stem": "Order the events.",
+            "answer_items": "B. Collision\nC. Stop\nA. Backoff\nD. Retry",
+            "options_hint": ["A. Backoff", "B. Collision", "C. Stop", "D. Retry"],
+            "ordering_rule": "exact_only",
+        }))
+        response = self.client.post(f"/admin/exams/exam/{exam.pk}/change/", {
+            "title": exam.title, "subject": exam.subject, "grade": "9", "duration_minutes": "60",
+            "questions-TOTAL_FORMS": "1", "questions-INITIAL_FORMS": "1",
+            "questions-MIN_NUM_FORMS": "0", "questions-MAX_NUM_FORMS": "1000",
+            "questions-0-id": str(question.pk), "questions-0-slot": "1", "questions-0-kind": "ordering",
+            "questions-0-grading_mode": "ai", "questions-0-points": "3",
+            "questions-0-stem": question.stem,
+            "questions-0-answer_items": "B. Collision\nC. Stop\nA. Backoff\nD. Retry",
+        })
+        self.assertEqual(response.status_code, 302)
+        question.refresh_from_db()
+        self.assertEqual(question.interaction["scoring_rule"], "exact_only")
+        self.assertEqual(validate_stored_questions(exam)[1:], (1, 3))
+        preview = self.client.get(f"/exam/preview/{exam.pk}/")
+        self.assertContains(preview, "Position 4")
+
     def test_ordering_draft_allows_correcting_an_item(self):
         admin = get_user_model().objects.create_superuser("admin", "admin@example.invalid", "password")
         self.client.force_login(admin)

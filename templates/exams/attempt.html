@@ -5,6 +5,9 @@
 .exam-questions .question h2{margin:0 0 16px;font-size:1.2em}.exam-questions .question p{margin:0 0 16px}
 .question-stem{white-space:pre-wrap}
 .question-stem--fixed{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.question-table-scroll{box-sizing:border-box;max-width:100%;overflow-x:auto;white-space:pre;margin:0 0 16px;padding:12px;border:1px solid #d6dfe9;border-radius:8px;font:1em/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
+.question-table-hint{display:none}
+@media(max-width:600px){.exam-questions .question p.question-table-hint{display:block;margin:-8px 0 16px;color:#526174;font-size:.85em}}
 .live-exam .question {
   -webkit-user-select: none;
   user-select: none;
@@ -25,6 +28,7 @@
 .exam-questions .question-stem--fixed input{width:5ch;padding:4px;text-align:center}
 .exam-questions .matching-row{display:block;margin:10px 0}
 .exam-questions .matching-choices{margin:0 0 16px;padding-left:32px}
+.exam-questions .matching-choices--lettered{list-style:none;padding-left:0}
 .exam-questions .matching-choices li{margin:6px 0;overflow-wrap:anywhere}
 .exam-questions .matching-select{display:block;width:170px}
 .exam-questions input[type=radio]{accent-color:#124ab3}.exam-questions label{padding:6px 0}
@@ -46,17 +50,17 @@
 {% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% if q.interaction.selection_rule == "exact_correct_only" %} data-exact-choices="{{ q.points }}"{% endif %}{% endif %} tabindex="-1"><span class="points">{{ q.points }} point{{ q.points|pluralize }}</span>
 <h2>Question {{ forloop.counter }}</h2>
 {% if q.kind == "cloze" %}<p class="question-stem cloze-stem{% if q.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{% for part in q.stem|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
-{% else %}<p class="question-stem{% if q.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{{ q.stem }}</p>{% endif %}
+{% else %}{% for part in q.stem|table_stem_parts %}{% if part.table %}<pre class="question-table-scroll" role="region" aria-label="Question table" tabindex="0">{{ part.text }}</pre><p class="question-table-hint">Scroll sideways to read the table.</p>{% else %}<p class="question-stem{% if part.fixed %} question-stem--fixed{% endif %}">{{ part.text }}</p>{% endif %}{% endfor %}{% endif %}
 {% if q.image %}<img class="question-image" src="{% url 'exam_question_image' q.id %}" alt="Diagram for question {{ forloop.counter }}"><details class="diagram-detail"><summary>View larger diagram</summary><p class="muted">Scroll sideways to inspect the diagram.</p><div class="diagram-pan"><img src="{% url 'exam_question_image' q.id %}" alt="Enlarged diagram for question {{ forloop.counter }}"></div></details>{% endif %}
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
 {% endfor %}{% elif q.kind == "multiselect" %}<p>{% if q.interaction.selection_rule == "exact_correct_only" %}Select exactly{% else %}Select up to{% endif %} {{ q.points }} options.</p>{% for option in q.options %}
 <label><input type="checkbox" name="q_{{ q.id }}_{{ forloop.counter0 }}" value="1" {% if answers|dict_get:q.id|has_index:forloop.counter0 %}checked{% endif %}> {{ option }}</label>
-{% endfor %}{% elif q.kind == "matching" %}<p>Choose the numbered option for each item:</p>
-<ol class="matching-choices" id="choices-{{ q.id }}">{% for option in q.options %}<li>{{ option }}</li>{% endfor %}</ol>
+{% endfor %}{% elif q.kind == "matching" %}<p>Choose the {% if q.options|lettered_matching %}lettered{% else %}numbered{% endif %} option for each item:</p>
+<ol class="matching-choices{% if q.options|lettered_matching %} matching-choices--lettered{% endif %}" role="list" id="choices-{{ q.id }}">{% for option in q.options %}<li>{{ option }}</li>{% endfor %}</ol>
 {% for left in q.interaction.left %}
 {% with selected=answers|dict_get:q.id|list_get:forloop.counter0 %}<label class="matching-row">{{ left }}
-<select class="matching-select" name="q_{{ q.id }}_{{ forloop.counter0 }}" aria-describedby="choices-{{ q.id }}"><option value="">Choose a match</option>{% for option in q.options %}<option value="{{ forloop.counter0 }}" {% if selected == forloop.counter0|stringformat:"s" %}selected{% endif %}>Option {{ forloop.counter }}</option>{% endfor %}</select></label>{% endwith %}
+<select class="matching-select" name="q_{{ q.id }}_{{ forloop.counter0 }}" aria-describedby="choices-{{ q.id }}"><option value="">Choose a match</option>{% for option in q.options %}<option value="{{ forloop.counter0 }}" {% if selected == forloop.counter0|stringformat:"s" %}selected{% endif %}>{% if q.options|lettered_matching %}{{ option|first }}{% else %}Option {{ forloop.counter }}{% endif %}</option>{% endfor %}</select></label>{% endwith %}
 {% endfor %}{% elif q.kind == "ordering" %}<p>Place the items in the correct order.</p>{% for position in q.options %}
 {% with selected=answers|dict_get:q.id|list_get:forloop.counter0 %}<label class="matching-row">Position {{ forloop.counter }}
 <select name="q_{{ q.id }}_{{ forloop.counter0 }}"><option value="">Choose an item</option>{% for option in q.options %}<option value="{{ forloop.counter0 }}" {% if selected == forloop.counter0|stringformat:"s" %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>{% endwith %}

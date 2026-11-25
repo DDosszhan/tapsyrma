@@ -103,7 +103,7 @@ class ExamAdminTests(TestCase):
         self.assertEqual(response.status_code, 200)
         response.close()
 
-    def test_open_questions_can_be_excluded_and_grade_is_limited(self):
+    def test_open_questions_can_be_excluded_and_grade_eleven_is_allowed(self):
         data = self.form_data("8.00")
         data.update({"title": "Только MCQ", "grade": "10", "question_count": "4", "question_rules-TOTAL_FORMS": "1"})
         for key in ("question_rules-1-kind", "question_rules-1-count", "question_rules-1-points_each"):
@@ -118,8 +118,13 @@ class ExamAdminTests(TestCase):
         data.update({"grade": "11", "question_count": "4", "question_rules-TOTAL_FORMS": "1"})
         for key in ("question_rules-1-kind", "question_rules-1-count", "question_rules-1-points_each"):
             del data[key]
+        self.assertEqual(self.client.post("/admin/exams/exam/add/", data).status_code, 302)
+        self.assertEqual(Exam.objects.filter(grade=Exam.Grade.ELEVEN).count(), 1)
+        Student(name="Grade 11 student", grade=Exam.Grade.ELEVEN).full_clean()
+
+        data["grade"] = "12"
         self.assertEqual(self.client.post("/admin/exams/exam/add/", data).status_code, 200)
-        self.assertEqual(Exam.objects.count(), 1)
+        self.assertEqual(Exam.objects.count(), 2)
 
     def test_automatic_structure_and_manual_override(self):
         data = self.form_data("20.00")

@@ -15,6 +15,7 @@ class Exam(models.Model):
     class Grade(models.IntegerChoices):
         NINE = 9, "Grade 9"
         TEN = 10, "Grade 10"
+        ELEVEN = 11, "Grade 11"
         EMPLOYEE = 0, "Сотрудник"
 
     title = models.CharField("Title", max_length=200)
@@ -40,7 +41,7 @@ class Exam(models.Model):
         verbose_name_plural = "Exams"
         ordering = ["-created_at"]
         constraints = [
-            models.CheckConstraint(condition=models.Q(grade__in=[0, 9, 10]), name="exam_grade_0_9_or_10"),
+            models.CheckConstraint(condition=models.Q(grade__in=[0, 9, 10, 11]), name="exam_grade_0_9_10_or_11"),
             models.CheckConstraint(condition=models.Q(duration_minutes__gte=1), name="exam_duration_positive"),
         ]
 

@@ -74,7 +74,7 @@
             {% if item.question.kind == "cloze" %}
               <p class="question-stem{% if item.question.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{% for part in item.question.stem|cloze_parts %}{% if part.blank %}<span aria-label="Blank {{ part.number }}">____</span>{% else %}{{ part.text }}{% endif %}{% endfor %}</p>
             {% else %}
-              <p class="question-stem{% if item.question.stem|fixed_width_stem %} question-stem--fixed{% endif %}">{{ item.question.stem }}</p>
+              {% for part in item.question.stem|table_stem_parts %}{% if part.table %}<pre class="question-table-scroll" role="region" aria-label="Question table" tabindex="0">{{ part.text }}</pre><p class="question-table-hint">Scroll sideways to read the table.</p>{% else %}<p class="question-stem{% if part.fixed %} question-stem--fixed{% endif %}">{{ part.text }}</p>{% endif %}{% endfor %}
             {% endif %}
             {% if item.question.image %}
               <img class="question-image" src="{% url 'exam_question_image' item.question.id %}" alt="Diagram for question {{ forloop.counter }}">

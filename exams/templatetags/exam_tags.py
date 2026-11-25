@@ -1,3 +1,4 @@
+from itertools import groupby
 import re
 
 from django import template
@@ -21,9 +22,31 @@ def has_index(values, index):
 
 
 @register.filter
+def lettered_matching(options):
+    return (isinstance(options, list) and 2 <= len(options) <= 26
+            and all(isinstance(option, str) and option.startswith(f"{chr(65 + index)}. ")
+                    for index, option in enumerate(options)))
+
+
+@register.filter
 def fixed_width_stem(stem):
     return isinstance(stem, str) and (any(line.count("|") >= 2 for line in stem.splitlines())
                                       or ("<-" in stem and "[[" in stem))
+
+
+@register.filter
+def table_stem_parts(stem):
+    if not isinstance(stem, str):
+        return []
+    lines = stem.splitlines(keepends=True)
+    has_table = any(line.count("|") >= 2 for line in lines)
+    fixed = not has_table and fixed_width_stem(stem)
+    parts = []
+    for is_table, group in groupby(lines, key=lambda line: line.count("|") >= 2):
+        text = "".join(group).strip("\r\n")
+        if text:
+            parts.append({"table": is_table, "text": text, "fixed": fixed})
+    return parts
 
 
 @register.filter
