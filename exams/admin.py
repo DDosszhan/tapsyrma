@@ -72,6 +72,11 @@ class ExamAdminForm(forms.ModelForm):
                     'XLSX, TXT, PDF или DOCX. <a href="{}">Скачать шаблон XLSX</a>.', url)
         if "mode" in self.fields:
             self.fields["mode"].required = False
+        if "published" in self.fields:
+            self.fields["published"].help_text = (
+                "Show the exam in the list and allow new attempts. Students can finish attempts they "
+                "already started and view their submitted work."
+            )
         for name in ("question_count", "total_points"):
             if name in self.fields:
                 self.fields[name].required = False
@@ -83,6 +88,7 @@ class ExamAdminForm(forms.ModelForm):
         cleaned["mode"] = mode
         self.instance.mode = mode
         self.imported_questions = None
+        publishing = cleaned.get("published") and self.instance.pk
         upload_questions = cleaned.get("questions_file")
         if upload_questions:
             try:
@@ -108,7 +114,7 @@ class ExamAdminForm(forms.ModelForm):
                 cleaned["total_points"] = Decimal("0")
                 self.instance.question_count = 0
                 self.instance.total_points = Decimal("0")
-            if cleaned.get("published") and self.instance.pk:
+            if publishing and not self.instance.invitation_set.exists():
                 try:
                     _, count, points = validate_stored_questions(self.instance)
                     if (not self.instance.published and self.instance.questions.filter(
@@ -139,13 +145,11 @@ class ExamAdminForm(forms.ModelForm):
                     self.add_error(name, "This field is required for generated exams.")
         if cleaned.get("published") and not self.instance.pk:
             self.add_error("published", "Save the exam and its questions first.")
-        if mode == Exam.Mode.GENERATED and cleaned.get("published") and self.instance.pk:
+        if mode == Exam.Mode.GENERATED and publishing:
             try:
                 blueprint(self.instance)
             except ValidationError as exc:
                 self.add_error("published", exc)
-        if self.instance.pk and self.instance.published and not cleaned.get("published") and Invitation.objects.filter(exam=self.instance).exists():
-            self.add_error("published", "An exam with issued codes cannot be unpublished.")
         return cleaned
 
 
@@ -369,7 +373,7 @@ class ExamAdmin(admin.ModelAdmin):
                               "description": "Проверьте вопросы и схемы оценивания ниже. Сохраните изменения перед публикацией."}),
                 ("Публикация", {"fields": ["published"]}),
             ]
-            if obj.published:
+            if obj.published or obj.invitation_set.exists():
                 groups.append(("После завершения теста", {"fields": ["answers_released"],
                                "classes": ["collapse"],
                                "description": "Откройте ученикам ключи и подробный разбор, когда тест закончится."}))
@@ -433,6 +437,8 @@ class ExamAdmin(admin.ModelAdmin):
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
+        if change and form.instance.invitation_set.exists():
+            return
         if not change and form.imported_questions:
             Question.objects.bulk_create([Question(exam=form.instance, **row) for row in form.imported_questions])
         if form.instance.mode == Exam.Mode.FIXED:
@@ -440,7 +446,8 @@ class ExamAdmin(admin.ModelAdmin):
             form.instance.question_count = len(points)
             form.instance.total_points = Decimal(sum(points))
             form.instance.save(update_fields=["question_count", "total_points"])
-        elif form.instance.auto_structure:
+        elif form.instance.auto_structure and (
+                not change or {"auto_structure", "question_count", "total_points"}.intersection(form.changed_data)):
             form.instance.question_rules.all().delete()
             ExamQuestionRule.objects.bulk_create([
                 ExamQuestionRule(exam=form.instance, kind=kind, count=count, points_each=points)
@@ -607,7 +614,8 @@ class QuestionAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return request.user.is_superuser and obj is not None and not obj.invitation_id and not obj.exam.published and not Attempt.objects.filter(invitation__exam=obj.exam).exists()
+        return (request.user.is_superuser and obj is not None and not obj.invitation_id
+                and not obj.exam.published and not obj.exam.invitation_set.exists())
 
 
 class StudentAdminForm(forms.ModelForm):

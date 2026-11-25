@@ -95,12 +95,10 @@ class StudentHomeTests(TestCase):
         self.client.post(reverse("exam_resume", args=[current_attempt.pk]))
         foreign, _ = self.invitation("Other work", student=self.other)
         expired, _ = self.invitation("Just expired")
-        draft, _ = self.invitation("Draft work", published=False)
         closed, _ = self.invitation("Submitted work")
         attempts = [
             Attempt.objects.create(invitation=foreign),
             Attempt.objects.create(invitation=expired, deadline_at=timezone.now() - timedelta(seconds=1)),
-            Attempt.objects.create(invitation=draft),
             Attempt.objects.create(invitation=closed, status=Attempt.Status.PENDING),
         ]
         page = self.client.get("/")
@@ -112,6 +110,82 @@ class StudentHomeTests(TestCase):
                 self.assertEqual(self.client.session["invitation_id"], current.pk)
         for pk in (attempts[0].pk, attempts[-1].pk + 1):
             self.assertEqual(self.client.get(reverse("exam_attempt", args=[pk])).status_code, 404)
+
+    def test_hidden_exam_blocks_new_attempts_until_republished(self):
+        invitation, code = self.invitation("Practice exam")
+        shared_code, digest = new_code()
+        shared = SharedCode.objects.create(code_hash=digest, expires_at=timezone.now() + timedelta(hours=1),
+                                           created_by=self.teacher)
+        self.client.force_login(self.other.user)
+        self.assertRedirects(self.client.post("/", {"code": shared_code}), reverse("choose_exam"))
+        self.client.post(reverse("choose_exam"), {"exam_id": invitation.exam_id})
+        chosen = Invitation.objects.get(shared_code=shared, student=self.other)
+
+        Question.objects.create(exam=invitation.exam, invitation=invitation, slot=1,
+                                kind=Question.Kind.OPEN, points=20, stem="Explain your reasoning.")
+        invitation.variant_status = Invitation.VariantStatus.READY
+        invitation.save(update_fields=["variant_status"])
+        self.client.force_login(self.user)
+        self.assertRedirects(self.client.post("/", {"code": code}), reverse("exam_session"))
+        self.assertContains(self.client.get(reverse("exam_session")), "Start exam")
+
+        invitation.exam.published = False
+        invitation.exam.save(update_fields=["published"])
+        self.assertNotContains(self.client.get("/"), invitation.exam.title)
+        closed = "This exam is not open for new attempts."
+        self.assertContains(self.client.post(reverse("exam_session")), closed)
+        self.assertFalse(Attempt.objects.filter(invitation=invitation).exists())
+        self.client.logout()
+        self.client.force_login(self.user)
+        self.assertContains(self.client.post("/", {"code": code}), closed)
+        self.assertNotIn("invitation_id", self.client.session)
+
+        self.assertRedirects(self.client.post("/", {"code": shared_code}), reverse("choose_exam"))
+        self.assertNotContains(self.client.get(reverse("choose_exam")), invitation.exam.title)
+        self.client.post(reverse("choose_exam"), {"exam_id": invitation.exam_id})
+        self.assertFalse(Invitation.objects.filter(shared_code=shared, student=self.student).exists())
+
+        self.client.force_login(self.other.user)
+        self.assertContains(self.client.post("/", {"code": shared_code}), closed)
+        self.assertFalse(Attempt.objects.filter(invitation=chosen).exists())
+        invitation.exam.published = True
+        invitation.exam.save(update_fields=["published"])
+        self.assertRedirects(self.client.post("/", {"code": shared_code}), reverse("exam_session"))
+        self.assertEqual(self.client.session["invitation_id"], chosen.pk)
+
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get("/"), invitation.exam.title)
+        self.assertRedirects(self.client.post("/", {"code": code}), reverse("exam_session"))
+        self.assertRedirects(self.client.post(reverse("exam_session")), reverse("exam_session"))
+        self.assertTrue(Attempt.objects.filter(invitation=invitation, status=Attempt.Status.ACTIVE).exists())
+
+    def test_owned_attempt_can_resume_and_finish_after_exam_is_hidden(self):
+        invitation, code = self.invitation("Exam in progress")
+        question = Question.objects.create(exam=invitation.exam, invitation=invitation, slot=1,
+                                           kind=Question.Kind.OPEN, points=20, stem="Explain your reasoning.")
+        attempt = Attempt.objects.create(invitation=invitation, deadline_at=timezone.now() + timedelta(hours=1),
+                                         question_ids=[question.pk], answers={str(question.pk): "Saved response"})
+        invitation.exam.published = False
+        invitation.exam.save(update_fields=["published"])
+        self.client.force_login(self.user)
+        resume = reverse("exam_resume", args=[attempt.pk])
+        self.assertContains(self.client.get("/"), resume)
+        self.assertRedirects(self.client.post(resume), reverse("exam_attempt", args=[attempt.pk]))
+        self.assertContains(self.client.get(reverse("exam_attempt", args=[attempt.pk])), "Saved response")
+        self.assertRedirects(self.client.post("/", {"code": code}), reverse("exam_session"))
+        self.assertContains(self.client.get(reverse("exam_session")), "Saved response")
+
+        answers = {f"q_{question.pk}": "Completed response", "attempt_id": attempt.pk}
+        self.assertEqual(self.client.post(reverse("exam_save"), answers).status_code, 200)
+        result_url = reverse("exam_result_history", args=[attempt.pk])
+        self.assertRedirects(self.client.post(reverse("exam_submit"), answers), result_url)
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.status, Attempt.Status.PENDING)
+        self.assertEqual(attempt.answers, {str(question.pk): "Completed response"})
+        self.assertContains(self.client.get(reverse("exam_result")), "Completed response")
+        self.assertContains(self.client.get(reverse("history")), result_url)
+        self.client.force_login(self.other.user)
+        self.assertEqual(self.client.get(result_url).status_code, 404)
 
     def test_exam_code_normalization_and_csrf_on_home_and_resume(self):
         browser = Client(enforce_csrf_checks=True)

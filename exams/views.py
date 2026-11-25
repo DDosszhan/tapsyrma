@@ -23,10 +23,13 @@ from .models import Attempt, AttemptVisibilityEvent, Exam, GradeAppeal, Invitati
 from .grading import AUTO_REVIEW_REASON
 
 
+EXAM_CLOSED_MESSAGE = "This exam is not open for new attempts."
+
+
 def _resumable_attempts(user):
     return Attempt.objects.filter(
         Q(deadline_at__gt=timezone.now()) | Q(deadline_at__isnull=True),
-        status=Attempt.Status.ACTIVE, invitation__student__user=user, invitation__exam__published=True,
+        status=Attempt.Status.ACTIVE, invitation__student__user=user,
     )
 
 
@@ -67,6 +70,13 @@ def _render_home(request, error=None):
     return render(request, "exams/enter.html", context)
 
 
+def _select_invitation(request, invitation):
+    if not invitation.exam.published and not hasattr(invitation, "attempt"):
+        return _render_home(request, EXAM_CLOSED_MESSAGE)
+    request.session["invitation_id"] = invitation.pk
+    return redirect("exam_session")
+
+
 def enter(request):
     if request.method == "POST":
         if not request.user.is_authenticated:
@@ -80,14 +90,12 @@ def enter(request):
         if invitation and invitation.student.user_id == request.user.pk and (
             invitation.expires_at >= timezone.now() or hasattr(invitation, "attempt")
         ):
-            request.session["invitation_id"] = invitation.id
-            return redirect("exam_session")
+            return _select_invitation(request, invitation)
         shared = SharedCode.objects.filter(code_hash=digest).first()
         if shared:
             chosen = Invitation.objects.filter(shared_code=shared, student=student).first()
             if chosen:
-                request.session["invitation_id"] = chosen.id
-                return redirect("exam_session")
+                return _select_invitation(request, chosen)
             if shared.is_active and shared.expires_at >= timezone.now():
                 request.session["shared_code_id"] = shared.id
                 return redirect("choose_exam")
@@ -111,8 +119,7 @@ def choose_exam(request):
     shared = get_object_or_404(SharedCode, pk=request.session.get("shared_code_id"))
     chosen = Invitation.objects.filter(shared_code=shared, student=student).first()
     if chosen:
-        request.session["invitation_id"] = chosen.id
-        return redirect("exam_session")
+        return _select_invitation(request, chosen)
     exams = Exam.objects.filter(published=True, grade=student.grade).order_by("subject", "title")
     if not shared.is_active or shared.expires_at < timezone.now():
         return render(request, "exams/choose.html", {"error": "The code has expired.", "exams": []})
@@ -137,7 +144,7 @@ def choose_exam(request):
 
 
 def _invitation(request):
-    invitation = Invitation.objects.filter(pk=request.session.get("invitation_id"), exam__published=True,
+    invitation = Invitation.objects.filter(pk=request.session.get("invitation_id"),
                                            student__user=request.user).select_related("exam", "student").first()
     if not invitation:
         raise Http404
@@ -224,8 +231,7 @@ def _show_attempt(request, attempt, *, scoped):
 @login_required
 @require_GET
 def exam_attempt(request, attempt_id):
-    attempt = get_object_or_404(Attempt, pk=attempt_id, invitation__student__user=request.user,
-                                invitation__exam__published=True)
+    attempt = get_object_or_404(Attempt, pk=attempt_id, invitation__student__user=request.user)
     return _show_attempt(request, attempt, scoped=True)
 
 
@@ -237,16 +243,25 @@ def session(request):
         return _show_attempt(request, attempt, scoped=False)
     if request.method == "POST":
         with transaction.atomic():
+            # A student can have the start page open when the exam is unpublished.
+            exam = Exam.objects.select_for_update().only("published", "question_count", "duration_minutes").get(
+                pk=invitation.exam_id)
             locked = Invitation.objects.select_for_update().get(pk=invitation.pk)
+            if not exam.published:
+                if Attempt.objects.filter(invitation=locked).exists():
+                    return redirect("exam_session")
+                return _render_home(request, EXAM_CLOSED_MESSAGE)
             if locked.expires_at < timezone.now():
                 return render(request, "exams/ready.html", {"invitation": locked, "expired": True})
             ids = list(locked.questions.order_by("slot").values_list("id", flat=True))
-            if locked.variant_status != Invitation.VariantStatus.READY or len(ids) != locked.exam.question_count:
+            if locked.variant_status != Invitation.VariantStatus.READY or len(ids) != exam.question_count:
                 return render(request, "exams/ready.html", {"invitation": locked, "error": "Your question set is not ready yet."})
             Attempt.objects.get_or_create(
                 invitation=locked,
-                defaults={"question_ids": ids, "deadline_at": timezone.now() + timedelta(minutes=locked.exam.duration_minutes)})
+                defaults={"question_ids": ids, "deadline_at": timezone.now() + timedelta(minutes=exam.duration_minutes)})
         return redirect("exam_session")
+    if not invitation.exam.published:
+        return _render_home(request, EXAM_CLOSED_MESSAGE)
     return render(request, "exams/ready.html", {"invitation": invitation,
                                                  "expired": invitation.expires_at < timezone.now()})
 
@@ -332,8 +347,7 @@ def _locked_page_attempt(request):
         return attempt
     if not (attempt_id.isascii() and attempt_id.isdecimal() and len(attempt_id) <= 19):
         raise Http404
-    return get_object_or_404(attempts, pk=int(attempt_id), invitation__student__user=request.user,
-                             invitation__exam__published=True)
+    return get_object_or_404(attempts, pk=int(attempt_id), invitation__student__user=request.user)
 
 
 @login_required
