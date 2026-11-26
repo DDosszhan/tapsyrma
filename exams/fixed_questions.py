@@ -71,17 +71,21 @@ def _structured_answer(kind, stem, points, value, reference, options_hint=None, 
     if points > MAX_STRUCTURED_ITEMS:
         raise ValidationError(f"{reference}: use no more than {MAX_STRUCTURED_ITEMS} answer items.")
     lines = [_text(line) for line in _text(value).splitlines() if _text(line)]
+    exact_cloze = kind == "cloze" and points == 1 and len(lines) > 1
     if ordering_rule == "exact_only" and kind == "ordering":
         if not 3 <= len(lines) <= MAX_STRUCTURED_ITEMS:
             raise ValidationError(f"{reference}: exact-only ordering needs 3 to {MAX_STRUCTURED_ITEMS} items.")
+    elif exact_cloze:
+        if len(lines) > MAX_STRUCTURED_ITEMS:
+            raise ValidationError(f"{reference}: use no more than {MAX_STRUCTURED_ITEMS} answer items.")
     elif len(lines) != points:
         raise ValidationError(f"{reference}: answer_items needs exactly {points} lines, one per answer.")
     options_hint = ([_text(item) for item in options_hint if _text(item)]
                     if isinstance(options_hint, list) else [])
     if kind == "cloze":
         markers = re.findall(r"\[\[([^\[\]]*)\]\]", stem)
-        if markers != [str(index) for index in range(1, points + 1)]:
-            raise ValidationError(f"{reference}: use [[1]] through [[{points}]] once each in order.")
+        if markers != [str(index) for index in range(1, len(lines) + 1)]:
+            raise ValidationError(f"{reference}: use [[1]] through [[{len(lines)}]] once each in order.")
         answers = []
         for index, line in enumerate(lines, 1):
             alternatives = [_text(part) for part in line.split("|")]
@@ -89,10 +93,14 @@ def _structured_answer(kind, stem, points, value, reference, options_hint=None, 
                     or len({_key(part) for part in alternatives}) != len(alternatives)):
                 raise ValidationError(f"{reference}: blank {index} needs different answers up to 120 characters, separated by |.")
             answers.append(alternatives)
-        rubric = [{"criterion": f"Blank {index}: {choices[0]}", "points": 1}
-                  for index, choices in enumerate(answers, 1)]
+        rubric = ([{"criterion": "All blanks correct", "points": 1}] if exact_cloze else
+                  [{"criterion": f"Blank {index}: {choices[0]}", "points": 1}
+                   for index, choices in enumerate(answers, 1)])
         model_answer = "\n".join(f"{index}. {choices[0]}" for index, choices in enumerate(answers, 1))
-        return {"answers": answers}, [], rubric, model_answer
+        interaction = {"answers": answers}
+        if exact_cloze:
+            interaction["scoring_rule"] = "exact_only"
+        return interaction, [], rubric, model_answer
 
     if kind == "ordering":
         if points < 3:
@@ -317,7 +325,8 @@ def validate_stored_questions(exam):
             "rubric": question.rubric, "model_answer": question.model_answer,
             "answer_items": answer_items_from_question(question),
             "selection_rule": (question.interaction or {}).get("selection_rule", ""),
-            "ordering_rule": (question.interaction or {}).get("scoring_rule", ""),
+            "ordering_rule": (question.interaction or {}).get("scoring_rule", "")
+            if question.kind == "ordering" else "",
             "subtopic_explanation": question.subtopic_explanation,
             "answer_explanation": question.answer_explanation,
             "requires_image": question.requires_image,

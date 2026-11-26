@@ -24,6 +24,10 @@ class Exam(models.Model):
     mode = models.CharField("Question source", max_length=12, choices=Mode.choices, default=Mode.GENERATED)
     syllabus_file = models.FileField("Syllabus file", upload_to="syllabi/%Y/%m/", blank=True)
     syllabus_text = models.TextField("Syllabus text", blank=True, help_text="Check the extracted text before generating questions.")
+    student_instructions = models.TextField("Student instructions", blank=True,
+                                            help_text="Shown before the questions during the exam.")
+    reference_text = models.TextField("Instruction reference", blank=True,
+                                      help_text="Available from the reference button throughout the exam.")
     question_count = models.PositiveSmallIntegerField("Total questions")
     auto_structure = models.BooleanField("Allocate question types and points automatically", default=True)
     duration_minutes = models.PositiveSmallIntegerField(

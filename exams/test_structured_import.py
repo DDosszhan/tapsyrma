@@ -13,6 +13,24 @@ from .models import Exam, Question
 
 
 class StructuredImportTests(SimpleTestCase):
+    def test_two_blanks_can_share_one_all_or_nothing_point(self):
+        row = normalize_question({
+            "slot": 1, "kind": "cloze", "points": 1,
+            "stem": "Opcode [[1]], operand [[2]].", "answer_items": "ADD\n#7",
+        })
+        question = Question(**row)
+        self.assertEqual(question.interaction, {"answers": [["ADD"], ["#7"]], "scoring_rule": "exact_only"})
+        self.assertEqual(question.rubric, [{"criterion": "All blanks correct", "points": 1}])
+        self.assertEqual(grade_structured(question, [" add ", " #7 "])["score"], 1)
+        self.assertEqual(grade_structured(question, ["ADD", "7"])["score"], 0)
+        self.assertEqual(grade_structured(question, ["ADD.", "#7"])["score"], 0)
+        with self.assertRaises(ValidationError):
+            normalize_question({"slot": 1, "kind": "cloze", "points": 1,
+                                "stem": "Opcode [[1]].", "answer_items": "ADD\n#7"})
+        single = normalize_question({"slot": 1, "kind": "cloze", "points": 1,
+                                     "stem": "Opcode [[1]].", "answer_items": "ADD"})
+        self.assertEqual(single["interaction"], {"answers": [["ADD"]]})
+
     def test_cloze_has_ordered_blanks_and_one_point_each(self):
         row = normalize_question({
             "slot": 1, "kind": "cloze", "points": 2,
@@ -135,6 +153,29 @@ class StructuredImportTests(SimpleTestCase):
 
 
 class StructuredAdminRoundTripTests(TestCase):
+    def test_two_blank_one_point_cloze_survives_draft_editor(self):
+        admin = get_user_model().objects.create_superuser("admin", "admin@example.invalid", "password")
+        self.client.force_login(admin)
+        exam = Exam.objects.create(title="Assembly", subject="Computer Science", grade=10, mode=Exam.Mode.FIXED,
+                                   question_count=1, total_points=1, created_by=admin)
+        question = Question.objects.create(exam=exam, **normalize_question({
+            "slot": 1, "kind": "cloze", "points": 1,
+            "stem": "Opcode [[1]], operand [[2]].", "answer_items": "ADD\n#7",
+        }))
+        self.assertEqual(validate_stored_questions(exam)[1:], (1, 1))
+        response = self.client.post(f"/admin/exams/exam/{exam.pk}/change/", {
+            "title": exam.title, "subject": exam.subject, "grade": "10", "duration_minutes": "30",
+            "questions-TOTAL_FORMS": "1", "questions-INITIAL_FORMS": "1",
+            "questions-MIN_NUM_FORMS": "0", "questions-MAX_NUM_FORMS": "1000",
+            "questions-0-id": str(question.pk), "questions-0-slot": "1", "questions-0-kind": "cloze",
+            "questions-0-grading_mode": "ai", "questions-0-points": "1",
+            "questions-0-stem": question.stem, "questions-0-answer_items": "ADD\n#7",
+        })
+        self.assertEqual(response.status_code, 302)
+        question.refresh_from_db()
+        self.assertEqual(question.interaction["scoring_rule"], "exact_only")
+        self.assertEqual(validate_stored_questions(exam)[1:], (1, 1))
+
     def test_exact_only_ordering_survives_draft_editor_and_preview(self):
         admin = get_user_model().objects.create_superuser("admin", "admin@example.invalid", "password")
         self.client.force_login(admin)

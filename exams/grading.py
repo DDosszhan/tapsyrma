@@ -48,6 +48,14 @@ def grade_structured(question, answer):
             score = question.points if answer == [str(index) for index in expected] else 0
             return {"score": score, "criteria": [score],
                     "explanation": "Correct complete order." if score else "The complete order is incorrect."}
+    if question.kind == "cloze" and question.interaction.get("scoring_rule") == "exact_only":
+        expected = question.interaction["answers"]
+        if question.points != 1 or len(question.rubric) != 1 or len(expected) < 2 or len(answer) != len(expected):
+            raise ValueError("The exact-only cloze key or answer is invalid.")
+        score = int(all(value.strip().casefold() in {item.strip().casefold() for item in choices}
+                        for value, choices in zip(answer, expected)))
+        return {"score": score, "criteria": [score],
+                "explanation": "All blanks correct." if score else "At least one blank is incorrect."}
     if len(answer) != len(question.rubric):
         raise ValueError("The saved answer does not match the question parts.")
     if question.kind == "cloze":

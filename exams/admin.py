@@ -370,6 +370,7 @@ class ExamAdmin(admin.ModelAdmin):
         if obj and obj.mode == Exam.Mode.FIXED:
             groups = [
                 ("Тест", {"fields": ["title", "subject", "grade", "duration_minutes"]}),
+                ("Для учеников", {"fields": ["student_instructions", "reference_text"]}),
                 ("Вопросы", {"fields": ["question_count", "total_points", "upload_questions_link",
                                          "generate_schemes_control"],
                               "description": "Проверьте вопросы и схемы оценивания ниже. Сохраните изменения перед публикацией."}),
@@ -467,6 +468,8 @@ class ExamAdmin(admin.ModelAdmin):
             base += ["question_count", "total_points"]
         if obj and (obj.published or obj.questions.exists() or obj.invitation_set.exists()):
             base += ["subject", "grade", "syllabus_file", "syllabus_text", "question_count", "total_points", "auto_structure"]
+        if obj and (obj.published or obj.invitation_set.exists()):
+            base += ["student_instructions", "reference_text"]
         return base
 
     def get_inline_instances(self, request, obj=None):

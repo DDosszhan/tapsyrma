@@ -32,7 +32,8 @@ class FixedExamPreviewTests(TestCase):
         response = self.client.get(url)
         self.assertContains(response, "Student preview")
         self.assertContains(response, f'name="q_{self.first.pk}_0"')
-        self.assertContains(response, "question-stem--fixed")
+        self.assertContains(response, "question-table-scroll cloze-stem")
+        self.assertContains(response, "Scroll sideways to read the table.")
         self.assertContains(response, "Preview only. Your answers stay on this page.")
         self.assertContains(response, "Time limit: 60 minutes (preview)")
         self.assertNotContains(response, '<form id="answers"')
@@ -42,3 +43,14 @@ class FixedExamPreviewTests(TestCase):
         self.assertEqual(self.client.post(url).status_code, 405)
         self.assertFalse(Invitation.objects.exists())
         self.assertFalse(Attempt.objects.exists())
+
+    def test_student_instructions_and_reference_are_available_without_answers(self):
+        self.exam.student_instructions = "Answer all questions. Use the reference."
+        self.exam.reference_text = "LDM #n — Load n into ACC.\nEND — Stop the program."
+        self.exam.save(update_fields=["student_instructions", "reference_text"])
+        self.client.force_login(self.admin)
+        response = self.client.get(f"/exam/preview/{self.exam.pk}/")
+        self.assertContains(response, "Answer all questions. Use the reference.")
+        self.assertContains(response, "<summary>Instruction reference</summary>", html=True)
+        self.assertContains(response, "LDM #n — Load n into ACC.")
+        self.assertNotContains(response, "TOPSECRET")
