@@ -188,6 +188,21 @@ class RegradeTests(TestCase):
         self.assertEqual(appeal.student_reason, "Please review this answer")
         self.assertEqual(appeal.status, GradeAppeal.Status.PENDING)
 
+    def test_pending_appeal_prefills_current_grade_after_correction(self):
+        attempt, question = self.make_attempt("appeal-corrected")
+        appeal = GradeAppeal.objects.create(
+            attempt=attempt, question=question, student_reason="Review fixture",
+            original_grade=self.old_grade)
+        corrected = {"score": 1, "criteria": [1], "explanation": "Key correction"}
+        attempt.grades[str(question.pk)] = corrected
+        attempt.score = 1
+        attempt.save(update_fields=["grades", "score"])
+
+        response = self.client.get(f"/admin/exams/gradeappeal/{appeal.pk}/change/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["adminform"].form["criterion_scores"].value(), "1")
+        self.assertEqual(appeal.original_grade, self.old_grade)
+
     def test_failed_regrade_keeps_old_result_visible(self):
         attempt, question = self.make_attempt("api-failure")
         second = self.add_second_open(attempt)

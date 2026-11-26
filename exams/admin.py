@@ -1043,8 +1043,10 @@ class GradeAppealReviewForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance.pk:
+            current_grade = self.instance.attempt.grades.get(
+                str(self.instance.question_id), self.instance.original_grade)
             self.fields["criterion_scores"].initial = ", ".join(
-                str(value) for value in self.instance.original_grade.get("criteria", []))
+                str(value) for value in current_grade.get("criteria", []))
 
     def clean(self):
         data = super().clean()
