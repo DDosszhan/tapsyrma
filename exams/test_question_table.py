@@ -48,3 +48,6 @@ class QuestionTableTests(SimpleTestCase):
                 self.assertIn('Number of cores | 2           | 4', html)
                 self.assertIn('<p class="question-stem">Explain which processor has more cores.</p>', html)
                 self.assertIn('Scroll sideways to read the table.', html)
+        hint = 'Tables above are read-only. Write any table entries in the Your answer box below.'
+        self.assertIn(hint, pages[0])
+        self.assertNotIn(hint, pages[1])

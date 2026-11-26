@@ -134,6 +134,7 @@ def render_question_stem(context, question, result=False):
     fixed_class = (" question-stem--fixed" if fixed_width_stem(question.stem)
                    and not any(line.count("|") >= 2 for line in question.stem.splitlines()) else "")
     output = []
+    has_table = False
     for kind, content in _stem_blocks(question.stem):
         if kind == "text" and content:
             output.append(format_html('<p class="question-stem{}{}">{}</p>', cloze_class, fixed_class,
@@ -142,11 +143,13 @@ def render_question_stem(context, question, result=False):
             output.append(format_html('<pre class="question-code{}"><code>{}</code></pre>', cloze_class,
                                       _render_text(content, question, saved, result, formatting=False)))
         elif kind == "plain_table":
+            has_table = True
             output.append(format_html(
                 '<pre class="question-table-scroll{}" role="region" aria-label="Question table" tabindex="0">{}</pre>',
                 cloze_class, _render_text(content, question, saved, result, formatting=False)))
             output.append(format_html('<p class="question-table-hint">{}</p>', "Scroll sideways to read the table."))
         elif kind == "table":
+            has_table = True
             header, _, *rows = content
             head = format_html_join("", '<th scope="col">{}</th>',
                                     ((_render_text(cell, question, saved, result),) for cell in header))
@@ -158,4 +161,8 @@ def render_question_stem(context, question, result=False):
                 '<div class="question-table-scroll{}" role="region" aria-label="Question table" tabindex="0"><table><thead><tr>{}</tr></thead><tbody>{}</tbody></table></div>',
                 cloze_class, head, body))
             output.append(format_html('<p class="question-table-hint">{}</p>', "Scroll sideways to read the table."))
+    if has_table and question.kind == "open" and not result:
+        output.append(format_html(
+            '<p class="muted">{}</p>',
+            "Tables above are read-only. Write any table entries in the Your answer box below."))
     return format_html_join("", "{}", ((part,) for part in output))
