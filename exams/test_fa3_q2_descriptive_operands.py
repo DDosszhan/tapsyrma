@@ -10,7 +10,7 @@ from .grading import grade_structured
 from .management.commands.accept_fa3_q2_descriptive_operands import (
     NEW_KEY, OLD_KEY, OLD_MODEL, RUBRIC, STEM, TITLE,
 )
-from .management.commands.enable_fa3_q2_grouped_cloze import NEW_ROW
+from .management.commands.enable_fa3_q2_grouped_cloze import NEW_ROW, PREVIOUS_GROUPED_ROW
 from .models import Attempt, Exam, GradeAppeal, Invitation, Question, RegradeJob, Student
 
 
@@ -57,6 +57,24 @@ class DescriptiveOperandRepairTests(TestCase):
                 attempt=attempt, question=question, student_reason="Review fixture",
                 original_grade=grade, status=appeal_status)
         return attempt, question, grade
+
+    def test_previous_grouped_template_and_attempt_remain_valid(self):
+        for field in ("stem", "interaction", "rubric", "model_answer"):
+            setattr(self.template, field, PREVIOUS_GROUPED_ROW[field])
+        self.template.save(update_fields=["stem", "interaction", "rubric", "model_answer"])
+        attempt, question, grade = self.make_attempt(
+            "previous-grouped", ["ADD", "#12", "Arithmetic"], grouped=True)
+        for field in ("stem", "interaction", "rubric", "model_answer"):
+            setattr(question, field, PREVIOUS_GROUPED_ROW[field])
+        question.save(update_fields=["stem", "interaction", "rubric", "model_answer"])
+
+        call_command("accept_fa3_q2_descriptive_operands", "--apply", stdout=StringIO())
+        self.template.refresh_from_db()
+        question.refresh_from_db()
+        attempt.refresh_from_db()
+        self.assertEqual(self.template.interaction, PREVIOUS_GROUPED_ROW["interaction"])
+        self.assertEqual(question.interaction, PREVIOUS_GROUPED_ROW["interaction"])
+        self.assertEqual(attempt.grades[str(question.pk)], grade)
 
     def test_dry_run_apply_and_repeat_preserve_appeals_and_grouped_copies(self):
         corrected, corrected_question, old_grade = self.make_attempt(

@@ -18,9 +18,15 @@ NEW_RUBRIC = [
     {"criterion": "Opcode and operand both correct", "points": 1},
     {"criterion": "Instruction group correct", "points": 1},
 ]
-NEW_ROW = normalize_question({
+PREVIOUS_GROUPED_ROW = normalize_question({
     "slot": SLOT, "kind": "cloze", "points": 2, "stem": NEW_STEM,
     "answer_items": "ADD\n#12\n" + "|".join(OLD_KEY["answers"][1]),
+    "cloze_group_sizes": [2, 1], "rubric": NEW_RUBRIC,
+})
+NEW_ROW = normalize_question({
+    "slot": SLOT, "kind": "cloze", "points": 2, "stem": NEW_STEM,
+    "answer_items": "ADD\n#12|# 12|immediate #12\n" + "|".join(
+        OLD_KEY["answers"][1] + ["Arithmetic instruction", "Arithmetic instructions"]),
     "cloze_group_sizes": [2, 1], "rubric": NEW_RUBRIC,
 })
 
@@ -32,9 +38,12 @@ class Command(BaseCommand):
         parser.add_argument("--apply", action="store_true", help="Update only unattempted question copies.")
 
     def handle(self, *args, **options):
+        from exams.management.commands.accept_fa3_q2_descriptive_operands import NEW_KEY as CORRECTED_OLD_KEY
+
         with transaction.atomic():
             exam = Exam.objects.select_for_update().filter(
-                pk=EXAM_ID, title=TITLE, mode=Exam.Mode.FIXED, published=True).first()
+                pk=EXAM_ID, title=TITLE, mode=Exam.Mode.FIXED, published=True,
+                question_count=9, total_points=25).first()
             if exam is None:
                 raise CommandError("The expected published FA3 exam is unavailable.")
             invitations = list(Invitation.objects.select_for_update().filter(exam=exam).order_by("pk"))
@@ -56,15 +65,19 @@ class Command(BaseCommand):
                 raise CommandError("A prepared question set is missing FA3 question 2.")
 
             old_content = (OLD_STEM, OLD_KEY, OLD_RUBRIC, OLD_MODEL)
+            corrected_old_content = (OLD_STEM, CORRECTED_OLD_KEY, OLD_RUBRIC, OLD_MODEL)
+            previous_grouped_content = tuple(PREVIOUS_GROUPED_ROW[field] for field in (
+                "stem", "interaction", "rubric", "model_answer"))
             new_content = tuple(NEW_ROW[field] for field in ("stem", "interaction", "rubric", "model_answer"))
+            accepted_content = (old_content, corrected_old_content, previous_grouped_content, new_content)
             for question in questions:
                 content = (question.stem, question.interaction, question.rubric, question.model_answer)
-                if question.kind != Question.Kind.CLOZE or question.points != 2 or content not in (old_content, new_content):
+                if question.kind != Question.Kind.CLOZE or question.points != 2 or content not in accepted_content:
                     raise CommandError(f"Unexpected FA3 question 2 data for question {question.pk}.")
 
             attempted = {attempt.invitation_id for attempt in attempts}
             changed = [q for q in questions if q.invitation_id not in attempted
-                       and (q.stem, q.interaction, q.rubric, q.model_answer) == old_content]
+                       and (q.stem, q.interaction, q.rubric, q.model_answer) != new_content]
             if options["apply"] and changed:
                 for question in changed:
                     question.stem, question.interaction, question.rubric, question.model_answer = new_content

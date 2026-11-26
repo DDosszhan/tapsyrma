@@ -10,7 +10,10 @@ from django.utils import timezone
 from .admin import FixedQuestionForm
 from .fixed_questions import answer_items_from_question, normalize_question, validate_stored_questions
 from .grading import grade_structured
-from .management.commands.enable_fa3_q2_grouped_cloze import NEW_ROW, OLD_KEY, OLD_MODEL, OLD_RUBRIC, OLD_STEM, TITLE
+from .management.commands.accept_fa3_q2_descriptive_operands import NEW_KEY as CORRECTED_OLD_KEY
+from .management.commands.enable_fa3_q2_grouped_cloze import (
+    NEW_ROW, OLD_KEY, OLD_MODEL, OLD_RUBRIC, OLD_STEM, PREVIOUS_GROUPED_ROW, TITLE,
+)
 from .management.commands.enable_fa3_trace_table import NEW_STEM as TRACE_STEM
 from .models import Attempt, Exam, Invitation, Question, Student
 
@@ -20,7 +23,10 @@ class GroupedClozeTests(SimpleTestCase):
         question = Question(**NEW_ROW)
         self.assertEqual(question.interaction["group_sizes"], [2, 1])
         self.assertEqual(grade_structured(question, ["ADD", "#12", "Arithmetic"])["criteria"], [1, 1])
+        self.assertEqual(grade_structured(question, ["ADD", "# 12", "Arithmetic instruction"])["criteria"], [1, 1])
+        self.assertEqual(grade_structured(question, ["ADD", "immediate #12", "Arithmetic instructions"])["criteria"], [1, 1])
         self.assertEqual(grade_structured(question, ["ADD", "12", "Arithmetic"])["criteria"], [0, 1])
+        self.assertEqual(grade_structured(question, ["SUB", "# 12", "Arithmetic"])["criteria"], [0, 1])
         self.assertEqual(grade_structured(question, ["ADD", "#12", "Arthmetic"])["criteria"], [1, 1])
         self.assertEqual(grade_structured(question, ["", "", "Arithmetic"])["criteria"], [0, 1])
 
@@ -72,7 +78,7 @@ class Fa3Question2SwitchTests(TestCase):
         teacher = get_user_model().objects.create_superuser("teacher", "teacher@example.invalid", "password")
         exam = Exam.objects.create(
             pk=19, title=TITLE, subject="Computer Science", grade=10, mode=Exam.Mode.FIXED,
-            question_count=1, total_points=2, published=True, created_by=teacher)
+            question_count=9, total_points=25, published=True, created_by=teacher)
         template = Question.objects.create(
             exam=exam, slot=2, kind=Question.Kind.CLOZE, points=2, stem=OLD_STEM,
             interaction=OLD_KEY, rubric=OLD_RUBRIC, model_answer=OLD_MODEL)
@@ -109,6 +115,61 @@ class Fa3Question2SwitchTests(TestCase):
         self.assertEqual(attempted_question.stem, OLD_STEM)
         self.assertEqual(attempt.grades[str(attempted_question.pk)], old_grade)
         self.assertEqual(attempt.score, 1)
+        output = StringIO()
+        call_command("enable_fa3_q2_grouped_cloze", stdout=output)
+        self.assertIn("0 unattempted question copies", output.getvalue())
+
+    def test_switch_migrates_previous_grouped_and_corrected_old_copies(self):
+        teacher = get_user_model().objects.create_superuser("teacher", "teacher@example.invalid", "password")
+        exam = Exam.objects.create(
+            pk=19, title=TITLE, subject="Computer Science", grade=10, mode=Exam.Mode.FIXED,
+            question_count=9, total_points=25, published=True, created_by=teacher)
+        template = Question.objects.create(exam=exam, **PREVIOUS_GROUPED_ROW)
+        copies = []
+        saved_attempts = {}
+        for index, row, attempted in (
+                (0, PREVIOUS_GROUPED_ROW, True),
+                (1, {"slot": 2, "kind": Question.Kind.CLOZE, "points": 2,
+                     "stem": OLD_STEM, "interaction": CORRECTED_OLD_KEY,
+                     "rubric": OLD_RUBRIC, "model_answer": OLD_MODEL}, True),
+                (2, PREVIOUS_GROUPED_ROW, False),
+                (3, {"slot": 2, "kind": Question.Kind.CLOZE, "points": 2,
+                     "stem": OLD_STEM, "interaction": CORRECTED_OLD_KEY,
+                     "rubric": OLD_RUBRIC, "model_answer": OLD_MODEL}, False)):
+            student = Student.objects.create(name=f"Fixture {index}", grade=10)
+            invitation = Invitation.objects.create(
+                exam=exam, student=student, code_hash=f"q2-extended-{index}",
+                expires_at=timezone.now() + timedelta(hours=1), created_by=teacher,
+                variant_status=Invitation.VariantStatus.READY)
+            question = Question.objects.create(exam=exam, invitation=invitation, **row)
+            if attempted:
+                answer = (["ADD", "#12", "Arithmetic"] if index == 0 else ["ADD #12", "Arithmetic"])
+                grade = grade_structured(question, answer)
+                attempt = Attempt.objects.create(
+                    invitation=invitation, question_ids=[question.pk],
+                    answers={str(question.pk): answer}, grades={str(question.pk): grade},
+                    score=grade["score"], status=Attempt.Status.DONE)
+                saved_attempts[attempt.pk] = (attempt.answers, attempt.grades, attempt.score)
+            copies.append((question, attempt if attempted else None))
+
+        output = StringIO()
+        call_command("enable_fa3_q2_grouped_cloze", stdout=output)
+        self.assertIn("3 unattempted question copies", output.getvalue())
+        template.refresh_from_db()
+        self.assertEqual(template.interaction, PREVIOUS_GROUPED_ROW["interaction"])
+        call_command("enable_fa3_q2_grouped_cloze", "--apply", stdout=StringIO())
+        template.refresh_from_db()
+        self.assertEqual(template.interaction, NEW_ROW["interaction"])
+        for index, (question, attempt) in enumerate(copies):
+            question.refresh_from_db()
+            if attempt:
+                attempt.refresh_from_db()
+                expected = PREVIOUS_GROUPED_ROW if index == 0 else {"interaction": CORRECTED_OLD_KEY}
+                self.assertEqual(question.interaction, expected["interaction"])
+                self.assertEqual((attempt.answers, attempt.grades, attempt.score), saved_attempts[attempt.pk])
+            else:
+                self.assertEqual(question.interaction, NEW_ROW["interaction"])
+                self.assertEqual(question.stem, NEW_ROW["stem"])
         output = StringIO()
         call_command("enable_fa3_q2_grouped_cloze", stdout=output)
         self.assertIn("0 unattempted question copies", output.getvalue())

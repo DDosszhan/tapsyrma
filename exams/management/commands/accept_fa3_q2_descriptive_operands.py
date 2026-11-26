@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from exams.grading import grade_structured
-from exams.management.commands.enable_fa3_q2_grouped_cloze import NEW_ROW
+from exams.management.commands.enable_fa3_q2_grouped_cloze import NEW_ROW, PREVIOUS_GROUPED_ROW
 from exams.management.commands.repair_fa3_opcode_operand import (
     EXAM_ID, NEW_KEY as OLD_KEY, RUBRIC, SLOT, STEM, TITLE,
 )
@@ -52,11 +52,13 @@ class Command(BaseCommand):
 
             questions = list(Question.objects.select_for_update().filter(exam=exam, slot=SLOT).order_by("pk"))
             templates = [q for q in questions if q.invitation_id is None]
-            grouped = tuple(NEW_ROW[field] for field in ("stem", "interaction", "rubric", "model_answer"))
+            grouped = [tuple(row[field] for field in (
+                "stem", "interaction", "rubric", "model_answer"))
+                for row in (PREVIOUS_GROUPED_ROW, NEW_ROW)]
             if (len(templates) != 1 or templates[0].kind != Question.Kind.CLOZE
                     or templates[0].points != 2
                     or tuple(getattr(templates[0], field) for field in (
-                        "stem", "interaction", "rubric", "model_answer")) != grouped):
+                        "stem", "interaction", "rubric", "model_answer")) not in grouped):
                 raise CommandError("The new three-field FA3 question 2 template is unavailable.")
             by_id = {q.pk: q for q in questions}
             appeals = {
@@ -77,7 +79,7 @@ class Command(BaseCommand):
                 if question.interaction.get("scoring_rule") == "grouped_cloze_v1":
                     if (question.kind != Question.Kind.CLOZE or question.points != 2
                             or tuple(getattr(question, field) for field in (
-                                "stem", "interaction", "rubric", "model_answer")) != grouped):
+                                "stem", "interaction", "rubric", "model_answer")) not in grouped):
                         raise CommandError(f"Unexpected grouped FA3 question 2 data for question {question.pk}.")
                     continue
                 if (question.kind != Question.Kind.CLOZE or question.points != 2
