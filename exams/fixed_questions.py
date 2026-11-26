@@ -11,7 +11,7 @@ from .syllabus import extract_syllabus_text
 XLSX_COLUMNS = (
     "number", "kind", "grading_mode", "points", "topic", "question", "answer_items", "requires_image", "option_1", "option_2",
     "option_3", "option_4", "correct_option", "criteria", "model_answer",
-    "topic_explanation", "answer_explanation", "ordering_rule",
+    "topic_explanation", "answer_explanation", "ordering_rule", "cloze_group_sizes",
 )
 MAX_QUESTIONS = 1000
 MAX_STRUCTURED_ITEMS = 100
@@ -67,15 +67,40 @@ def _key(value):
     return " ".join(value.casefold().split())
 
 
-def _structured_answer(kind, stem, points, value, reference, options_hint=None, ordering_rule=""):
+def _validate_trace_layout(stem, reference):
+    """The renderer edits the second Markdown table and expects three blank rows."""
+    tables = []
+    lines = []
+    for line in stem.splitlines() + [""]:
+        if line.count("|") >= 2:
+            lines.append([cell.strip() for cell in line.strip().strip("|").split("|")])
+        elif lines:
+            tables.append(lines)
+            lines = []
+    if (len(tables) != 2 or any(
+            len(table) < 2 or any(len(row) != len(table[0]) for row in table)
+            or not all(re.fullmatch(r":?-{3,}:?", cell) for cell in table[1])
+            for table in tables)):
+        raise ValidationError(f"{reference}: trace layout needs exactly two Markdown tables.")
+    header, _, *rows = tables[1]
+    if (header != ["Iteration", "ACC", "IX", "Contents of address 400", "Does JPN jump?"]
+            or len(rows) != 3 or [row[0] for row in rows] !=
+            ["1", "2, if executed", "3, if executed"]
+            or any(any(cell for cell in row[1:]) for row in rows)):
+        raise ValidationError(f"{reference}: trace answer table needs the expected columns and three blank rows.")
+
+
+def _structured_answer(kind, stem, points, value, reference, options_hint=None, ordering_rule="",
+                       cloze_group_sizes=None, custom_rubric=None):
     if points > MAX_STRUCTURED_ITEMS:
         raise ValidationError(f"{reference}: use no more than {MAX_STRUCTURED_ITEMS} answer items.")
     lines = [_text(line) for line in _text(value).splitlines() if _text(line)]
+    grouped_cloze = bool(cloze_group_sizes)
     exact_cloze = kind == "cloze" and points == 1 and len(lines) > 1
     if ordering_rule == "exact_only" and kind == "ordering":
         if not 3 <= len(lines) <= MAX_STRUCTURED_ITEMS:
             raise ValidationError(f"{reference}: exact-only ordering needs 3 to {MAX_STRUCTURED_ITEMS} items.")
-    elif exact_cloze:
+    elif exact_cloze or grouped_cloze:
         if len(lines) > MAX_STRUCTURED_ITEMS:
             raise ValidationError(f"{reference}: use no more than {MAX_STRUCTURED_ITEMS} answer items.")
     elif len(lines) != points:
@@ -83,6 +108,8 @@ def _structured_answer(kind, stem, points, value, reference, options_hint=None, 
     options_hint = ([_text(item) for item in options_hint if _text(item)]
                     if isinstance(options_hint, list) else [])
     if kind == "cloze":
+        if grouped_cloze and (len(cloze_group_sizes) != points or sum(cloze_group_sizes) != len(lines)):
+            raise ValidationError(f"{reference}: cloze groups must cover every blank and match {points} points.")
         markers = re.findall(r"\[\[([^\[\]]*)\]\]", stem)
         if markers != [str(index) for index in range(1, len(lines) + 1)]:
             raise ValidationError(f"{reference}: use [[1]] through [[{len(lines)}]] once each in order.")
@@ -93,12 +120,26 @@ def _structured_answer(kind, stem, points, value, reference, options_hint=None, 
                     or len({_key(part) for part in alternatives}) != len(alternatives)):
                 raise ValidationError(f"{reference}: blank {index} needs different answers up to 120 characters, separated by |.")
             answers.append(alternatives)
-        rubric = ([{"criterion": "All blanks correct", "points": 1}] if exact_cloze else
-                  [{"criterion": f"Blank {index}: {choices[0]}", "points": 1}
-                   for index, choices in enumerate(answers, 1)])
+        if grouped_cloze:
+            rubric = _criteria(custom_rubric, points, reference)
+            if rubric and (len(rubric) != points or any(row["points"] != 1 for row in rubric)):
+                raise ValidationError(f"{reference}: grouped blanks need one point per criterion.")
+            if not rubric:
+                rubric = []
+                start = 1
+                for size in cloze_group_sizes:
+                    label = f"Blank {start}" if size == 1 else f"Blanks {start}–{start + size - 1}"
+                    rubric.append({"criterion": f"{label} correct", "points": 1})
+                    start += size
+        else:
+            rubric = ([{"criterion": "All blanks correct", "points": 1}] if exact_cloze else
+                      [{"criterion": f"Blank {index}: {choices[0]}", "points": 1}
+                       for index, choices in enumerate(answers, 1)])
         model_answer = "\n".join(f"{index}. {choices[0]}" for index, choices in enumerate(answers, 1))
         interaction = {"answers": answers}
-        if exact_cloze:
+        if grouped_cloze:
+            interaction.update({"scoring_rule": "grouped_cloze_v1", "group_sizes": cloze_group_sizes})
+        elif exact_cloze:
             interaction["scoring_rule"] = "exact_only"
         return interaction, [], rubric, model_answer
 
@@ -223,12 +264,23 @@ def normalize_question(data, *, reference="Question"):
     ordering_rule = _text(data.get("ordering_rule"))
     if ordering_rule and (kind != "ordering" or ordering_rule != "exact_only"):
         raise ValidationError(f"{reference}: unsupported ordering rule.")
+    group_input = data.get("cloze_group_sizes")
+    group_values = (group_input if isinstance(group_input, list) else _text(group_input).split(",")
+                    if _text(group_input) else [])
+    cloze_group_sizes = [_positive_int(value, "Cloze group size", reference) for value in group_values]
+    if cloze_group_sizes and kind != "cloze":
+        raise ValidationError(f"{reference}: cloze groups require a fill-in-the-blanks question.")
+    response_layout = _text(data.get("response_layout"))
+    if response_layout and (kind != "open" or response_layout != "trace_table_v1"):
+        raise ValidationError(f"{reference}: unsupported open-answer layout.")
     grading_mode = _text(data.get("grading_mode") or "ai").lower()
     if grading_mode not in ("ai", "manual"):
         raise ValidationError(f"{reference}: grading mode must be 'ai' or 'manual'.")
     stem = _text(data.get("stem"))
     if not stem:
         raise ValidationError(f"{reference}: question text is required.")
+    if response_layout:
+        _validate_trace_layout(stem, reference)
     subtopic = _text(data.get("subtopic"))
     if len(subtopic) > 200:
         raise ValidationError(f"{reference}: topic is longer than 200 characters.")
@@ -239,7 +291,7 @@ def normalize_question(data, *, reference="Question"):
         interaction, options, rubric, model_answer = _structured_answer(
             kind, stem, points, data.get("answer_items"), reference,
             (data.get("options_hint") or data.get("options")) if kind == "ordering" else data.get("options"),
-            ordering_rule)
+            ordering_rule, cloze_group_sizes, data.get("rubric"))
         correct_option = 0
     elif kind == "multiselect":
         if grading_mode == "manual":
@@ -279,6 +331,8 @@ def normalize_question(data, *, reference="Question"):
         correct_option = 0
         if not rubric:
             rubric = [{"criterion": "Correct and complete answer", "points": points}]
+        if response_layout:
+            interaction = {"response_layout": response_layout}
     image_flag = data.get("requires_image", False)
     if isinstance(image_flag, str):
         image_flag = image_flag.strip().lower()
@@ -324,6 +378,8 @@ def validate_stored_questions(exam):
             "correct_option_number": question.correct_option + 1 if question.kind == "mcq" and question.correct_option is not None else "",
             "rubric": question.rubric, "model_answer": question.model_answer,
             "answer_items": answer_items_from_question(question),
+            "cloze_group_sizes": (question.interaction or {}).get("group_sizes", []),
+            "response_layout": (question.interaction or {}).get("response_layout", ""),
             "selection_rule": (question.interaction or {}).get("selection_rule", ""),
             "ordering_rule": (question.interaction or {}).get("scoring_rule", "")
             if question.kind == "ordering" else "",
@@ -372,6 +428,7 @@ def _read_xlsx(upload):
                 "stem": record.get("question"), "options": options,
                 "answer_items": record.get("answer_items"),
                 "ordering_rule": record.get("ordering_rule"),
+                "cloze_group_sizes": record.get("cloze_group_sizes"),
                 "requires_image": record.get("requires_image"),
                 "correct_option_number": record.get("correct_option"),
                 "rubric": record.get("criteria"), "model_answer": record.get("model_answer"),

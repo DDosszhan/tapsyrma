@@ -27,6 +27,7 @@ from .models import Attempt, AttemptVisibilityEvent, Exam, ExamQuestionRule, Gra
 from .regrade import enqueue_regrade
 from .student_import import read_student_emails
 from .syllabus import extract_syllabus_text, validate_syllabus_file
+from .trace_answers import format_trace_answer, is_trace_question
 
 
 def new_code():
@@ -258,6 +259,10 @@ class FixedQuestionForm(forms.ModelForm):
                 if cleaned["kind"] == Question.Kind.MULTISELECT else "",
                 "ordering_rule": (self.instance.interaction or {}).get("scoring_rule", "")
                 if cleaned["kind"] == Question.Kind.ORDERING else "",
+                "cloze_group_sizes": (self.instance.interaction or {}).get("group_sizes", [])
+                if cleaned["kind"] == Question.Kind.CLOZE else [],
+                "response_layout": (self.instance.interaction or {}).get("response_layout", "")
+                if cleaned["kind"] == Question.Kind.OPEN else "",
                 "subtopic_explanation": cleaned.get("subtopic_explanation"),
                 "answer_explanation": cleaned.get("answer_explanation"),
                 "requires_image": cleaned.get("requires_image"),
@@ -936,7 +941,7 @@ class AttemptAdmin(admin.ModelAdmin):
                 elif question.kind == Question.Kind.MCQ:
                     answer_text = option(answer)
                 elif question.kind == Question.Kind.OPEN:
-                    answer_text = answer
+                    answer_text = format_trace_answer(answer) if is_trace_question(question) else answer
                 elif question.kind == Question.Kind.CLOZE:
                     values = answer if isinstance(answer, list) else []
                     count = len(question.interaction.get("answers", []))
@@ -1099,6 +1104,8 @@ class GradeAppealAdmin(admin.ModelAdmin):
     @admin.display(description="Student answer")
     def student_answer(self, obj):
         value = obj.attempt.answers.get(str(obj.question_id), "")
+        if is_trace_question(obj.question) and isinstance(value, dict):
+            return format_html('<pre style="white-space:pre-wrap">{}</pre>', format_trace_answer(value))
         if obj.question.kind == Question.Kind.MCQ and isinstance(value, str) and value.isdecimal() and int(value) < len(obj.question.options):
             return obj.question.options[int(value)]
         def chosen(index):

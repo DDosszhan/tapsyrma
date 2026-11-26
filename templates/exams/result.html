@@ -85,7 +85,14 @@
 
             <div class="result-answer">
               <h3>Your answer</h3>
-              {% if item.answer_rows %}
+              {% if item.trace_answer %}
+                <div class="question-table-scroll" role="region" aria-label="Your completed trace table" tabindex="0"><table>
+                  <thead><tr><th scope="col">Iteration</th><th scope="col">ACC</th><th scope="col">IX</th><th scope="col">memory[400]</th><th scope="col">JPN jumps?</th></tr></thead>
+                  <tbody>{% for row in item.trace_answer.rows %}<tr><th scope="row">{{ forloop.counter }}</th><td>{{ row.acc|default:"—" }}</td><td>{{ row.ix|default:"—" }}</td><td>{{ row.memory|default:"—" }}</td><td>{{ row.jump|default:"—" }}</td></tr>{% endfor %}</tbody>
+                </table></div>
+                <p><strong>(b) Compared value:</strong> {{ item.trace_answer.comparison|default:"No answer given" }}</p>
+                <p><strong>Why the program stops:</strong> {{ item.trace_answer.reason|default:"No answer given"|linebreaksbr }}</p>
+              {% elif item.answer_rows %}
                 <ul>{% for label, value in item.answer_rows %}<li>{{ label }}: {{ value|default:"No answer given" }}</li>{% endfor %}</ul>
               {% elif item.question.kind == "mcq" %}
                 {% if item.answer %}

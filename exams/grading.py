@@ -56,6 +56,28 @@ def grade_structured(question, answer):
                         for value, choices in zip(answer, expected)))
         return {"score": score, "criteria": [score],
                 "explanation": "All blanks correct." if score else "At least one blank is incorrect."}
+    if question.kind == "cloze" and question.interaction.get("scoring_rule") == "grouped_cloze_v1":
+        expected = question.interaction.get("answers")
+        sizes = question.interaction.get("group_sizes")
+        if (not isinstance(expected, list) or not isinstance(sizes, list)
+                or len(answer) != len(expected) or len(sizes) != question.points
+                or len(question.rubric) != question.points
+                or any(type(size) is not int or size < 1 for size in sizes)
+                or sum(sizes) != len(expected)
+                or any(row.get("points") != 1 for row in question.rubric)
+                or any(not isinstance(value, str) for value in answer)):
+            raise ValueError("The grouped cloze key or answer is invalid.")
+        normalize = lambda value: " ".join(value.casefold().split()).strip(".,;:!?")
+        correct = [bool(value.strip()) and normalize(value) in {normalize(item) for item in choices}
+                   for value, choices in zip(answer, expected)]
+        scores = []
+        offset = 0
+        for size in sizes:
+            scores.append(int(all(correct[offset:offset + size])))
+            offset += size
+        return {"score": sum(scores), "criteria": scores,
+                "explanation": " ".join(f"Part {index}: {'correct' if score else 'incorrect'}."
+                                       for index, score in enumerate(scores, 1))}
     if len(answer) != len(question.rubric):
         raise ValueError("The saved answer does not match the question parts.")
     if question.kind == "cloze":

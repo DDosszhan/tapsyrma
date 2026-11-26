@@ -4,6 +4,8 @@ import re
 from django import template
 from django.utils.html import escape, format_html, format_html_join
 
+from ..trace_answers import TRACE_FIELDS, TRACE_LAYOUT
+
 register = template.Library()
 
 
@@ -127,14 +129,47 @@ def _stem_blocks(stem):
         yield "text", "\n".join(text_lines).strip("\n")
 
 
+def _trace_answer_table(question, header, rows, saved):
+    """Render the marked answer table without making reference tables editable."""
+    saved_rows = saved.get("rows", []) if isinstance(saved, dict) else []
+    head = format_html_join("", '<th scope="col">{}</th>', ((cell,) for cell in header))
+    body = []
+    for row_index, row in enumerate(rows):
+        row_label = row[0]
+        saved_row = saved_rows[row_index] if row_index < len(saved_rows) and isinstance(saved_rows[row_index], dict) else {}
+        cells = [format_html('<th scope="row">{}</th>', row_label)]
+        for field, column in zip(TRACE_FIELDS, header[1:]):
+            name = f"q_{question.id}_trace_{row_index}_{field}"
+            value = saved_row.get(field, "")
+            label = f"Iteration {row_label}, {column}"
+            if field == "jump":
+                options = format_html_join("", '<option value="{}"{}>{}</option>',
+                                           ((choice, " selected" if value == choice else "", text)
+                                            for choice, text in (("", "Choose"), ("Yes", "Yes"), ("No", "No"))))
+                control = format_html('<select name="{}" aria-label="{}">{}</select>', name, label, options)
+            else:
+                control = format_html(
+                    '<input type="text" name="{}" value="{}" maxlength="120" inputmode="numeric" '
+                    'autocomplete="off" aria-label="{}">', name, value, label)
+            cells.append(format_html('<td data-label="{}">{}</td>', column, control))
+        body.append(format_html('<tr>{}</tr>', format_html_join("", "{}", ((cell,) for cell in cells))))
+    return format_html(
+        '<div class="question-table-scroll trace-answer-table" role="region" '
+        'aria-label="Editable trace table" tabindex="0"><table><thead><tr>{}</tr></thead><tbody>{}</tbody></table></div>',
+        head, format_html_join("", "{}", ((row,) for row in body)))
+
+
 @register.simple_tag(takes_context=True)
 def render_question_stem(context, question, result=False):
     saved = context.get("answers", {}).get(str(question.id), []) if not result else []
+    trace_layout = (question.kind == "open" and
+                    (getattr(question, "interaction", None) or {}).get("response_layout") == TRACE_LAYOUT)
     cloze_class = " cloze-stem" if question.kind == "cloze" and not result else ""
     fixed_class = (" question-stem--fixed" if fixed_width_stem(question.stem)
                    and not any(line.count("|") >= 2 for line in question.stem.splitlines()) else "")
     output = []
     has_table = False
+    table_number = 0
     for kind, content in _stem_blocks(question.stem):
         if kind == "text" and content:
             output.append(format_html('<p class="question-stem{}{}">{}</p>', cloze_class, fixed_class,
@@ -150,7 +185,12 @@ def render_question_stem(context, question, result=False):
             output.append(format_html('<p class="question-table-hint">{}</p>', "Scroll sideways to read the table."))
         elif kind == "table":
             has_table = True
+            table_number += 1
             header, _, *rows = content
+            if trace_layout and table_number == 2:
+                if not result:
+                    output.append(_trace_answer_table(question, header, rows, saved))
+                continue
             head = format_html_join("", '<th scope="col">{}</th>',
                                     ((_render_text(cell, question, saved, result),) for cell in header))
             body = format_html_join("", "<tr>{}</tr>",
@@ -161,7 +201,7 @@ def render_question_stem(context, question, result=False):
                 '<div class="question-table-scroll{}" role="region" aria-label="Question table" tabindex="0"><table><thead><tr>{}</tr></thead><tbody>{}</tbody></table></div>',
                 cloze_class, head, body))
             output.append(format_html('<p class="question-table-hint">{}</p>', "Scroll sideways to read the table."))
-    if has_table and question.kind == "open" and not result:
+    if has_table and question.kind == "open" and not result and not trace_layout:
         output.append(format_html(
             '<p class="muted">{}</p>',
             "Tables above are read-only. Write any table entries in the Your answer box below."))

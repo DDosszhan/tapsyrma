@@ -21,6 +21,7 @@ from courses.models import Course
 
 from .models import Attempt, AttemptVisibilityEvent, Exam, GradeAppeal, Invitation, Question, SharedCode
 from .grading import AUTO_REVIEW_REASON
+from .trace_answers import format_trace_answer, is_trace_question, read_trace_answer
 
 
 EXAM_CLOSED_MESSAGE = "This exam is not open for new attempts."
@@ -325,6 +326,9 @@ def _read_answers(request, questions, *, final=False):
                 raise ValueError("Answer is too long (maximum 5,000 characters).")
             answers[str(q.id)] = values
             continue
+        if is_trace_question(q):
+            answers[str(q.id)] = read_trace_answer(request.POST, q.id)
+            continue
         answer = request.POST.get(f"q_{q.id}", "").strip()
         if q.kind == "mcq":
             if answer not in ("", "0", "1", "2", "3"):
@@ -446,7 +450,9 @@ def result(request, attempt_id=None):
     items = []
     for q in _questions(attempt):
         grade = attempt.grades.get(str(q.id))
-        answer = attempt.answers.get(str(q.id), "")
+        saved_answer = attempt.answers.get(str(q.id), "")
+        trace_answer = saved_answer if is_trace_question(q) and isinstance(saved_answer, dict) else None
+        answer = format_trace_answer(saved_answer) if trace_answer is not None else saved_answer
         answer_rows = []
         correct_rows = []
         if q.kind in ("cloze", "matching", "multiselect", "ordering"):
@@ -455,7 +461,8 @@ def result(request, attempt_id=None):
                 answer_key = grade.get("interaction_snapshot", q.interaction) if grade else q.interaction
                 for index, alternatives in enumerate(answer_key.get("answers", [])):
                     answer_rows.append((f"Blank {index + 1}", values[index] if index < len(values) else ""))
-                    correct_rows.append((f"Blank {index + 1}", ", ".join(alternatives)))
+                    correct = alternatives[:1] if q.interaction.get("scoring_rule") == "grouped_cloze_v1" else alternatives
+                    correct_rows.append((f"Blank {index + 1}", ", ".join(correct)))
             elif q.kind == "matching":
                 keys = q.interaction.get("answers", [])
                 for index, left in enumerate(q.interaction.get("left", [])):
@@ -489,7 +496,8 @@ def result(request, attempt_id=None):
             map_status, map_label = "correct", "full marks"
         else:
             map_status, map_label = "wrong", "points lost"
-        items.append({"question": q, "answer": answer, "answer_rows": answer_rows,
+        items.append({"question": q, "answer": answer, "trace_answer": trace_answer,
+                      "answer_rows": answer_rows,
                       "correct_rows": correct_rows,
                       "grade": grade,
                       "display_rubric": grade.get("rubric_snapshot", q.rubric) if grade else q.rubric,

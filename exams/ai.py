@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 
 from .fixed_questions import normalize_question
 from .models import Exam, ExamQuestionRule, Question
+from .trace_answers import format_trace_answer, is_trace_question
 
 
 def _object(properties):
@@ -254,6 +255,26 @@ def generate_round(exam, variation_id="", existing_questions=(), on_valid=None):
 
 
 def grade_open(question, answer):
+    entered_values = None
+    evidence_fields = []
+    if isinstance(answer, dict):
+        if not is_trace_question(question):
+            raise ManualReviewRequired("Unsupported structured answer.")
+        try:
+            formatted = format_trace_answer(answer)
+        except ValueError as exc:
+            raise ManualReviewRequired("The saved trace answer is invalid.") from exc
+        labels = (("acc", "accumulator value = "), ("ix", "index value = "),
+                  ("memory", "memory address 400 contents = "), ("jump", "JPN jumps = "))
+        evidence_fields = [(label, row[field]) for row in answer["rows"]
+                           for field, label in labels if row[field]]
+        evidence_fields.extend((label, answer[field]) for field, label in (
+            ("comparison", "Compared value: "), ("reason", "Why the program stops: ")) if answer[field])
+        entered_values = [value for _, value in evidence_fields]
+        if any(re.search(r"(?im)^\s*(?:system|developer|assistant)\s*:", value)
+               for value in entered_values):
+            raise ManualReviewRequired("The answer contains instructions to the grader; teacher review is required.")
+        answer = formatted
     criteria = question.rubric
     if (question.image or question.requires_image) and (
         not question.model_answer.strip()
@@ -303,8 +324,21 @@ def grade_open(question, answer):
                     "If full marks are earned, use empty feedback and suggestion. Write all feedback in English.")
     if not question.model_answer.strip():
         instructions += " No model answer was supplied. If a reliable answer cannot be determined, request teacher review."
+    if entered_values is not None:
+        instructions += (" Field labels and blank markers in the formatted answer were added by the platform. "
+                         "A quote may include a label when it also includes the complete value entered by the student; "
+                         "a label or blank marker alone is not evidence.")
     content = json.dumps({"question": question.stem, "model_answer": question.model_answer,
                           "rubric": criteria, "student_answer": answer}, ensure_ascii=False)
+    normalized_answer = " ".join(answer.casefold().split())
+    value_spans = []
+    for label, value in evidence_fields:
+        field_text = " ".join((label + value).casefold().split())
+        value_offset = len(field_text) - len(" ".join(value.casefold().split()))
+        start = 0
+        while (start := normalized_answer.find(field_text, start)) != -1:
+            value_spans.append((start + value_offset, start + len(field_text)))
+            start += len(field_text)
     for attempt in range(2):
         result = structured_response(
             "rubric_grade", GRADE_SCHEMA, instructions, content,
@@ -321,7 +355,16 @@ def grade_open(question, answer):
                     or not isinstance(row.get("evidence"), str)):
                 raise ManualReviewRequired("AI returned a score outside the criteria; teacher review is required.")
             quote = " ".join(row["evidence"].casefold().split())
-            if row["score"] and (not quote or quote not in " ".join(answer.casefold().split())):
+            if entered_values is None:
+                evidence_matches = quote in normalized_answer
+            else:
+                evidence_matches = any(quote in " ".join(value.casefold().split()) for value in entered_values)
+                if not evidence_matches:
+                    evidence_matches = any(
+                        match.start() <= start and match.end() >= end
+                        for match in re.finditer(re.escape(quote), normalized_answer)
+                        for start, end in value_spans)
+            if row["score"] and (not quote or not evidence_matches):
                 bad_evidence = True
         if not bad_evidence:
             break
