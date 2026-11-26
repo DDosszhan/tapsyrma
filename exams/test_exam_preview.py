@@ -51,6 +51,7 @@ class FixedExamPreviewTests(TestCase):
         self.client.force_login(self.admin)
         response = self.client.get(f"/exam/preview/{self.exam.pk}/")
         self.assertContains(response, "Answer all questions. Use the reference.")
-        self.assertContains(response, "<summary>Instruction reference</summary>", html=True)
+        self.assertContains(response, 'class="exam-toolbar"')
+        self.assertContains(response, '<summary aria-label="Instruction reference">Reference</summary>', html=True)
         self.assertContains(response, "LDM #n — Load n into ACC.")
         self.assertNotContains(response, "TOPSECRET")
