@@ -55,3 +55,23 @@ class FixedExamPreviewTests(TestCase):
         self.assertContains(response, '<summary aria-label="Instruction reference">Reference</summary>', html=True)
         self.assertContains(response, "LDM #n — Load n into ACC.")
         self.assertNotContains(response, "TOPSECRET")
+
+    def test_markdown_program_and_table_render_with_safe_cloze_inputs(self):
+        self.first.stem = (
+            "**Complete the program** using `LDX 500`. <img src=x onerror=alert(1)>\n\n"
+            "| Address | Value |\n|---|---:|\n| 500 | [[1]] |\n\n"
+            "```text\nLDR #1\n[[2]]\nEND\n```"
+        )
+        self.first.save(update_fields=["stem"])
+        self.client.force_login(self.admin)
+        response = self.client.get(f"/exam/preview/{self.exam.pk}/")
+        self.assertContains(response, "<strong>Complete the program</strong>", html=True)
+        self.assertContains(response, "<code>LDX 500</code>", html=True)
+        self.assertContains(response, '<th scope="col">Address</th>', html=True)
+        self.assertContains(response, f'<td><input type="text" name="q_{self.first.pk}_0"')
+        self.assertContains(response, 'class="question-code cloze-stem"')
+        self.assertContains(response, f'name="q_{self.first.pk}_0"')
+        self.assertContains(response, f'name="q_{self.first.pk}_1"')
+        self.assertContains(response, "&lt;img src=x onerror=alert(1)&gt;")
+        self.assertNotContains(response, '<img src=x onerror=alert(1)>')
+        self.assertNotContains(response, "```text")

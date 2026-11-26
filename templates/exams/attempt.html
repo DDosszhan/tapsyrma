@@ -5,7 +5,11 @@
 .exam-questions .question h2{margin:0 0 16px;font-size:1.2em}.exam-questions .question p{margin:0 0 16px}
 .question-stem{white-space:pre-wrap}
 .question-stem--fixed{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-.question-table-scroll{box-sizing:border-box;max-width:100%;overflow-x:auto;white-space:pre;margin:0 0 16px;padding:12px;border:1px solid #d6dfe9;border-radius:8px;font:1em/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
+.question-table-scroll,.question-code{box-sizing:border-box;max-width:100%;overflow-x:auto;margin:0 0 16px;padding:12px;border:1px solid #d6dfe9;border-radius:8px;font:1em/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
+pre.question-table-scroll,.question-code{white-space:pre}
+.question-table-scroll table{border-collapse:collapse;min-width:100%;text-align:left;white-space:nowrap}
+.question-table-scroll :is(th,td){padding:6px 10px;border:1px solid #d6dfe9}
+.question-table-scroll th{background:#f3f6fa}
 .question-table-hint{display:none}
 @media(max-width:600px){.exam-questions .question p.question-table-hint{display:block;margin:-8px 0 16px;color:#526174;font-size:.85em}}
 .live-exam .question {
@@ -27,6 +31,7 @@
 .exam-questions .cloze-stem input{width:150px;margin:2px 4px}
 .exam-questions .question-stem--fixed input{width:5ch;padding:4px;text-align:center}
 .exam-questions .question-table-scroll input[type=text]{width:8ch;padding:4px;text-align:center}
+.exam-questions .question-code input[type=text]{width:10ch;padding:4px;margin:2px 0}
 .exam-questions .matching-row{display:block;margin:10px 0}
 .exam-questions .matching-choices{margin:0 0 16px;padding-left:32px}
 .exam-questions .matching-choices--lettered{list-style:none;padding-left:0}
@@ -62,8 +67,7 @@
 <input type="hidden" name="attempt_id" value="{{ attempt.pk }}">{% endif %}
 {% for q in questions %}<section class="question" id="question-{{ q.id }}" data-question="{{ q.id }}" {% if q.kind == "multiselect" %}data-max-choices="{{ q.points }}"{% if q.interaction.selection_rule == "exact_correct_only" %} data-exact-choices="{{ q.points }}"{% endif %}{% endif %} tabindex="-1"><span class="points">{{ q.points }} point{{ q.points|pluralize }}</span>
 <h2>Question {{ forloop.counter }}</h2>
-{% if q.kind == "cloze" %}{% for segment in q.stem|table_stem_parts %}{% if segment.table %}<pre class="question-table-scroll cloze-stem" role="region" aria-label="Question table" tabindex="0">{% for part in segment.text|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</pre><p class="question-table-hint">Scroll sideways to read the table.</p>{% else %}<p class="question-stem cloze-stem{% if segment.fixed %} question-stem--fixed{% endif %}">{% for part in segment.text|cloze_parts %}{% if part.blank %}<input type="text" name="q_{{ q.id }}_{{ part.index }}" maxlength="120" value="{{ answers|dict_get:q.id|list_get:part.index }}" aria-label="Blank {{ part.number }}">{% else %}{{ part.text }}{% endif %}{% endfor %}</p>{% endif %}{% endfor %}
-{% else %}{% for part in q.stem|table_stem_parts %}{% if part.table %}<pre class="question-table-scroll" role="region" aria-label="Question table" tabindex="0">{{ part.text }}</pre><p class="question-table-hint">Scroll sideways to read the table.</p>{% else %}<p class="question-stem{% if part.fixed %} question-stem--fixed{% endif %}">{{ part.text }}</p>{% endif %}{% endfor %}{% endif %}
+{% render_question_stem q %}
 {% if q.image %}<img class="question-image" src="{% url 'exam_question_image' q.id %}" alt="Diagram for question {{ forloop.counter }}"><details class="diagram-detail"><summary>View larger diagram</summary><p class="muted">Scroll sideways to inspect the diagram.</p><div class="diagram-pan"><img src="{% url 'exam_question_image' q.id %}" alt="Enlarged diagram for question {{ forloop.counter }}"></div></details>{% endif %}
 {% if q.kind == "mcq" %}{% for option in q.options %}
 <label><input type="radio" name="q_{{ q.id }}" value="{{ forloop.counter0 }}" {% if answers|dict_get:q.id == forloop.counter0|stringformat:"s" %}checked{% endif %}> {{ option }}</label>
